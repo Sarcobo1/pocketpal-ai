@@ -1,4 +1,10 @@
-import React, {useCallback, useContext, useEffect, useMemo} from 'react';
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+} from 'react';
 import {
   BackHandler,
   Pressable,
@@ -21,11 +27,26 @@ import Animated, {
 } from 'react-native-reanimated';
 import {scheduleOnRN} from 'react-native-worklets';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {
+  Camera,
+  getCameraDevice,
+  useCameraDevices,
+  useCameraPermission,
+} from 'react-native-vision-camera';
 
 import {useTheme} from '../../hooks';
 import {voiceModeStore} from '../../store';
 import {L10nContext} from '../../utils';
-import {CloseIcon, MicrophoneIcon, MicrophoneOffIcon} from '../../assets/icons';
+import {
+  CameraIcon,
+  CloseIcon,
+  MicrophoneIcon,
+  MicrophoneOffIcon,
+} from '../../assets/icons';
+import {
+  setVoiceFrameSource,
+  storeVoiceFrame,
+} from '../../services/voice/frameSource';
 import {VoiceCloud, voiceVisual} from '../VoiceCloud';
 
 import {useVoiceModeControls} from './controls';
@@ -33,6 +54,8 @@ import {useAnnounceVoiceStatus, voiceStatus} from './status';
 
 const CLOUD_SIZE = 280;
 const CONTROL_SIZE = 64;
+const HANDLE_ROW_HEIGHT = 64;
+const PREVIEW_SIZE = 120;
 const PULL_DISTANCE = 80;
 /** A downward flick this fast (pt/s) collapses the view whatever the distance. */
 const FLICK_VELOCITY = 800;
@@ -47,11 +70,47 @@ export const VoiceModeView: React.FC = observer(() => {
   const l10n = useContext(L10nContext);
   const insets = useSafeAreaInsets();
   const {tapCloud, toggleMute, end} = useVoiceModeControls();
-  const {phase, micMuted, lastError} = voiceModeStore;
+  const {phase, micMuted, lastError, cameraOn} = voiceModeStore;
   const visual = voiceVisual(phase, micMuted);
   const status = voiceStatus(phase, micMuted, lastError, l10n.voiceMode);
   const {title, hint} = status;
   useAnnounceVoiceStatus(status, true);
+
+  const {hasPermission, requestPermission} = useCameraPermission();
+  const devices = useCameraDevices();
+  const device = getCameraDevice(devices, 'back') ?? devices[0];
+  const camera = useRef<Camera>(null);
+  const showPreview = cameraOn && !!device;
+
+  const takeFrame = useCallback(async (): Promise<string | null> => {
+    const shot = await camera.current?.takePhoto({
+      flash: 'off',
+      enableShutterSound: false,
+    });
+    return shot ? storeVoiceFrame(shot.path) : null;
+  }, []);
+
+  useEffect(() => {
+    if (!showPreview) {
+      return;
+    }
+    setVoiceFrameSource(takeFrame);
+    return () => setVoiceFrameSource(null);
+  }, [showPreview, takeFrame]);
+
+  const toggleCamera = useCallback(async () => {
+    if (voiceModeStore.cameraOn) {
+      voiceModeStore.setCameraOn(false);
+      return;
+    }
+    if (!hasPermission) {
+      const granted = await requestPermission().catch(() => false);
+      if (!granted) {
+        return;
+      }
+    }
+    voiceModeStore.setCameraOn(true);
+  }, [hasPermission, requestPermission]);
 
   const collapse = useCallback(() => voiceModeStore.setPresentation('bar'), []);
 
@@ -176,6 +235,24 @@ export const VoiceModeView: React.FC = observer(() => {
           </Text>
         </Pressable>
 
+        {showPreview && device ? (
+          <View
+            testID="voice-camera-preview"
+            accessibilityLabel={l10n.voiceMode.cameraPreviewLabel}
+            style={[
+              styles.preview,
+              {top: HANDLE_ROW_HEIGHT + 8, right: theme.spacing.m},
+            ]}>
+            <Camera
+              ref={camera}
+              device={device}
+              photo={true}
+              isActive={true}
+              style={StyleSheet.absoluteFill}
+            />
+          </View>
+        ) : null}
+
         <View style={[styles.center, {gap: theme.spacing.xl}]}>
           <Pressable
             onPress={tapCloud}
@@ -226,6 +303,30 @@ export const VoiceModeView: React.FC = observer(() => {
             )}
           </Pressable>
           <Pressable
+            onPress={toggleCamera}
+            accessibilityRole="switch"
+            accessibilityLabel={l10n.voiceMode.cameraSwitchLabel}
+            accessibilityState={{checked: cameraOn}}
+            testID="voice-camera"
+            style={[
+              styles.control,
+              {
+                backgroundColor: cameraOn
+                  ? theme.colors.secondaryContainer
+                  : theme.colors.surfaceContainerHighest,
+              },
+            ]}>
+            <CameraIcon
+              width={24}
+              height={24}
+              stroke={
+                cameraOn
+                  ? theme.colors.onSecondaryContainer
+                  : theme.colors.onSurface
+              }
+            />
+          </Pressable>
+          <Pressable
             onPress={end}
             accessibilityRole="button"
             accessibilityLabel={l10n.voiceMode.endLabel}
@@ -246,7 +347,7 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   top: {
-    height: 64,
+    height: HANDLE_ROW_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -259,6 +360,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  preview: {
+    position: 'absolute',
+    width: PREVIEW_SIZE,
+    height: PREVIEW_SIZE,
+    borderRadius: 16,
+    overflow: 'hidden',
   },
   status: {
     alignItems: 'center',

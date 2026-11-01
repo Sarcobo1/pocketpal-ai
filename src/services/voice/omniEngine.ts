@@ -4,6 +4,7 @@ import {ModelOrigin} from '../../utils/types';
 import {vtrace} from '../../utils/voiceTrace';
 
 import {findTurn} from './chatTurns';
+import {captureVoiceFrame} from './frameSource';
 import {writeUtteranceWav} from './wav';
 import type {
   VoiceEngine,
@@ -96,11 +97,26 @@ export class OmniVoiceEngine implements VoiceEngine {
       if (aborted) {
         return 'interrupted';
       }
-      vtrace('utt.wav', {bytes: utterance.length, audioUri});
-      on.transcribed('');
-      sending = port.send({text: '', audioUri}, id => {
-        turnId = id;
+      const imageUris = await captureVoiceFrame();
+      if (aborted) {
+        return 'interrupted';
+      }
+      vtrace('utt.wav', {
+        bytes: utterance.length,
+        audioUri,
+        frames: imageUris.length,
       });
+      on.transcribed('');
+      sending = port.send(
+        {
+          text: '',
+          audioUri,
+          imageUris: imageUris.length ? imageUris : undefined,
+        },
+        id => {
+          turnId = id;
+        },
+      );
       let sendFailed = false;
       try {
         await sending;

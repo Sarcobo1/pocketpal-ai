@@ -8,6 +8,7 @@ import {asrStore, ttsStore} from '../../store';
 import {vtrace} from '../../utils/voiceTrace';
 
 import {findTurn} from './chatTurns';
+import {captureVoiceFrame} from './frameSource';
 import type {
   VoiceEngine,
   VoiceTurn,
@@ -117,6 +118,10 @@ export class CascadeVoiceEngine implements VoiceEngine {
       if (!text) {
         return 'empty';
       }
+      const imageUris = await captureVoiceFrame();
+      if (aborted) {
+        return 'interrupted';
+      }
       on.transcribed(text);
       const stopWatching = when(
         () => {
@@ -125,9 +130,12 @@ export class CascadeVoiceEngine implements VoiceEngine {
         },
         () => on.speechStarted(),
       );
-      sending = port.send({text}, id => {
-        turnId = id;
-      });
+      sending = port.send(
+        {text, imageUris: imageUris.length ? imageUris : undefined},
+        id => {
+          turnId = id;
+        },
+      );
       let sendFailed = false;
       try {
         await sending;

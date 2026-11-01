@@ -24,6 +24,7 @@ class MockVoiceModeStore {
   phase: VoicePhase = 'closed';
   micMuted = false;
   presentation: 'full' | 'bar' = 'full';
+  cameraOn = false;
   lastError: VoiceError | null = null;
   unlockOverride: boolean | null = null;
   userVoiceModeOverride: boolean | null = null;
@@ -32,6 +33,7 @@ class MockVoiceModeStore {
   setMicMuted: jest.Mock;
   setLastError: jest.Mock;
   setPresentation: jest.Mock;
+  setCameraOn: jest.Mock;
   setUnlockOverride: jest.Mock;
   setUserVoiceModeOverride: jest.Mock;
 
@@ -41,6 +43,7 @@ class MockVoiceModeStore {
       setMicMuted: false,
       setLastError: false,
       setPresentation: false,
+      setCameraOn: false,
       setUnlockOverride: false,
       setUserVoiceModeOverride: false,
     });
@@ -58,6 +61,7 @@ class MockVoiceModeStore {
         if (phase === 'closed') {
           this.micMuted = false;
           this.presentation = 'full';
+          this.cameraOn = false;
         }
       });
     });
@@ -74,6 +78,11 @@ class MockVoiceModeStore {
     this.setPresentation = jest.fn((presentation: 'full' | 'bar') => {
       runInAction(() => {
         this.presentation = presentation;
+      });
+    });
+    this.setCameraOn = jest.fn((cameraOn: boolean) => {
+      runInAction(() => {
+        this.cameraOn = cameraOn;
       });
     });
     this.setUnlockOverride = jest.fn((unlocked: boolean | null) => {
@@ -108,6 +117,7 @@ class MockVoiceModeStore {
       this.phase = 'closed';
       this.micMuted = false;
       this.presentation = 'full';
+      this.cameraOn = false;
       this.lastError = null;
       this.unlockOverride = null;
       this.userVoiceModeOverride = null;

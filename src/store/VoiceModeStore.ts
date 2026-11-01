@@ -30,6 +30,8 @@ export class VoiceModeStore {
   phase: VoicePhase = 'closed';
   micMuted = false;
   presentation: VoicePresentation = 'full';
+  /** The session sends a camera frame with each turn. Voice view only. */
+  cameraOn = false;
   lastError: VoiceError | null = null;
   /** E2E builds only: forces the default entitlement either way. */
   unlockOverride: boolean | null = null;
@@ -80,6 +82,7 @@ export class VoiceModeStore {
     if (phase === 'closed') {
       this.micMuted = false;
       this.presentation = 'full';
+      this.cameraOn = false;
     }
   }
 
@@ -95,6 +98,10 @@ export class VoiceModeStore {
 
   setPresentation(presentation: VoicePresentation): void {
     this.presentation = presentation;
+  }
+
+  setCameraOn(cameraOn: boolean): void {
+    this.cameraOn = cameraOn;
   }
 
   setUserVoiceModeOverride(enabled: boolean): void {

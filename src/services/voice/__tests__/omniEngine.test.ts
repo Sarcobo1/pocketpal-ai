@@ -1,7 +1,10 @@
+import {runInAction} from 'mobx';
+
 import {ASR_CHUNK_BYTES} from '../../asr/constants';
-import {chatSessionStore} from '../../../store';
+import {chatSessionStore, voiceModeStore} from '../../../store';
 
 import {OmniVoiceEngine} from '../omniEngine';
+import {setVoiceFrameSource} from '../frameSource';
 import type {VoiceTurnEvents, VoiceTurnPayload} from '../types';
 
 const chat = chatSessionStore as any;
@@ -51,6 +54,10 @@ describe('OmniVoiceEngine', () => {
 
   afterEach(() => {
     chat.sessions = savedSessions;
+    setVoiceFrameSource(null);
+    runInAction(() => {
+      voiceModeStore.cameraOn = false;
+    });
     jest.clearAllMocks();
   });
 
@@ -65,6 +72,35 @@ describe('OmniVoiceEngine', () => {
     const payload = port.send.mock.calls[0][0] as VoiceTurnPayload;
     expect(payload.text).toBe('');
     expect(payload.audioUri).toMatch(/\/voice-audio\/utt-\d+\.wav$/);
+
+    chat.sessions = [
+      {
+        id: 'session-1',
+        messages: [
+          {id: 'turn-1', type: 'assistant_turn', steps: [], metadata: {}},
+        ],
+      },
+    ];
+    port.onTurn!('turn-1');
+    port.settle();
+
+    await expect(turn.done).resolves.toBe('answered');
+  });
+
+  it('sends what the camera saw along with the audio', async () => {
+    const frame = '/path/to/caches/voice-frames/frame-1.jpg';
+    runInAction(() => {
+      voiceModeStore.cameraOn = true;
+    });
+    setVoiceFrameSource(async () => `file://${frame}`);
+    const port = makePort();
+
+    const turn = engine.runTurn(speech(500), port, events());
+    await flush();
+
+    const payload = port.send.mock.calls[0][0] as VoiceTurnPayload;
+    expect(payload.audioUri).toMatch(/\/voice-audio\/utt-\d+\.wav$/);
+    expect(payload.imageUris).toEqual([`file://${frame}`]);
 
     chat.sessions = [
       {

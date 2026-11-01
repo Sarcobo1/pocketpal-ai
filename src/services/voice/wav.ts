@@ -6,7 +6,7 @@ import {chatSessionStore} from '../../store';
 
 const HEADER_BYTES = 44;
 
-/** Utterance WAVs are kept for this many turns beyond the ones still in a chat. */
+/** Voice media is kept for this many turns beyond the ones still in a chat. */
 const KEEP_TURNS = 40;
 
 export const voiceAudioDir = `${RNFS.CachesDirectoryPath}/voice-audio`;
@@ -46,18 +46,24 @@ export const int16PcmToWav = (pcm: Uint8Array): Uint8Array => {
 };
 
 /**
- * WAVs that a chat still shows must stay: replaying a spoken turn sends its
- * audio again. Everything older than `KEEP_TURNS` files goes.
+ * Media that a chat still shows must stay: replaying a spoken turn sends its
+ * audio again and its bubble redraws the frame. Everything older than
+ * `KEEP_TURNS` files of one kind goes.
  */
-const prune = async () => {
-  const files = (await RNFS.readDir(voiceAudioDir))
-    .filter(file => file.name.endsWith('.wav'))
+export const pruneVoiceMedia = async (dir: string, extension: string) => {
+  const files = (await RNFS.readDir(dir))
+    .filter(file => file.name.endsWith(extension))
     .sort((a, b) => a.name.localeCompare(b.name));
   const referenced = new Set<string>();
   for (const session of chatSessionStore.sessions) {
     for (const message of session.messages) {
-      if (message.type === 'text' && message.audioUri) {
-        referenced.add(message.audioUri);
+      if (message.type !== 'text') {
+        continue;
+      }
+      for (const uri of [message.audioUri, ...(message.imageUris ?? [])]) {
+        if (uri) {
+          referenced.add(uri.replace(/^file:\/\//, ''));
+        }
       }
     }
   }
@@ -73,7 +79,7 @@ export const writeUtteranceWav = async (pcm: Uint8Array): Promise<string> => {
   await RNFS.mkdir(voiceAudioDir);
   const path = `${voiceAudioDir}/utt-${Date.now()}.wav`;
   await RNFS.writeFile(path, fromByteArray(int16PcmToWav(pcm)), 'base64');
-  await prune().catch(err =>
+  await pruneVoiceMedia(voiceAudioDir, '.wav').catch(err =>
     console.warn('[voiceMode] utterance cleanup failed:', err),
   );
   return path;

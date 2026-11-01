@@ -20,6 +20,28 @@ import {VoiceModeView} from '../VoiceModeView';
 const strings = l10n.en.voiceMode;
 const controls = {tapCloud: jest.fn(), toggleMute: jest.fn(), end: jest.fn()};
 
+const mockCameraPermission = {
+  hasPermission: true,
+  requestPermission: jest.fn(() => Promise.resolve(true)),
+};
+
+jest.mock('react-native-vision-camera', () => {
+  const mockReact = require('react');
+  return {
+    Camera: mockReact.forwardRef(({children, ...props}: any, ref: any) =>
+      mockReact.createElement(
+        'View',
+        {ref, testID: 'camera', ...props},
+        children,
+      ),
+    ),
+    useCameraDevices: jest.fn(() => [{id: 'mock-device', position: 'back'}]),
+    getCameraDevice: (devices: any[], position: string) =>
+      devices.find(d => d.position === position),
+    useCameraPermission: jest.fn(() => mockCameraPermission),
+  };
+});
+
 const renderView = () =>
   render(
     <VoiceModeControlsContext.Provider value={controls}>
@@ -145,6 +167,66 @@ describe('VoiceModeView', () => {
     const mic = getByLabelText(strings.micSwitchLabel);
     expect(mic.props.accessibilityRole).toBe('switch');
     expect(mic.props.accessibilityState).toEqual({checked: false});
+  });
+
+  describe('camera', () => {
+    beforeEach(() => {
+      (voiceModeStore as any).setCameraOn.mockClear();
+      mockCameraPermission.hasPermission = true;
+      mockCameraPermission.requestPermission.mockReset();
+      mockCameraPermission.requestPermission.mockResolvedValue(true);
+    });
+
+    it('is a switch that starts off, with no preview', () => {
+      setSession('listening');
+      const {getByTestId, queryByTestId} = renderView();
+
+      expect(getByTestId('voice-camera').props.accessibilityState).toEqual({
+        checked: false,
+      });
+      expect(queryByTestId('voice-camera-preview')).toBeNull();
+    });
+
+    it('shows the preview once the camera is switched on', async () => {
+      setSession('listening');
+      const {getByTestId} = renderView();
+
+      await act(async () => {
+        fireEvent.press(getByTestId('voice-camera'));
+      });
+
+      expect(voiceModeStore.setCameraOn).toHaveBeenCalledWith(true);
+      expect(getByTestId('voice-camera-preview')).toBeTruthy();
+    });
+
+    it('takes the preview away again on the second press', async () => {
+      setSession('listening');
+      const {getByTestId, queryByTestId} = renderView();
+
+      await act(async () => {
+        fireEvent.press(getByTestId('voice-camera'));
+      });
+      await act(async () => {
+        fireEvent.press(getByTestId('voice-camera'));
+      });
+
+      expect(voiceModeStore.setCameraOn).toHaveBeenLastCalledWith(false);
+      expect(queryByTestId('voice-camera-preview')).toBeNull();
+    });
+
+    it('asks for permission, and stays off when it is refused', async () => {
+      mockCameraPermission.hasPermission = false;
+      mockCameraPermission.requestPermission.mockResolvedValueOnce(false);
+      setSession('listening');
+      const {getByTestId} = renderView();
+
+      await act(async () => {
+        fireEvent.press(getByTestId('voice-camera'));
+      });
+
+      expect(mockCameraPermission.requestPermission).toHaveBeenCalledTimes(1);
+      expect(voiceModeStore.setCameraOn).not.toHaveBeenCalled();
+    });
   });
 
   describe('pulling down', () => {

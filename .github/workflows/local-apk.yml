@@ -5,6 +5,9 @@ name: Local APK (Plus ungated)
 # reports isPlusUnlocked() === true. Upstream documents this in README.md.
 
 on:
+  push:
+    branches:
+      - local-apk
   workflow_dispatch:
 
 permissions:

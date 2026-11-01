@@ -20,6 +20,10 @@ import {
   MemoryEstimateSettings,
   stateCacheBudgetMb,
 } from '../../src/utils/memoryEstimator';
+import type {
+  ExtendedRamSetting,
+  MemoryBudget,
+} from '../../src/utils/extendedRam';
 import type {Tier} from '../../src/services/deviceRules/types';
 import {
   draftCacheDefaults,
@@ -52,6 +56,14 @@ class MockModelStore {
   availableMemoryCeiling: number | undefined = 5 * 1e9; // 5GB ceiling
   largestSuccessfulLoad: number | undefined = 4 * 1e9; // 4GB largest successful load
   loadedModelBytes: number | undefined = undefined;
+
+  // Virtual RAM spilling. Plain fields, annotated non-observable below, so a
+  // test can set a budget without wrapping it in a MobX action.
+  extendedRamSetting: ExtendedRamSetting = 'auto';
+  memoryBudget: MemoryBudget | undefined = undefined;
+  lastCrashedModelId: string | undefined = undefined;
+  setExtendedRamSetting: jest.Mock;
+  refreshMemoryStats: jest.Mock;
 
   refreshDownloadStatuses: jest.Mock;
   retryDownload: jest.Mock;
@@ -174,6 +186,11 @@ class MockModelStore {
       abortActiveGeneration: false,
       generationSlot: false,
       isGenerationBusy: false,
+      extendedRamSetting: false,
+      memoryBudget: false,
+      lastCrashedModelId: false,
+      setExtendedRamSetting: false,
+      refreshMemoryStats: false,
       contextId: computed,
       memoryEstimateSettings: computed,
       lastUsedModel: computed,
@@ -249,6 +266,10 @@ class MockModelStore {
     this.setCacheTypeV = jest.fn();
     this.setUseMmap = jest.fn();
     this.setNoExtraBufts = jest.fn();
+    this.setExtendedRamSetting = jest.fn((value: ExtendedRamSetting) => {
+      this.extendedRamSetting = value;
+    });
+    this.refreshMemoryStats = jest.fn().mockResolvedValue(undefined);
     this.setSpeculativeEnabled = jest.fn();
     this.setSelectedDraftModel = jest.fn();
     this.setSpecDraftNGpuLayers = jest.fn();

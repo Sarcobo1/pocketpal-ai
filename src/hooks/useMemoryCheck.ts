@@ -145,6 +145,15 @@ export const useMemoryCheck = (
     modelStore.availableMemoryCeiling ?? 0,
   );
 
+  // Virtual RAM the phone is willing to lend, read during render for the same
+  // reason as the ceiling: a change here changes what a model's badge should
+  // say.
+  const spillBytes =
+    modelStore.extendedRamSetting === 'off'
+      ? 0
+      : (modelStore.memoryBudget?.virtualBytes ?? 0);
+  const crashedModelId = modelStore.lastCrashedModelId;
+
   // Read context settings that affect memory estimation
   // This ensures the hook re-runs when user changes context size, cache types, etc.
   const contextInitParams = modelStore.contextInitParams;
@@ -169,30 +178,43 @@ export const useMemoryCheck = (
 
         setFitStatus(status);
 
-        if (status === 'tight') {
-          // Concise badge text
-          setShortMemoryWarning(l10n.memory.memoryTight);
-          // Detailed message with numbers
+        if (status === 'tight' || status === 'wont_fit') {
+          // A model that does not fit in RAM is not a dead end when the phone
+          // has virtual RAM: say which of the two the user is looking at.
           const neededText = formatBytes(requiredBytes, 1);
           const availableText = formatBytes(availableBytes, 1);
-          setMemoryWarning(
-            t(l10n.memory.memoryDetailMessage, {
-              needed: neededText,
-              available: availableText,
-            }),
-          );
-        } else if (status === 'wont_fit') {
-          // Concise badge text
-          setShortMemoryWarning(l10n.memory.lowMemory);
-          // Detailed message with numbers
-          const neededText = formatBytes(requiredBytes, 1);
-          const availableText = formatBytes(availableBytes, 1);
-          setMemoryWarning(
-            t(l10n.memory.memoryDetailMessage, {
-              needed: neededText,
-              available: availableText,
-            }),
-          );
+          const crashedBefore =
+            crashedModelId !== undefined &&
+            crashedModelId === (model as Model).id;
+          const spills =
+            status === 'wont_fit' &&
+            spillBytes > 0 &&
+            requiredBytes <= availableBytes + spillBytes;
+
+          if (spills || (crashedBefore && spillBytes > 0)) {
+            setShortMemoryWarning(l10n.memory.virtualRamShort);
+            setMemoryWarning(
+              crashedBefore
+                ? l10n.memory.crashRecoveryMessage
+                : t(l10n.memory.virtualRamDetailMessage, {
+                    needed: neededText,
+                    physical: availableText,
+                    virtual: formatBytes(spillBytes, 1),
+                  }),
+            );
+          } else {
+            setShortMemoryWarning(
+              status === 'tight'
+                ? l10n.memory.memoryTight
+                : l10n.memory.lowMemory,
+            );
+            setMemoryWarning(
+              t(l10n.memory.memoryDetailMessage, {
+                needed: neededText,
+                available: availableText,
+              }),
+            );
+          }
         }
 
         // Additional check for multimodal capability
@@ -221,6 +243,8 @@ export const useMemoryCheck = (
     draftModel,
     l10n,
     calibrationCeiling,
+    spillBytes,
+    crashedModelId,
     contextInitParams,
     deviceTier,
   ]);

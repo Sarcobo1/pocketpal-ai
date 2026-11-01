@@ -2,6 +2,7 @@ import axios from 'axios';
 import {
   createErrorState,
   createMultimodalWarning,
+  isMemoryError,
   NetworkError,
   ServerError,
   AppCheckError,
@@ -24,6 +25,7 @@ jest.mock('../../store/UIStore', () => ({
         networkTimeout: 'Network timeout',
         hfNetworkError: 'HF network error',
         networkError: 'Network error',
+        memoryError: 'The phone ran out of memory',
       },
     },
   },
@@ -197,13 +199,38 @@ describe('errors.ts', () => {
 
     it('should handle object errors with message property (JSI bridge errors)', () => {
       // Errors from native JSI calls may not be proper Error instances
-      const jsiError = {message: 'Native error: out of memory'};
+      const jsiError = {message: 'Native error: unsupported chat template'};
 
       const errorState = createErrorState(jsiError, 'modelInit');
 
       expect(errorState.code).toBe('unknown');
-      expect(errorState.message).toBe('Native error: out of memory');
+      expect(errorState.message).toBe(
+        'Native error: unsupported chat template',
+      );
       expect(errorState.context).toBe('modelInit');
+    });
+
+    it('should classify a native allocation failure as a memory error', () => {
+      const jsiError = {message: 'Native error: out of memory'};
+
+      const errorState = createErrorState(jsiError, 'modelInit');
+
+      expect(errorState.code).toBe('memory');
+      expect(errorState.message).toBe('The phone ran out of memory');
+      expect(errorState.metadata.nativeMessage).toBe(
+        'Native error: out of memory',
+      );
+    });
+
+    it('should classify a ggml allocation failure raised as an Error', () => {
+      const error = new Error('ggml_buffer_alloc failed');
+
+      const errorState = createErrorState(error, 'modelInit');
+
+      expect(errorState.code).toBe('memory');
+      expect(errorState.metadata.nativeMessage).toBe(
+        'ggml_buffer_alloc failed',
+      );
     });
 
     it('should use default message for null/undefined errors', () => {
@@ -241,6 +268,42 @@ describe('errors.ts', () => {
       );
 
       expect(errorState.severity).toBe('warning');
+    });
+  });
+
+  describe('isMemoryError', () => {
+    it.each([
+      'out of memory',
+      'Unable to allocate 2.4 GiB',
+      'std::bad_alloc',
+      'OOM killer',
+      'unable to lock model in memory',
+      'failed to mlock buffers',
+      'mmap failed',
+      'ggml_buffer_alloc failed',
+    ])('recognizes the native wording %p', message => {
+      expect(isMemoryError(message)).toBe(true);
+      expect(isMemoryError(new Error(message))).toBe(true);
+    });
+
+    it('reads the code and name fields, not just the message', () => {
+      // Native JSI rejections often carry the reason in code or name.
+      expect(isMemoryError({name: 'Error', code: 'out of memory'})).toBe(true);
+      expect(isMemoryError({name: 'bad_alloc'})).toBe(true);
+      expect(isMemoryError({message: 'unrelated', code: 'OutOfMemory'})).toBe(
+        true,
+      );
+    });
+
+    it('does not mistake "room" for "OOM"', () => {
+      expect(isMemoryError('no room for another chat session')).toBe(false);
+    });
+
+    it('leaves unrelated failures alone', () => {
+      expect(isMemoryError('chat template is invalid')).toBe(false);
+      expect(isMemoryError({message: 'file not found'})).toBe(false);
+      expect(isMemoryError(null)).toBe(false);
+      expect(isMemoryError(undefined)).toBe(false);
     });
   });
 

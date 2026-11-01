@@ -146,6 +146,96 @@ describe('memoryEstimator', () => {
       expect(result).toBeGreaterThan(0);
     });
 
+    it('counts only a working set of the weights when they stay file-backed', () => {
+      const model = {
+        ...baseModel,
+        ggufMetadata: {
+          architecture: 'llama',
+          n_layers: 32,
+          n_embd: 4096,
+          n_head: 32,
+          n_head_kv: 8,
+          n_vocab: 32000,
+          n_embd_head_k: 128,
+          n_embd_head_v: 128,
+        },
+      } as Model;
+
+      const resident = getModelMemoryRequirement(
+        model,
+        undefined,
+        contextSettings,
+      );
+      const fileBacked = getModelMemoryRequirement(
+        model,
+        undefined,
+        contextSettings,
+        {
+          fileBackedWeights: true,
+        },
+      );
+
+      // mmap'd weights are reclaimable, so three quarters of them no longer
+      // compete with the KV cache for RAM the kernel cannot take back.
+      expect(fileBacked).toBe(resident - 0.75 * model.size! * 1.1);
+      expect(fileBacked).toBeLessThan(resident);
+    });
+
+    it('counts a projection model the same way it counts the weights', () => {
+      const model = {
+        ...baseModel,
+        ggufMetadata: {
+          architecture: 'llama',
+          n_layers: 32,
+          n_embd: 4096,
+          n_head: 32,
+          n_head_kv: 8,
+          n_vocab: 32000,
+          n_embd_head_k: 128,
+          n_embd_head_v: 128,
+        },
+      } as Model;
+      const projectionModel = {size: 500 * 1e6} as Model;
+
+      const resident = getModelMemoryRequirement(
+        model,
+        projectionModel,
+        contextSettings,
+      );
+      const fileBacked = getModelMemoryRequirement(
+        model,
+        projectionModel,
+        contextSettings,
+        undefined,
+        {fileBackedWeights: true},
+      );
+
+      expect(resident - fileBacked).toBe(
+        0.75 * (model.size! + 500 * 1e6) * 1.1,
+      );
+    });
+
+    it('stays conservative when the model has no usable metadata', () => {
+      const model = {...baseModel} as Model;
+
+      const resident = getModelMemoryRequirement(
+        model,
+        undefined,
+        contextSettings,
+      );
+      const fileBacked = getModelMemoryRequirement(
+        model,
+        undefined,
+        contextSettings,
+        {
+          fileBackedWeights: true,
+        },
+      );
+
+      // With no KV/buffer split to recover, the whole file still has to count.
+      expect(fileBacked).toBe(resident);
+    });
+
     it('includes projection model size in estimation', () => {
       const model = {...baseModel} as Model;
       const projectionModel = {size: 500 * 1e6} as Model; // 500MB

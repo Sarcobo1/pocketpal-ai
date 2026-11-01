@@ -91,6 +91,7 @@ export interface ErrorState {
     | 'storage'
     | 'server'
     | 'multimodal'
+    | 'memory'
     | 'unknown';
   service?: 'huggingface' | 'firebase' | 'localapi';
   message: string;
@@ -101,6 +102,36 @@ export interface ErrorState {
     modelId?: string;
     [key: string]: any;
   };
+}
+
+/**
+ * Memory failures reach JavaScript as whatever the native layer said, so the
+ * only signal is its wording. These are the phrases llama.cpp, ggml and the
+ * allocator actually produce; `\boom\b` deliberately keeps "room" out of it.
+ */
+const MEMORY_PATTERNS =
+  /(out of memory|not enough memory|insufficient memory|cannot allocate|could not allocate|unable to allocate|memory allocation failed|std::bad_alloc|bad_alloc|\boom\b|outofmemory|unable to lock|failed to (mlock|migrate)|mmap.*(fail|error)|ggml.*(alloc|buffer).*(fail|error))/i;
+
+/**
+ * True when the error is about memory rather than about the model file, the
+ * template or the device. Drives both the message the user sees and the
+ * one retry from backing store in ModelStore.
+ */
+export function isMemoryError(error: unknown): boolean {
+  if (typeof error === 'string') {
+    return MEMORY_PATTERNS.test(error);
+  }
+  if (error && typeof error === 'object') {
+    const candidate = error as {
+      message?: unknown;
+      name?: unknown;
+      code?: unknown;
+    };
+    return [candidate.message, candidate.name, candidate.code].some(
+      value => typeof value === 'string' && MEMORY_PATTERNS.test(value),
+    );
+  }
+  return false;
 }
 
 /**
@@ -230,6 +261,15 @@ export function createErrorState(
     }
   }
 
+  // Memory last, because it carries no status code: a native allocation
+  // failure would otherwise land as 'unknown' and read as a broken model.
+  let nativeMessage: string | undefined;
+  if (code === 'unknown' && isMemoryError(error)) {
+    code = 'memory';
+    nativeMessage = message;
+    message = l10nObject.errors.memoryError || message;
+  }
+
   return {
     code,
     service: errorService,
@@ -237,7 +277,7 @@ export function createErrorState(
     context,
     recoverable,
     severity,
-    metadata,
+    metadata: nativeMessage ? {...metadata, nativeMessage} : metadata,
   };
 }
 

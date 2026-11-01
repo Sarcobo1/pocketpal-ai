@@ -86,11 +86,26 @@ export type MemoryEstimateSettings = ContextInitParams & {
 const RUNTIME_OVERHEAD = 1.1;
 const RUNTIME_OVERHEAD_WITHOUT_METADATA = 1.2;
 
+/**
+ * With mmap on and mlock off, weights are clean file pages: the kernel reclaims
+ * them under pressure instead of handing the process to the low-memory killer,
+ * so they do not compete for the same budget as anonymous memory. Some still
+ * have to stay resident for generation to be worth doing, and this is the slice
+ * we insist on.
+ */
+const RESIDENT_WEIGHT_FRACTION = 0.25;
+
+export interface MemoryRequirementOptions {
+  /** Count weights, the projection and the draft as file-backed. */
+  fileBackedWeights?: boolean;
+}
+
 export function getModelMemoryRequirement(
   model: Model,
   projectionModel?: Model,
   contextSettings?: MemoryEstimateSettings,
   draftModel?: Model,
+  options?: MemoryRequirementOptions,
 ): number {
   const mmProjSize = projectionModel?.size || 0;
   const draftSize = draftModel?.size || 0;
@@ -118,7 +133,8 @@ export function getModelMemoryRequirement(
     isValidGGUFMetadata(model.ggufMetadata)
   ) {
     const metadata = model.ggufMetadata;
-    const weightsSize = model.size;
+    const fileShare = options?.fileBackedWeights ? RESIDENT_WEIGHT_FRACTION : 1;
+    const weightsSize = model.size * fileShare;
     const kvCacheSize = calculateKVCacheMemory(metadata, contextSettings);
     const computeBuffer = calculateComputeBuffer(metadata, contextSettings);
 
@@ -129,8 +145,8 @@ export function getModelMemoryRequirement(
         : 0;
     const totalMemory =
       baseMemory * RUNTIME_OVERHEAD +
-      mmProjSize * RUNTIME_OVERHEAD +
-      (draftSize + draftKvCacheSize) * RUNTIME_OVERHEAD +
+      mmProjSize * fileShare * RUNTIME_OVERHEAD +
+      (draftSize * fileShare + draftKvCacheSize) * RUNTIME_OVERHEAD +
       checkpointBytes;
 
     return totalMemory;

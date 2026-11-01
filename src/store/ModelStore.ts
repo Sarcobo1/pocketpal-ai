@@ -41,6 +41,7 @@ import {
   hfAsModel,
   getMmprojFiles,
   filterProjectionModels,
+  formatBytes,
   inferRepoFromModelId,
   parseSizeLabel,
 } from '../utils';
@@ -90,7 +91,7 @@ import {
 } from '../utils/types';
 import type {Samplers} from '../utils/samplerParams';
 
-import {ErrorState, createErrorState} from '../utils/errors';
+import {ErrorState, createErrorState, isMemoryError} from '../utils/errors';
 import {chatSessionRepository} from '../repositories/ChatSessionRepository';
 import {hasEnoughMemory} from '../hooks/useMemoryCheck';
 import {
@@ -111,7 +112,19 @@ import {
   createContextInitParams,
   createDefaultContextInitParams,
 } from '../utils/contextInitParamsVersions';
-import NativeHardwareInfo from '../specs/NativeHardwareInfo';
+import NativeHardwareInfo, {MemoryStats} from '../specs/NativeHardwareInfo';
+import {inferBackendType} from '../utils/flashAttnCompatibility';
+import {
+  ExtendedRamSetting,
+  MemoryBudget,
+  MemoryPlan,
+  MemoryPlanReason,
+  PlanInput,
+  forcedExtendedPlan,
+  memoryBudgetFromStats,
+  physicalBytesOf,
+  planModelLoad,
+} from '../utils/extendedRam';
 import {
   getModelMemoryRequirement,
   MemoryEstimateSettings,
@@ -172,6 +185,23 @@ const answersSession = (
 
 const pairedDraftModel = (config?: DraftConfig): Model | undefined =>
   config?.mode === 'paired' ? config.draftModel : undefined;
+
+// Survives the process it describes: written right before a native load,
+// removed the moment that context answers. A copy found at the next launch
+// means the load never reported back, which is how an out-of-memory kill looks
+// from JavaScript — the kernel gives no error, it just takes the process.
+export const LOAD_ATTEMPT_KEY = '@pocketpal/modelLoadAttempt';
+
+// A marker older than this is a reload or a device pause, not a kill.
+const LOAD_ATTEMPT_FRESH_MS = 10 * 60 * 1000;
+
+// Load verdicts where starting the load is a gamble rather than a slowdown, so
+// the user hears "the app may be closed" instead of "may be unstable".
+const OUT_OF_RANGE_REASONS = new Set<MemoryPlanReason>([
+  'no_backing_store',
+  'beyond_backing_store',
+  'crash_without_backing_store',
+]);
 
 class ModelStore {
   models: Model[] = [];
@@ -263,6 +293,18 @@ class ModelStore {
   largestSuccessfulLoad: number | undefined = undefined;
   // Estimated memory of the loaded local context; undefined when none.
   loadedModelBytes: number | undefined = undefined;
+
+  // Virtual RAM (extended RAM) — see utils/extendedRam.ts.
+  // 'auto' spills into backing store when a model needs it and asks first.
+  extendedRamSetting: ExtendedRamSetting = 'auto';
+  // Last stats read from the system; null until the first read completes.
+  memoryStats: MemoryStats | null = null;
+  // How the context that is loaded now got its parameters; runtime only.
+  activeMemoryPlan: MemoryPlan | undefined = undefined;
+  // Model whose previous load attempt did not report back.
+  lastCrashedModelId: string | undefined = undefined;
+  // Plan chosen during the pre-flight check, consumed by the load itself.
+  private pendingMemoryPlan: MemoryPlan | undefined = undefined;
   // Projection models orphaned by the vision heal, awaiting deletion; drained
   // every launch (see drainPendingProjectionCleanup).
   pendingProjectionCleanupIds: string[] = [];
@@ -298,6 +340,7 @@ class ModelStore {
         'lastAutoReleasedModelId',
         'availableMemoryCeiling',
         'largestSuccessfulLoad',
+        'extendedRamSetting',
         'pendingProjectionCleanupIds',
       ],
       storage: AsyncStorage,
@@ -820,6 +863,11 @@ class ModelStore {
     this.upgradeToFetchedRules();
 
     await this.initializeGpuSettings(); // Should be awaited to ensure GPU settings are applied before initializing context
+
+    // A load that never reported back is only knowable at the next launch, and
+    // it has to be known before anything can ask for that model again.
+    await this.adoptLoadCrashMarker();
+    await this.refreshMemoryStats();
 
     // Initialize available memory ceiling at app startup if not set
     if (this.availableMemoryCeiling === undefined) {
@@ -2092,6 +2140,197 @@ class ModelStore {
     );
   }
 
+  setExtendedRamSetting = (setting: ExtendedRamSetting) => {
+    runInAction(() => {
+      this.extendedRamSetting = setting;
+    });
+  };
+
+  /** RAM plus backing-store counters, read once and kept current. */
+  refreshMemoryStats = async (): Promise<MemoryStats | null> => {
+    try {
+      const stats = await NativeHardwareInfo.getMemoryStats();
+      runInAction(() => {
+        this.memoryStats = stats;
+      });
+      return stats;
+    } catch (error) {
+      console.warn('[ModelStore] Native getMemoryStats failed:', error);
+      runInAction(() => {
+        this.memoryStats = null;
+      });
+      return null;
+    }
+  };
+
+  /** Largest load physical RAM is known to carry; 0 when nothing is known. */
+  private physicalCeilingBytes = (stats: MemoryStats | null): number => {
+    const {largestSuccessfulLoad, availableMemoryCeiling} = this;
+    if (
+      largestSuccessfulLoad !== undefined ||
+      availableMemoryCeiling !== undefined
+    ) {
+      return physicalBytesOf(largestSuccessfulLoad, availableMemoryCeiling);
+    }
+    // Cold start, with nothing measured yet: min(60% of RAM, RAM - 1.2GB).
+    const total = stats?.totalBytes ?? 0;
+    return Math.max(Math.min(total * 0.6, total - 1.2e9), 0);
+  };
+
+  /** What the current calibration and system counters add up to. */
+  get memoryBudget(): MemoryBudget | undefined {
+    if (!this.memoryStats) {
+      return undefined;
+    }
+    return memoryBudgetFromStats(
+      this.memoryStats,
+      this.physicalCeilingBytes(this.memoryStats),
+    );
+  }
+
+  private memoryPlanInput = async (
+    model: Model,
+    projectionModel?: Model,
+    draftModel?: Model,
+  ): Promise<PlanInput> => {
+    const stats = await this.refreshMemoryStats();
+    const settings = this.memoryEstimateSettings;
+    return {
+      requiredBytes: getModelMemoryRequirement(
+        model,
+        projectionModel,
+        settings,
+        draftModel,
+      ),
+      budget: memoryBudgetFromStats(stats, this.physicalCeilingBytes(stats)),
+      setting: this.extendedRamSetting,
+      previousAttemptCrashed: this.lastCrashedModelId === model.id,
+      n_ctx: this.contextInitParams.n_ctx,
+      n_batch: this.contextInitParams.n_batch,
+      n_ubatch: this.contextInitParams.n_ubatch,
+      backend: await inferBackendType(this.contextInitParams.devices),
+      state_cache_budget_mb: stateCacheBudgetMb(this.deviceTier),
+      // Re-measured per candidate: the point of shrinking the context is that
+      // the KV cache is what grows while you talk. Every candidate forces mmap,
+      // so the weights are file-backed here and only their working set counts.
+      measure: candidate =>
+        getModelMemoryRequirement(
+          model,
+          projectionModel,
+          {
+            ...settings,
+            n_ctx: candidate.n_ctx,
+            n_ubatch: candidate.n_ubatch,
+            cache_type_k: candidate.cache_type_k,
+            cache_type_v: candidate.cache_type_v,
+            state_cache_budget_mb: candidate.state_cache_budget_mb,
+          },
+          draftModel,
+          {fileBackedWeights: true},
+        ),
+    };
+  };
+
+  /**
+   * Where this model would have to live: physical RAM, backing store, or not
+   * at all. Decided before any native call, so the app can still say no
+   * instead of being closed by the system for asking.
+   */
+  private buildMemoryPlan = async (
+    model: Model,
+    projectionModel?: Model,
+    draftModel?: Model,
+  ): Promise<MemoryPlan> => {
+    const input = await this.memoryPlanInput(
+      model,
+      projectionModel,
+      draftModel,
+    );
+    if (input.budget.physicalBytes <= 0) {
+      // Nothing to compare against — load with the user's own parameters
+      // rather than refuse a model we are unable to measure.
+      return {
+        mode: 'normal',
+        reason: 'fits_physical',
+        budget: input.budget,
+        requiredBytes: input.requiredBytes,
+      };
+    }
+    return planModelLoad(input);
+  };
+
+  /**
+   * The same decision after a load already failed on memory: spill, whatever
+   * the forecast said, unless the user has backing store switched off.
+   */
+  private forcedMemoryPlan = async (
+    model: Model,
+    projectionModel?: Model,
+    draftModel?: Model,
+  ): Promise<MemoryPlan | undefined> =>
+    forcedExtendedPlan(
+      await this.memoryPlanInput(model, projectionModel, draftModel),
+    );
+
+  /** Fold an extended-RAM plan into the parameters handed to llama.rn. */
+  private applyMemoryPlan = (
+    base: Omit<ContextParams, 'model'>,
+    plan: MemoryPlan,
+  ): Omit<ContextParams, 'model'> =>
+    plan.mode === 'extended' && plan.params ? {...base, ...plan.params} : base;
+
+  private markLoadAttempt = async (modelId: string): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(
+        LOAD_ATTEMPT_KEY,
+        JSON.stringify({modelId, ts: Date.now()}),
+      );
+    } catch (error) {
+      console.warn('[ModelStore] Could not record the load attempt:', error);
+    }
+  };
+
+  private clearLoadAttempt = async (): Promise<void> => {
+    try {
+      await AsyncStorage.removeItem(LOAD_ATTEMPT_KEY);
+    } catch (error) {
+      console.warn('[ModelStore] Could not clear the load attempt:', error);
+    }
+  };
+
+  /**
+   * At launch: a marker left behind is a load that never reported back, so
+   * this model is known to be able to close the app as it is configured now.
+   */
+  private adoptLoadCrashMarker = async (): Promise<void> => {
+    try {
+      const raw = await AsyncStorage.getItem(LOAD_ATTEMPT_KEY);
+      if (!raw) {
+        return;
+      }
+      await AsyncStorage.removeItem(LOAD_ATTEMPT_KEY);
+      const {modelId, ts} = JSON.parse(raw) as {
+        modelId?: string;
+        ts?: number;
+      };
+      if (
+        !modelId ||
+        typeof ts !== 'number' ||
+        Date.now() - ts > LOAD_ATTEMPT_FRESH_MS
+      ) {
+        return;
+      }
+      runInAction(() => {
+        this.lastCrashedModelId = modelId;
+      });
+      console.warn(
+        `[ModelStore] Load of ${modelId} did not report back — it will be loaded from backing store if the phone has any`,
+      );
+    } catch (error) {
+      console.warn('[ModelStore] Could not read the load attempt:', error);
+    }
+  };
+
   /**
    * Check memory/capability requirements and show warning alert if needed.
    * Returns true if user confirms or no warning needed, false if cancelled.
@@ -2114,30 +2353,96 @@ class ModelStore {
     const hasMemoryIssue = !hasMemory;
     const hasCapabilityIssue = isMultimodalInit && !isCapable;
 
+    // Decided before asking: "this will not fit in RAM" and "this can run from
+    // backing store" are two different conversations with the user. The same
+    // verdict carries the parameters the load itself will use.
+    const plan = await this.buildMemoryPlanSafely(
+      model,
+      projectionModel,
+      draftModel,
+    );
+    this.pendingMemoryPlan = plan;
+
     if (!hasMemoryIssue && !hasCapabilityIssue) {
       return true; // No warning needed
+    }
+
+    if (plan?.mode === 'extended') {
+      const alerts = uiStore.l10n.memory.alerts;
+      if (this.extendedRamSetting === 'on') {
+        console.warn(
+          `[ModelStore] "${model.name}" exceeds physical RAM; loading from backing store without asking`,
+        );
+        return true;
+      }
+      // Two different rescues: pages the phone lends, and pages it never had.
+      const borrows = plan.reason === 'virtual_ram';
+      return this.confirmAlert(
+        alerts.virtualRamTitle,
+        t(borrows ? alerts.virtualRamMessage : alerts.storageMessage, {
+          needed: formatBytes(plan.requiredBytes, 1),
+          physical: formatBytes(plan.budget.physicalBytes, 1),
+          ...(borrows
+            ? {virtual: formatBytes(plan.budget.virtualBytes, 1)}
+            : {}),
+        }),
+        borrows ? alerts.virtualRamContinue : alerts.storageContinue,
+      );
     }
 
     console.warn(
       `Device performance warning for model: ${model.name} - Memory: ${hasMemoryIssue}, Capability: ${hasCapabilityIssue}`,
     );
 
+    const alerts = uiStore.l10n.memory.alerts;
     let title: string;
     let message: string;
+    let continueLabel = alerts.continue;
 
     if (hasMemoryIssue && hasCapabilityIssue) {
-      title = uiStore.l10n.memory.alerts.combinedWarningTitle;
-      message = uiStore.l10n.memory.alerts.combinedWarningMessage;
+      title = alerts.combinedWarningTitle;
+      message = alerts.combinedWarningMessage;
     } else if (hasMemoryIssue) {
-      title = uiStore.l10n.memory.alerts.memoryWarningTitle;
-      message = uiStore.l10n.memory.alerts.memoryWarningMessage;
+      if (plan && OUT_OF_RANGE_REASONS.has(plan.reason)) {
+        title = alerts.noRoomTitle;
+        message = t(alerts.noRoomMessage, {
+          needed: formatBytes(plan.requiredBytes, 1),
+          physical: formatBytes(plan.budget.physicalBytes, 1),
+        });
+        continueLabel = alerts.tryAnyway;
+      } else {
+        title = alerts.memoryWarningTitle;
+        message = alerts.memoryWarningMessage;
+      }
     } else {
-      title = uiStore.l10n.memory.alerts.multimodalWarningTitle;
-      message = uiStore.l10n.memory.alerts.multimodalWarningMessage;
+      title = alerts.multimodalWarningTitle;
+      message = alerts.multimodalWarningMessage;
     }
 
     // Show alert and wait for user decision - this happens OUTSIDE the mutex
-    return new Promise<boolean>(resolve => {
+    return this.confirmAlert(title, message, continueLabel);
+  };
+
+  /** A plan must never block a load by failing; degrade to the old warning. */
+  private buildMemoryPlanSafely = async (
+    model: Model,
+    projectionModel?: Model,
+    draftModel?: Model,
+  ): Promise<MemoryPlan | undefined> => {
+    try {
+      return await this.buildMemoryPlan(model, projectionModel, draftModel);
+    } catch (error) {
+      console.warn('[ModelStore] Memory plan failed:', error);
+      return undefined;
+    }
+  };
+
+  private confirmAlert = (
+    title: string,
+    message: string,
+    continueLabel: string,
+  ): Promise<boolean> =>
+    new Promise(resolve => {
       Alert.alert(title, message, [
         {
           text: uiStore.l10n.memory.alerts.cancel,
@@ -2145,12 +2450,11 @@ class ModelStore {
           onPress: () => resolve(false),
         },
         {
-          text: uiStore.l10n.memory.alerts.continue,
+          text: continueLabel,
           onPress: () => resolve(true),
         },
       ]);
     });
-  };
 
   /**
    * Take exclusive ownership of the native context for the e2e benchmark
@@ -2315,6 +2619,63 @@ class ModelStore {
     }
   };
 
+  private createLlamaContext = (
+    filePath: string,
+    settings: Omit<ContextParams, 'model'>,
+  ): Promise<LlamaContext> =>
+    initLlama(
+      {
+        model: filePath,
+        ...settings, // Use settings without version for llama.rn
+        use_progress_callback: true,
+      },
+      (_progress: number) => {
+        //console.log('progress: ', _progress);
+      },
+    );
+
+  /**
+   * One load, and one retry from virtual RAM when that load fails on memory
+   * after the forecast claimed the model would fit. A native out-of-memory
+   * error that returns instead of killing the process is the case this saves.
+   */
+  private loadWithMemoryFallback = async (
+    filePath: string,
+    baseSettings: Omit<ContextParams, 'model'>,
+    plan: MemoryPlan,
+    model: Model,
+    projectionModel?: Model,
+    draftModel?: Model,
+  ): Promise<{
+    ctx: LlamaContext;
+    settings: Omit<ContextParams, 'model'>;
+    plan: MemoryPlan;
+  }> => {
+    const settings = this.applyMemoryPlan(baseSettings, plan);
+    try {
+      const ctx = await this.createLlamaContext(filePath, settings);
+      return {ctx, settings, plan};
+    } catch (error) {
+      if (plan.mode !== 'normal' || !isMemoryError(error)) {
+        throw error;
+      }
+      const fallback = await this.forcedMemoryPlan(
+        model,
+        projectionModel,
+        draftModel,
+      );
+      if (!fallback?.params) {
+        throw error;
+      }
+      console.warn(
+        '[ModelStore] Load ran out of memory — retrying once from virtual RAM',
+      );
+      const retrySettings = this.applyMemoryPlan(baseSettings, fallback);
+      const ctx = await this.createLlamaContext(filePath, retrySettings);
+      return {ctx, settings: retrySettings, plan: fallback};
+    }
+  };
+
   /**
    * Proceed with the actual model initialization after device capability checks
    */
@@ -2342,23 +2703,51 @@ class ModelStore {
       draftConfig,
     );
 
+    // Where the model is going to live. The pre-flight check hands its verdict
+    // down; a load that reaches here without one (an auto-reload after a
+    // release, for instance) decides for itself — and a decision that fails
+    // must not be the reason the load never started.
+    const draftModel = pairedDraftModel(draftConfig);
+    const plan: MemoryPlan = this.pendingMemoryPlan ??
+      (await this.buildMemoryPlanSafely(
+        model,
+        projectionModel,
+        draftModel,
+      )) ?? {
+        mode: 'normal',
+        reason: 'fits_physical',
+        budget: this.memoryBudget ?? memoryBudgetFromStats(null, 0),
+        requiredBytes: 0,
+      };
+    this.pendingMemoryPlan = undefined;
+
     try {
-      // Create properly versioned ContextInitParams
-      const contextInitParams = createContextInitParams(effectiveSettings);
+      // Recorded before the native call: a kernel that takes the process leaves
+      // no error here for us to catch, so the next launch reads this instead.
+      await this.markLoadAttempt(model.id);
 
       const t0 = Date.now();
-      const ctx = await initLlama(
-        {
-          model: filePath,
-          ...effectiveSettings, // Use effectiveSettings without version for llama.rn
-          use_progress_callback: true,
-        },
-        (_progress: number) => {
-          //console.log('progress: ', _progress);
-        },
+      const loaded = await this.loadWithMemoryFallback(
+        filePath,
+        effectiveSettings,
+        plan,
+        model,
+        projectionModel,
+        draftModel,
       );
+      const {ctx, settings: usedSettings, plan: usedPlan} = loaded;
       const t1 = Date.now();
       console.log('init time: ', t1 - t0);
+
+      await this.clearLoadAttempt();
+      runInAction(() => {
+        this.lastCrashedModelId = undefined;
+        this.activeMemoryPlan =
+          usedPlan.mode === 'extended' ? usedPlan : undefined;
+      });
+
+      // Create properly versioned ContextInitParams
+      const contextInitParams = createContextInitParams(usedSettings);
 
       await this.updateModelStopTokens(ctx, model);
 
@@ -2417,7 +2806,7 @@ class ModelStore {
           model,
           projectionModel,
           this.memoryEstimateSettings,
-          pairedDraftModel(draftConfig),
+          draftModel,
         );
         runInAction(() => {
           this.loadedModelBytes = loadedBytes;
@@ -2426,27 +2815,31 @@ class ModelStore {
         console.warn('[ModelStore] Failed to estimate loaded model:', error);
       }
 
-      // Update largestSuccessfulLoad using GGUF estimator
-      try {
-        const estimated = getModelMemoryRequirement(
-          model,
-          projectionModel,
-          {...contextInitParams, state_cache_budget_mb: 0},
-          pairedDraftModel(draftConfig),
-        );
-        runInAction(() => {
-          if (
-            this.largestSuccessfulLoad === undefined ||
-            estimated > this.largestSuccessfulLoad
-          ) {
-            this.largestSuccessfulLoad = estimated;
-          }
-        });
-      } catch (error) {
-        console.warn(
-          '[ModelStore] Failed to update largestSuccessfulLoad:',
-          error,
-        );
+      // Update largestSuccessfulLoad using GGUF estimator. An extended load is
+      // not evidence about physical RAM — it succeeded because the model did
+      // not have to fit in it — so it must not raise that ceiling.
+      if (usedPlan.mode !== 'extended') {
+        try {
+          const estimated = getModelMemoryRequirement(
+            model,
+            projectionModel,
+            {...contextInitParams, state_cache_budget_mb: 0},
+            draftModel,
+          );
+          runInAction(() => {
+            if (
+              this.largestSuccessfulLoad === undefined ||
+              estimated > this.largestSuccessfulLoad
+            ) {
+              this.largestSuccessfulLoad = estimated;
+            }
+          });
+        } catch (error) {
+          console.warn(
+            '[ModelStore] Failed to update largestSuccessfulLoad:',
+            error,
+          );
+        }
       }
 
       return ctx;
@@ -2455,6 +2848,15 @@ class ModelStore {
         `Failed to initialize model context for "${model.name}" (${model.id}):`,
         error,
       );
+
+      // The process survived, so the marker has served its purpose; what is
+      // worth remembering is whether memory was the reason.
+      await this.clearLoadAttempt();
+      if (isMemoryError(error)) {
+        runInAction(() => {
+          this.lastCrashedModelId = model.id;
+        });
+      }
 
       // Set error state for UI feedback - include model info and context params for error reporting
       const errorState = createErrorState(error, 'modelInit', undefined, {
@@ -2557,6 +2959,7 @@ class ModelStore {
         this.activeRemoteBinding = undefined;
         this.activeContextSettings = undefined;
         this.loadedModelBytes = undefined;
+        this.activeMemoryPlan = undefined;
         // Ensure multimodal state is cleared even if something went wrong above
         this.isMultimodalActive = false;
         this.activeProjectionModelId = undefined;

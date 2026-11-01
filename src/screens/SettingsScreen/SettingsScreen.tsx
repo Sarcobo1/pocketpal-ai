@@ -93,6 +93,7 @@ import {
   getAllowedCacheTypeKOptions,
   getAllowedCacheTypeVOptions,
 } from '../../utils/flashAttnCompatibility';
+import type {ExtendedRamSetting} from '../../utils/extendedRam';
 
 // OpenCL documentation URL (not localized)
 const OPENCL_DOCS_URL =
@@ -218,6 +219,22 @@ export const SettingsScreen: React.FC = observer(() => {
   const flashAttnOff =
     !modelStore.contextInitParams.flash_attn_type ||
     modelStore.contextInitParams.flash_attn_type === 'off';
+
+  // What this phone offers a model that is too big for RAM; blank until the
+  // system counters have been read. A model already running from backing
+  // store says that instead, because it is the fact the user can act on.
+  const memoryBudget = modelStore.memoryBudget;
+  const virtualRamStatus =
+    modelStore.activeMemoryPlan?.mode === 'extended'
+      ? l10n.settings.virtualRamInUse
+      : !memoryBudget
+        ? ''
+        : memoryBudget.hasVirtualRam
+          ? t(l10n.settings.virtualRamDetected, {
+              kind: memoryBudget.swapKinds.join(', ') || 'swap',
+              size: formatBytes(memoryBudget.virtualBytes, 1),
+            })
+          : l10n.settings.virtualRamNone;
 
   const cacheTypeKOptions = getAllowedCacheTypeKOptions(
     currentFlashAttnType as 'auto' | 'on' | 'off',
@@ -960,6 +977,52 @@ export const SettingsScreen: React.FC = observer(() => {
                     }
                   />
                 </View>
+              </View>
+              <Divider />
+
+              {/* Virtual RAM (extended memory / swap) */}
+              <View style={styles.settingItemContainer}>
+                <Text variant="titleMedium" style={styles.textLabel}>
+                  {l10n.settings.virtualRam}
+                </Text>
+                <Text variant="labelSmall" style={styles.textDescription}>
+                  {l10n.settings.virtualRamDescription}
+                </Text>
+                {!!virtualRamStatus && (
+                  <Text variant="labelSmall" style={styles.textDescription}>
+                    {virtualRamStatus}
+                  </Text>
+                )}
+                <SegmentedButtons
+                  value={modelStore.extendedRamSetting}
+                  onValueChange={value =>
+                    modelStore.setExtendedRamSetting(
+                      value as ExtendedRamSetting,
+                    )
+                  }
+                  density="medium"
+                  buttons={[
+                    {
+                      value: 'auto',
+                      label: l10n.settings.virtualRamAuto,
+                      labelStyle: {fontSize: 12},
+                      testID: 'extended-ram-auto',
+                    },
+                    {
+                      value: 'on',
+                      label: l10n.settings.virtualRamOn,
+                      labelStyle: {fontSize: 12},
+                      testID: 'extended-ram-on',
+                    },
+                    {
+                      value: 'off',
+                      label: l10n.settings.virtualRamOff,
+                      labelStyle: {fontSize: 12},
+                      testID: 'extended-ram-off',
+                    },
+                  ]}
+                  style={styles.segmentedButtons}
+                />
               </View>
               <Divider />
 

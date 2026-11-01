@@ -229,6 +229,25 @@ class HardwareInfoModule(reactContext: ReactApplicationContext) :
     }
   }
 
+  override fun getMemoryStats(promise: Promise) {
+    try {
+      val meminfo = readMemInfoKb()
+      val swaps = readSwapKinds()
+
+      promise.resolve(Arguments.createMap().apply {
+        putDouble("totalBytes", (meminfo["MemTotal"] ?: 0L) * 1024.0)
+        putDouble("availableBytes", (meminfo["MemAvailable"] ?: 0L) * 1024.0)
+        putDouble("swapTotalBytes", (meminfo["SwapTotal"] ?: 0L) * 1024.0)
+        putDouble("swapFreeBytes", (meminfo["SwapFree"] ?: 0L) * 1024.0)
+        val kinds = Arguments.createArray()
+        swaps.forEach { kinds.pushString(it) }
+        putArray("swapKinds", kinds)
+      })
+    } catch (e: Exception) {
+      promise.reject("ERROR", e.message)
+    }
+  }
+
   // Best-effort: a failing JNI/symbol-resolution path still resolves
   // with purged=false rather than rejecting, so callers don't have to
   // handle platform-availability cases themselves.
@@ -276,6 +295,58 @@ class HardwareInfoModule(reactContext: ReactApplicationContext) :
       if (maxKhz > 0L) (maxKhz / 1000).toInt() else null
     } catch (e: Throwable) {
       null
+    }
+  }
+
+  // "Key:  1234 kB" lines, values kept in kB. Covers MemTotal, MemAvailable,
+  // SwapTotal (zram / RAM Plus / a swap partition, counted once enabled) and
+  // SwapFree. A missing key is simply absent from the map.
+  private fun readMemInfoKb(): Map<String, Long> {
+    val wanted = setOf("MemTotal", "MemAvailable", "SwapTotal", "SwapFree")
+    return try {
+      val out = HashMap<String, Long>()
+      File("/proc/meminfo").bufferedReader().useLines { lines ->
+        for (line in lines) {
+          val key = line.substringBefore(":").trim()
+          if (key in wanted) {
+            line.substringAfter(":").trim().substringBefore(" ").toLongOrNull()
+              ?.let { out[key] = it }
+          }
+        }
+      }
+      out
+    } catch (e: Throwable) {
+      emptyMap()
+    }
+  }
+
+  // Decoration for SwapTotal: what kind of backing store provides it.
+  // /proc/swaps is not world-readable on every vendor ROM, and knowing the
+  // kind is not needed to decide whether spilling is possible — so an
+  // unreadable or absent list resolves to empty rather than an error.
+  private fun readSwapKinds(): List<String> {
+    return try {
+      val kinds = LinkedHashSet<String>()
+      File("/proc/swaps").bufferedReader().useLines { lines ->
+        lines.drop(1).forEach { line ->
+          val parts = line.trim().split(Regex("\\s+"))
+          val name = parts.getOrNull(0)
+          if (name.isNullOrEmpty()) {
+            return@forEach
+          }
+          val type = parts.getOrNull(1) ?: ""
+          kinds.add(
+            when {
+              name.startsWith("/dev/zram") -> "zram"
+              type == "file" -> "file"
+              else -> "partition"
+            }
+          )
+        }
+      }
+      kinds.toList()
+    } catch (e: Throwable) {
+      emptyList()
     }
   }
 

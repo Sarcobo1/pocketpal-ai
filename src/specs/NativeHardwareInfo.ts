@@ -32,6 +32,23 @@ export interface GPUInfo {
   gpuType: string;
 }
 
+/**
+ * System memory and backing-store state, as the kernel reports it.
+ * All sizes are bytes.
+ */
+export interface MemoryStats {
+  /** MemTotal — installed physical RAM. */
+  totalBytes: number;
+  /** MemAvailable — RAM the kernel can give us now, reclaimable pages included. */
+  availableBytes: number;
+  /** SwapTotal — virtual RAM sized by the system (zram / "RAM Plus" / a swap file). 0 when none. */
+  swapTotalBytes: number;
+  /** SwapFree — the part of it not already taken. */
+  swapFreeBytes: number;
+  /** Backing-store kinds behind SwapTotal: 'zram', 'file', 'partition'. Empty when unreadable. */
+  swapKinds: string[];
+}
+
 export interface Spec extends TurboModule {
   getCPUInfo(): Promise<CPUInfo>;
   getGPUInfo(): Promise<GPUInfo>;
@@ -43,6 +60,13 @@ export interface Spec extends TurboModule {
    * @returns Promise<number> Available memory in bytes
    */
   getAvailableMemory(): Promise<number>;
+  /**
+   * Read memory and swap counters in one native round-trip.
+   * - Android: /proc/meminfo plus the device list from /proc/swaps
+   * - iOS: physical RAM and os_proc_available_memory(); swap is always 0
+   *   because the app has no addressable backing store.
+   */
+  getMemoryStats(): Promise<MemoryStats>;
   /**
    * Collect memory metrics and write a snapshot entry to disk.
    * Appends to Documents/memory-snapshots.json (iOS) or externalFilesDir/memory-snapshots.json (Android).

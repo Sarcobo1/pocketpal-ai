@@ -72,6 +72,29 @@ RCT_EXPORT_METHOD(getAvailableMemory:(RCTPromiseResolveBlock)resolve
   }
 }
 
+RCT_EXPORT_METHOD(getMemoryStats:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+  @try {
+    uint64_t totalMemory = [[NSProcessInfo processInfo] physicalMemory];
+    uint64_t availableMemory = os_proc_available_memory();
+
+    // iOS gives an app no addressable backing store to spill into: compressed
+    // memory is kernel-managed and Jetsam kills the process before paging
+    // would help, so swap reports as absent and the caller plans for physical
+    // memory only. Keeps the contract identical on both platforms.
+    resolve(@{
+      @"totalBytes": @(totalMemory),
+      @"availableBytes": @(availableMemory),
+      @"swapTotalBytes": @0,
+      @"swapFreeBytes": @0,
+      @"swapKinds": @[],
+    });
+  } @catch (NSException *exception) {
+    reject(@"error_getting_memory_stats", @"Could not retrieve memory stats", nil);
+  }
+}
+
 RCT_EXPORT_METHOD(writeMemorySnapshot:(NSString *)label
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)

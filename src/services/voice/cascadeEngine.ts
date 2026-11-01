@@ -4,9 +4,10 @@ import {when} from 'mobx';
 import {energyVad, int16PcmToFloat32, whisperAsrEngine} from '../asr';
 import type {AsrTier, AsrTranscript} from '../asr';
 import {getEngine, ttsRuntime} from '../tts';
-import {asrStore, chatSessionStore, ttsStore} from '../../store';
+import {asrStore, ttsStore} from '../../store';
 import {vtrace} from '../../utils/voiceTrace';
 
+import {findTurn} from './chatTurns';
 import type {
   VoiceEngine,
   VoiceTurn,
@@ -14,16 +15,6 @@ import type {
   VoiceTurnOutcome,
   VoiceTurnPort,
 } from './types';
-
-const findTurn = (turnId: string) => {
-  for (const session of chatSessionStore.sessions) {
-    const message = session.messages.find(m => m.id === turnId);
-    if (message) {
-      return {sessionId: session.id, message};
-    }
-  }
-  return null;
-};
 
 /**
  * Whisper, then the chat model through the normal send path, then TTS.
@@ -134,7 +125,7 @@ export class CascadeVoiceEngine implements VoiceEngine {
         },
         () => on.speechStarted(),
       );
-      sending = port.send(text, id => {
+      sending = port.send({text}, id => {
         turnId = id;
       });
       let sendFailed = false;

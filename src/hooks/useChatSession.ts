@@ -75,6 +75,7 @@ import {
 // run flips to `preparing`.
 const prepareCompletion = async ({
   imageUris,
+  audioUri,
   message,
   systemMessages,
   contextId,
@@ -86,6 +87,7 @@ const prepareCompletion = async ({
   spoken,
 }: {
   imageUris: string[];
+  audioUri?: string;
   message: MessageType.PartialText;
   systemMessages: Array<{role: 'system'; content: string}>;
   contextId: string;
@@ -100,14 +102,15 @@ const prepareCompletion = async ({
     await chatSessionStore.getCurrentCompletionSettings();
   const stopWords = toJS(modelStore.activeModel?.stopWords);
 
-  // Check if we have images and if multimodal is enabled
+  // Check if we have media and if multimodal is enabled
   const hasImages = imageUris && imageUris.length > 0;
+  const hasAudio = !!audioUri;
 
   // Create user message content - use array format only for multimodal,
   // string for text-only.
   let userMessageContent: any;
 
-  if (hasImages && isMultimodalEnabled) {
+  if ((hasImages || hasAudio) && isMultimodalEnabled) {
     userMessageContent = [
       {
         type: 'text',
@@ -118,10 +121,16 @@ const prepareCompletion = async ({
         image_url: {url: path},
       })),
     ];
+    if (hasAudio) {
+      userMessageContent.push({
+        type: 'input_audio',
+        input_audio: {data: audioUri, format: 'wav'},
+      });
+    }
   } else {
     userMessageContent = message.text;
 
-    if (hasImages && !isMultimodalEnabled) {
+    if ((hasImages || hasAudio) && !isMultimodalEnabled) {
       uiStore.setChatWarning(
         createMultimodalWarning(l10n.chat.multimodalNotEnabled),
       );
@@ -772,6 +781,8 @@ export const useChatSession = (
 
     const imageUris = message.imageUris;
     const hasImages = !!(imageUris && imageUris.length > 0);
+    const audioUri = message.audioUri;
+    const hasAudio = !!audioUri;
 
     const isMultimodalEnabled = modelStore.activeModelCaps.visionActive;
 
@@ -784,11 +795,12 @@ export const useChatSession = (
       text: message.text,
       type: 'text',
       imageUris: hasImages ? imageUris : undefined,
+      audioUri: hasAudio ? audioUri : undefined,
       metadata: {
         contextId,
         conversationId: conversationIdRef.current,
         copyable: true,
-        multimodal: hasImages,
+        multimodal: hasImages || hasAudio,
         ...(opts.spoken ? {spoken: true} : {}),
       },
     };
@@ -818,6 +830,7 @@ export const useChatSession = (
 
     const {cleanCompletionParams, messageInfo} = await prepareCompletion({
       imageUris: imageUris || [],
+      audioUri,
       message,
       systemMessages,
       contextId,

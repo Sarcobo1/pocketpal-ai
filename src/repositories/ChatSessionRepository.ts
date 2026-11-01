@@ -465,6 +465,13 @@ class ChatSessionRepository {
         metadata.imageUris = (message as MessageType.Text).imageUris;
       }
 
+      // Same for the spoken-turn WAV. The file itself lives in the cache
+      // directory and may be gone on a later reload; the row stays valid
+      // because the transcript it replaced was never stored either.
+      if (message.type === 'text' && (message as MessageType.Text).audioUri) {
+        metadata.audioUri = (message as MessageType.Text).audioUri;
+      }
+
       // Persist top-level `steps` for assistant_turn rows by writing it
       // into metadata.steps. The in-memory shape strips `steps` from
       // metadata (see Message.toMessageObject); this repository is the

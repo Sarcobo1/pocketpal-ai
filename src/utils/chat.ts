@@ -226,14 +226,15 @@ export function convertToChatMessages(
 
       // Multimodal user messages keep their existing shape.
       if (
-        textMessage.imageUris &&
-        textMessage.imageUris.length > 0 &&
+        ((textMessage.imageUris && textMessage.imageUris.length > 0) ||
+          textMessage.audioUri) &&
         isMultimodalEnabled
       ) {
         const contentArray: Array<{
-          type: 'text' | 'image_url';
+          type: 'text' | 'image_url' | 'input_audio';
           text?: string;
           image_url?: {url: string};
+          input_audio?: {data: string; format: string};
         }> = [
           {
             type: 'text',
@@ -242,11 +243,21 @@ export function convertToChatMessages(
         ];
 
         contentArray.push(
-          ...textMessage.imageUris.map(path => ({
+          ...(textMessage.imageUris ?? []).map(path => ({
             type: 'image_url' as const,
             image_url: {url: path},
           })),
         );
+
+        // llama.rn reads media from local paths, not from URLs, and one
+        // projector file carries both the vision and the audio encoder for
+        // omni models, so `isMultimodalEnabled` covers audio on purpose.
+        if (textMessage.audioUri) {
+          contentArray.push({
+            type: 'input_audio' as const,
+            input_audio: {data: textMessage.audioUri, format: 'wav'},
+          });
+        }
 
         return [
           {

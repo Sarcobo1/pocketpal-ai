@@ -31,7 +31,11 @@ import {
   VOICE_MIC_WATCHDOG_MS,
   VOICE_START_TIMEOUT_MS,
 } from '../../services/voice';
-import type {VoiceTurnEvents, VoiceTurnOutcome} from '../../services/voice';
+import type {
+  VoiceTurnEvents,
+  VoiceTurnOutcome,
+  VoiceTurnPayload,
+} from '../../services/voice';
 
 import {useVoiceMode} from '../useVoiceMode';
 
@@ -73,7 +77,10 @@ const setAppState = (state: string) =>
 type FakeTurn = {
   utterance: Uint8Array;
   port: {
-    send: (text: string, onTurnCreated: (id: string) => void) => Promise<void>;
+    send: (
+      payload: VoiceTurnPayload,
+      onTurnCreated: (id: string) => void,
+    ) => Promise<void>;
   };
   on: VoiceTurnEvents;
   done: Promise<VoiceTurnOutcome>;
@@ -1278,7 +1285,7 @@ describe('useVoiceMode', () => {
     speak(600, SILENT);
     expect(turns).toHaveLength(1);
     port.send.mockImplementationOnce(
-      (_text: string, onTurnCreated: (id: string) => void) =>
+      (_payload: VoiceTurnPayload, onTurnCreated: (id: string) => void) =>
         new Promise<void>(() => {
           chatSessionStore.activeSessionId = 'session-created-by-send';
           onTurnCreated('turn-1');
@@ -1286,7 +1293,7 @@ describe('useVoiceMode', () => {
     );
 
     act(() => {
-      turns[0].port.send('hello', jest.fn());
+      turns[0].port.send({text: 'hello'}, jest.fn());
     });
     await flush();
 
@@ -1325,14 +1332,14 @@ describe('useVoiceMode', () => {
     speak(500);
     speak(600, SILENT);
     port.send.mockImplementationOnce(
-      (_text: string, onTurnCreated: (id: string) => void) =>
+      (_payload: VoiceTurnPayload, onTurnCreated: (id: string) => void) =>
         new Promise<void>(() => {
           chatSessionStore.activeSessionId = 'session-created-by-send';
           onTurnCreated('turn-1');
         }),
     );
     act(() => {
-      turns[0].port.send('hello', jest.fn());
+      turns[0].port.send({text: 'hello'}, jest.fn());
     });
     await flush();
 

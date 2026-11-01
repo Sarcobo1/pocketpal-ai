@@ -41,9 +41,11 @@ export const writeFile = jest.fn(() => {
 });
 export const downloadFile = jest.fn();
 export const hash = jest.fn();
+export const readDir = jest.fn(() => Promise.resolve([]));
 // Make DocumentDirectoryPath configurable for tests
 let documentDirectoryPath = '/path/to/documents';
 export const DocumentDirectoryPath = documentDirectoryPath;
+export const CachesDirectoryPath = '/path/to/caches';
 export const LibraryDirectoryPath = '/path/to/library';
 export const MainBundlePath = '/path/to/bundle';
 
@@ -76,7 +78,9 @@ const RNFS = {
   writeFile,
   downloadFile,
   hash,
+  readDir,
   DocumentDirectoryPath,
+  CachesDirectoryPath,
   LibraryDirectoryPath,
   MainBundlePath,
   copyFile,

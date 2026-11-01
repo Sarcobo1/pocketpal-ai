@@ -1274,6 +1274,7 @@
     "readyToChat": "Ready to chat? Load the last used model.",
     "pleaseLoadModel": "Load a model to chat.",
     "multimodalNotEnabled": "Multimodal is not enabled for this model. Images will be displayed but not processed by the AI.",
+    "spokenTurn": "Voice message",
     "cannotSendWithoutModel": "Load a model first",
     "toolCompatWarning": "This model may not support tool calling. Results may be unreliable.",
     "softCapWarning": "Start a new chat for best performance.",

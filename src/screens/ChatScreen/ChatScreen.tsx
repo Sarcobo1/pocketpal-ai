@@ -91,9 +91,9 @@ export const ChatScreen: React.FC = observer(() => {
 
   const voiceMode = useVoiceMode({
     port: {
-      send: async (text, onTurnCreated) => {
+      send: async (payload, onTurnCreated) => {
         await handleSendPress(
-          {text, type: 'text'},
+          {...payload, type: 'text'},
           {spoken: true, onTurnCreated},
         );
       },

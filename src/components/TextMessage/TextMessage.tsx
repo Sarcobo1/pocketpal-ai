@@ -25,6 +25,7 @@ import {AgentStep, MessageType} from '../../utils/types';
 import {
   excludeDerivedMessageProps,
   getUserName,
+  L10nContext,
   UserContext,
 } from '../../utils';
 import {visibleStepContent} from '../../utils/chat';
@@ -82,6 +83,7 @@ export const TextMessage = ({
       : '';
   const theme = useTheme();
   const user = React.useContext(UserContext);
+  const l10n = React.useContext(L10nContext);
   const [previewData, setPreviewData] = React.useState(
     'previewData' in message ? message.previewData : undefined,
   );
@@ -110,6 +112,7 @@ export const TextMessage = ({
   // Extract imageUris from the message if available
   const imageUris = (message as any).imageUris || [];
   const hasImages = imageUris && imageUris.length > 0;
+  const audioUri = (message as any).audioUri as string | undefined;
 
   const handleEmailPress = (email: string) => {
     try {
@@ -270,6 +273,11 @@ export const TextMessage = ({
               ? renderPreviewHeader(getUserName(message.author))
               : null
           }
+
+          {/* A spoken turn has no transcript: the model heard the audio. */}
+          {!step && audioUri && !visibleText ? (
+            <Text style={text}>{l10n.chat.spokenTurn}</Text>
+          ) : null}
 
           {/* Render images above the text — legacy Text path only. */}
           {!step && renderImages()}

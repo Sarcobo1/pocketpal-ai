@@ -6,7 +6,7 @@ import {ttsRuntime} from '../../tts';
 import {asrStore, chatSessionStore, ttsStore} from '../../../store';
 
 import {CascadeVoiceEngine} from '../cascadeEngine';
-import type {VoiceTurnEvents} from '../types';
+import type {VoiceTurnEvents, VoiceTurnPayload} from '../types';
 
 const transcribe = jest.spyOn(whisperAsrEngine, 'transcribe');
 const cancelTranscription = jest.spyOn(whisperAsrEngine, 'cancelTranscription');
@@ -39,7 +39,7 @@ function makePort() {
     stop: jest.fn(),
   };
   port.send.mockImplementation(
-    (_text: string, onTurn: (id: string) => void) => {
+    (_payload: VoiceTurnPayload, onTurn: (id: string) => void) => {
       port.onTurn = onTurn;
       return new Promise<void>((resolve, reject) => {
         port.settle = resolve;
@@ -145,7 +145,7 @@ describe('CascadeVoiceEngine', () => {
         'What is the capital of France?',
       );
       expect(port.send).toHaveBeenCalledWith(
-        'What is the capital of France?',
+        {text: 'What is the capital of France?'},
         expect.any(Function),
       );
 

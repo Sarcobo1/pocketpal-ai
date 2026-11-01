@@ -38,6 +38,7 @@ import type {
   VoiceTurnPort,
 } from '../services/voice';
 import {CascadeVoiceEngine} from '../services/voice/cascadeEngine';
+import {OmniVoiceEngine, isOmniVoiceModel} from '../services/voice/omniEngine';
 import {
   asrStore,
   chatSessionStore,
@@ -127,10 +128,10 @@ class VoiceModeController {
   };
   private sendingToNewChat = false;
   private readonly turnPort: VoiceTurnPort = {
-    send: (text, onTurnCreated) => {
+    send: (payload, onTurnCreated) => {
       this.sendingToNewChat = chatSessionStore.activeSessionId == null;
       return this.port
-        .send(text, turnId => {
+        .send(payload, turnId => {
           this.sendingToNewChat = false;
           onTurnCreated(turnId);
         })
@@ -141,12 +142,25 @@ class VoiceModeController {
     stop: () => this.port.stop(),
   };
 
+  private readonly cascade = new CascadeVoiceEngine();
+  private readonly omni = new OmniVoiceEngine();
+  private readonly pinnedEngine: VoiceEngine | null;
+  /** The engine of the session that is open, or about to open. */
+  private engine: VoiceEngine;
+
+  /**
+   * `engine` pins the engine — tests drive one, and a caller that supplies
+   * an engine knows what it talks to. Otherwise the active model decides per
+   * session, because an omni model hears the mic itself.
+   */
   constructor(
-    private readonly engine: VoiceEngine,
+    engine: VoiceEngine | null,
     port: VoiceTurnPort,
     private readonly showSheet: (sheet: VoiceModeSheet) => void,
   ) {
     this.port = port;
+    this.pinnedEngine = engine;
+    this.engine = engine ?? this.cascade;
   }
 
   async requestEntry(actions: VoiceEntryActions): Promise<void> {
@@ -157,11 +171,34 @@ class VoiceModeController {
     if (this.entryBlocked()) {
       return;
     }
+    await this.selectEngine();
+    if (this.engine.id === 'omni') {
+      // One model does the listening and the answering, so the setup this
+      // session needs is the microphone alone.
+      if (!(await isMicGranted())) {
+        this.showSheet({kind: 'setup'});
+        return;
+      }
+      await this.enter(asrStore.selectedTier);
+      return;
+    }
     if (!(await isSetupComplete())) {
       this.showSheet({kind: 'setup'});
       return;
     }
     await this.checkMemoryAndEnter();
+  }
+
+  /**
+   * An omni model reads the utterance as audio through its own projector, so
+   * Whisper and the TTS voice drop out of the turn.
+   */
+  private async selectEngine(): Promise<void> {
+    if (this.pinnedEngine) {
+      this.engine = this.pinnedEngine;
+      return;
+    }
+    this.engine = (await isOmniVoiceModel()) ? this.omni : this.cascade;
   }
 
   async checkMemoryAndEnter(): Promise<void> {
@@ -250,10 +287,12 @@ class VoiceModeController {
     this.open = true;
     const session = ++this.session;
     startVoiceTrace();
-    ttsStore.setVoiceOutputActive(true, {
-      holdFirstChunk: modelStore.activeModel?.origin !== ModelOrigin.REMOTE,
-    });
-    ttsStore.stop('voice_enter').catch(() => {});
+    if (this.engine.id === 'cascade') {
+      ttsStore.setVoiceOutputActive(true, {
+        holdFirstChunk: modelStore.activeModel?.origin !== ModelOrigin.REMOTE,
+      });
+      ttsStore.stop('voice_enter').catch(() => {});
+    }
     this.releaseAwake = acquireKeepAwake();
     this.setPhase('starting', 'enter');
     voiceModeStore.setPresentation('full');
@@ -549,7 +588,8 @@ class VoiceModeController {
     vtrace('utt.end', {by, voicedMs: this.endpointer.voicedMs});
     const utterance = this.endpointer.take();
     this.stopCapture();
-    this.setPhase('transcribing', by);
+    // An omni turn has no transcript to wait for: the model has the audio.
+    this.setPhase(this.engine.id === 'omni' ? 'thinking' : 'transcribing', by);
     const current = () => session === this.session;
     const turn = this.engine.runTurn(utterance, this.turnPort, {
       transcribed: () => current() && this.setPhase('thinking', 'transcribed'),
@@ -588,12 +628,7 @@ export function useVoiceMode({
 }) {
   const [sheet, setSheet] = useState<VoiceModeSheet>(null);
   const [controller] = useState(
-    () =>
-      new VoiceModeController(
-        engine ?? new CascadeVoiceEngine(),
-        port,
-        setSheet,
-      ),
+    () => new VoiceModeController(engine ?? null, port, setSheet),
   );
   controller.port = port;
 

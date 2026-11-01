@@ -9,14 +9,29 @@ export type VoiceTurnOutcome =
   | 'reply_failed'
   | 'speech_failed';
 
+/**
+ * One turn handed to the chat. A cascade turn carries `text`; an omni turn
+ * carries the captured speech as a WAV path. `imageUris` is a camera frame
+ * for the same turn.
+ */
+export interface VoiceTurnPayload {
+  /** Empty for a turn the model hears instead of reads. */
+  text: string;
+  audioUri?: string;
+  imageUris?: string[];
+}
+
 /** The chat the voice session talks to, backed by `useChatSession`. */
 export interface VoiceTurnPort {
   /**
-   * Sends `text` as a spoken chat turn. `onTurnCreated` receives the
+   * Sends `payload` as a spoken chat turn. `onTurnCreated` receives the
    * assistant turn's id once its row exists; the promise resolves when the
    * run settles.
    */
-  send(text: string, onTurnCreated: (turnId: string) => void): Promise<void>;
+  send(
+    payload: VoiceTurnPayload,
+    onTurnCreated: (turnId: string) => void,
+  ): Promise<void>;
   /** Stops the running reply, as the Stop button does. */
   stop(): void;
 }
@@ -33,12 +48,13 @@ export interface VoiceTurn {
 }
 
 /**
- * Turns one utterance into a spoken reply. The cascade (whisper, chat
- * model, TTS) is the only engine. Its readiness and memory checks live in
- * the session controller, so another engine would need those moved here.
+ * Turns one utterance into a reply. The cascade (whisper, chat model, TTS)
+ * reads a transcript and speaks the answer; the omni engine hands the audio
+ * itself to one multimodal model. Entry readiness and the memory check stay
+ * in the session controller, which is also what picks the engine.
  */
 export interface VoiceEngine {
-  readonly id: 'cascade';
+  readonly id: 'cascade' | 'omni';
   /** Makes the speech models resident for the session; turns use `tier`. */
   prepare(tier: AsrTier): Promise<void>;
   /** Frees them; resolves once any in-flight decode has stopped. */

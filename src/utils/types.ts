@@ -184,6 +184,9 @@ export namespace MessageType {
     text: string;
     type: 'text';
     imageUris?: string[]; // Optional array of image URIs for multimodal messages
+    // Path to a WAV of the user's speech, for models with an audio input
+    // encoder. Text stays empty when the turn was spoken, not dictated.
+    audioUri?: string;
   }
 
   export interface Text extends Base, PartialText {

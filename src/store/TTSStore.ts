@@ -647,7 +647,7 @@ export class TTSStore {
     // below cannot reach it, and a reply said outside a stream has no handle
     // to cancel. Harmless when nothing is speaking: the flag is cleared when
     // the next utterance starts.
-    if (state.mode !== 'streaming') {
+    if (state.mode === 'playing') {
       this.modelVoice?.stop();
     }
     if (state.mode === 'streaming') {

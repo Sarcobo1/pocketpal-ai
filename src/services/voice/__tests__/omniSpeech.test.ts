@@ -159,16 +159,16 @@ describe('speakWithModel', () => {
           .mockResolvedValue({audioGen: true, audio: true}),
       };
     });
-    generateSpeech.mockResolvedValue(result);
+    generateSpeech.mockImplementation(async () => {
+      calls.push('generate');
+      return result;
+    });
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
     calls.length = 0;
-    generateSpeech = jest.fn().mockImplementation(async () => {
-      calls.push('generate');
-      return speechResult();
-    });
+    generateSpeech = jest.fn();
     clearCache = jest.fn().mockImplementation(async () => {
       calls.push('clear');
     });

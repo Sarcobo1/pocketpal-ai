@@ -60,7 +60,7 @@ const ObservedSkillsDisplay = observer(({model}) => {
       onVisionPress={toggleVision}
       onProjectionWarningPress={() =>
         model.defaultProjectionModel &&
-        modelStore.checkSpaceAndDownload(model.defaultProjectionModel)
+        modelStore.downloadProjectionModel(model.defaultProjectionModel)
       }
       visionEnabled={visionEnabled}
     />

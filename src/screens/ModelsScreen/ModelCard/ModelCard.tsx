@@ -263,7 +263,7 @@ export const ModelCard: React.FC<ModelCardProps> = observer(
     const handleProjectionWarningPress = useCallback(() => {
       if (model.defaultProjectionModel) {
         // Try to download the missing projection model
-        modelStore.checkSpaceAndDownload(model.defaultProjectionModel);
+        modelStore.downloadProjectionModel(model.defaultProjectionModel);
       }
       // Note: If no default projection model, user can manually select one in the vision controls
     }, [model.defaultProjectionModel]);

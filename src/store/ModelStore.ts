@@ -408,11 +408,10 @@ class ModelStore {
             model.isDownloaded = true;
           });
 
-          // Fetch and persist GGUF metadata after download completes
-          // Skip for projection models (CLIP) - they have different metadata structure
-          if (model.modelType !== ModelType.PROJECTION) {
-            await this.fetchAndPersistGGUFMetadata(model);
-          }
+          // Fetch and persist GGUF metadata after download completes. The
+          // projector branch reads the encoder header; the LLM branch estimates
+          // memory from the core fields.
+          await this.fetchAndPersistGGUFMetadata(model);
         }
       },
       onError: (modelId, error, keptProgress) => {
@@ -908,6 +907,7 @@ class ModelStore {
     } catch (error) {
       console.warn('[ModelStore] media-support hydration failed:', error);
     }
+    await this.recoverMissingCompanions();
 
     // Upgrade past the bundled floor to the online rules override in the
     // background; reconcile (id-keyed, dedup) folds in any newer set.
@@ -1644,6 +1644,47 @@ class ModelStore {
   };
 
   /**
+   * A companion belongs beside the model it serves. For HF models the LLM may
+   * still live at the legacy `models/hf/<author>/<file>` path, where resolving
+   * the projector on its own would put it under a new repository folder — the
+   * two files then look unrelated to every folder-based check.
+   */
+  private companionDestinationPath = async (
+    model: Model,
+    companion: Model,
+  ): Promise<string | undefined> => {
+    if (model.origin !== ModelOrigin.HF || companion.isLocal) {
+      return undefined;
+    }
+    const modelPath = await this.getModelFullPath(model);
+    const dir = modelPath.slice(0, modelPath.lastIndexOf('/'));
+    return `${dir}/${companion.filename}`;
+  };
+
+  /**
+   * Download a projector the user asked for, into the folder of the model that
+   * owns it. Every UI entry point goes through here: a projector that lands in
+   * its own repository folder is invisible to the folder scan and to a model
+   * imported from device storage.
+   */
+  downloadProjectionModel = async (projectorId: string): Promise<void> => {
+    const projector = this.models.find(m => m.id === projectorId);
+    if (!projector) {
+      return;
+    }
+    const owner = this.models.find(
+      m =>
+        m.modelType !== ModelType.PROJECTION &&
+        (m.defaultProjectionModel === projectorId ||
+          m.compatibleProjectionModels?.includes(projectorId)),
+    );
+    const destination = owner
+      ? await this.companionDestinationPath(owner, projector)
+      : undefined;
+    await this.checkSpaceAndDownload(projectorId, destination);
+  };
+
+  /**
    * Private method to handle projection model download for vision models
    * @param model The vision model that needs its projection model downloaded
    */
@@ -1652,7 +1693,8 @@ class ModelStore {
     if (
       !model.supportsMultimodal ||
       !model.defaultProjectionModel ||
-      model.modelType === ModelType.PROJECTION
+      model.modelType === ModelType.PROJECTION ||
+      model.mmprojPath
     ) {
       return;
     }
@@ -1672,7 +1714,8 @@ class ModelStore {
     if (
       projModel &&
       !projModel.isDownloaded &&
-      !downloadManager.isDownloading(projModelId)
+      !downloadManager.isDownloading(projModelId) &&
+      projectorIsUsable(projModel)
     ) {
       console.log('Auto-downloading projection model for vision model:', {
         llm: model.id,
@@ -1680,8 +1723,12 @@ class ModelStore {
       });
 
       try {
-        // Download the projection model
-        await this.checkSpaceAndDownload(projModelId);
+        // Download the projection model beside the model it serves.
+        const destination = await this.companionDestinationPath(
+          model,
+          projModel,
+        );
+        await this.checkSpaceAndDownload(projModelId, destination);
       } catch (error) {
         console.error('Failed to auto-download projection model:', error);
         // Don't re-throw - projection model download failure shouldn't fail the main model download
@@ -1724,7 +1771,10 @@ class ModelStore {
     }
   };
 
-  checkSpaceAndDownload = async (modelId: string) => {
+  checkSpaceAndDownload = async (
+    modelId: string,
+    destinationOverride?: string,
+  ) => {
     const model = this.models.find(m => m.id === modelId);
     // Skip if model is undefined, already downloaded, local or doesn't have a download URL
     // TODO: we need a better way to handle this. Why this could ever happen?
@@ -1739,7 +1789,8 @@ class ModelStore {
     }
 
     try {
-      const destinationPath = await this.getModelFullPath(model);
+      const destinationPath =
+        destinationOverride ?? (await this.getModelFullPath(model));
       const authToken = hfStore.shouldUseToken ? hfStore.hfToken : null;
       await downloadManager.startDownload(model, destinationPath, authToken);
 
@@ -2362,6 +2413,65 @@ class ModelStore {
   };
 
   /**
+   * Attach a projector the user picked from the device. The picker hands back
+   * a temporary URI, so the file is copied into the same app-owned folder as an
+   * imported model and then registered as a projection model. `mmprojPath` is
+   * the authoritative override from that point on.
+   */
+  addManualProjector = async (
+    modelId: string,
+    sourcePath: string,
+    filename?: string,
+  ): Promise<Model | undefined> => {
+    const model = this.models.find(m => m.id === modelId);
+    if (!model) {
+      return undefined;
+    }
+
+    const picked = (filename ?? sourcePath.split('/').pop() ?? 'mmproj.gguf')
+      .split('/')
+      .pop()!;
+    const withExtension = picked.toLowerCase().endsWith('.gguf')
+      ? picked
+      : `${picked}.gguf`;
+    const name = isProjectionModel(withExtension)
+      ? withExtension
+      : `mmproj-${withExtension}`;
+
+    const dir = `${RNFS.DocumentDirectoryPath}/models/local`;
+    await RNFS.mkdir(dir);
+    let destination = `${dir}/${name}`;
+    let counter = 1;
+    while (await RNFS.exists(destination)) {
+      destination = `${dir}/${name.replace(/\.gguf$/i, `-${counter}.gguf`)}`;
+      counter += 1;
+    }
+    if (sourcePath !== destination) {
+      await RNFS.copyFile(sourcePath, destination);
+    }
+
+    await this.addLocalModel(destination);
+    const projector = this.models.find(
+      m => isLocalFileModel(m) && m.fullPath === destination,
+    );
+    if (!projector) {
+      return undefined;
+    }
+
+    runInAction(() => {
+      projector.modelType = ModelType.PROJECTION;
+      model.supportsMultimodal = true;
+      model.compatibleProjectionModels = Array.from(
+        new Set([...(model.compatibleProjectionModels ?? []), projector.id]),
+      );
+      model.defaultProjectionModel = projector.id;
+      model.mmprojPath = destination;
+    });
+    this.refreshPairedMediaSupport(model);
+    return projector;
+  };
+
+  /**
    * Models imported before their folder was read carry no pairing, and
    * re-importing them would orphan every chat bound to the old id. Sweep once a
    * launch, after file statuses settle so a re-anchored path is what gets read.
@@ -2449,6 +2559,59 @@ class ModelStore {
         ? byFilename.get(preferred)
         : ids[0];
     });
+  };
+
+  /**
+   * Finish a pair whose file never landed: a projector download can fail after
+   * the LLM has already completed, and re-selecting the LLM does not retry it.
+   * Each missing file is queued on its own so a failure never restarts the
+   * multi-gigabyte weights that are already on disk.
+   */
+  recoverMissingCompanions = async () => {
+    for (const model of this.models) {
+      if (
+        !model.isDownloaded ||
+        !model.supportsMultimodal ||
+        model.modelType === ModelType.PROJECTION ||
+        model.mmprojPath ||
+        !this.getModelVisionPreference(model)
+      ) {
+        continue;
+      }
+      const projector = this.models.find(
+        m => m.id === model.defaultProjectionModel,
+      );
+      if (
+        !projector ||
+        projector.isDownloaded ||
+        projector.isLocal ||
+        projector.origin === ModelOrigin.LOCAL ||
+        !projector.downloadUrl ||
+        downloadManager.isDownloading(projector.id) ||
+        !projectorIsUsable(projector)
+      ) {
+        continue;
+      }
+      try {
+        const destination = await this.companionDestinationPath(
+          model,
+          projector,
+        );
+        this.checkSpaceAndDownload(projector.id, destination).catch(error => {
+          console.warn(
+            '[ModelStore] Companion recovery failed:',
+            projector.id,
+            error,
+          );
+        });
+      } catch (error) {
+        console.warn(
+          '[ModelStore] Could not resolve the companion path:',
+          projector.id,
+          error,
+        );
+      }
+    }
   };
 
   /**

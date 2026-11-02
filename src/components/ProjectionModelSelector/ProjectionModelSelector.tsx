@@ -105,7 +105,7 @@ export const ProjectionModelSelector = observer(
     };
 
     const handleDownloadModel = (projectionModel: Model) => {
-      modelStore.checkSpaceAndDownload(projectionModel.id);
+      modelStore.downloadProjectionModel(projectionModel.id);
     };
 
     const handleDeleteModel = (projectionModel: Model) => {

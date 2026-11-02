@@ -1,4 +1,8 @@
-import {readGGUFHeaderForMTP} from '../ggufHeader';
+import {
+  localFileSource,
+  readGGUFHeaderForMTP,
+  scanGGUFHeader,
+} from '../ggufHeader';
 import {FixtureType, GGUFFixture, rangeFetchFor} from './ggufFixture';
 
 const URL = 'https://host/file.gguf';
@@ -170,5 +174,45 @@ describe('readGGUFHeaderForMTP', () => {
     } finally {
       globalThis.TextDecoder = nativeTextDecoder;
     }
+  });
+});
+
+describe('scanGGUFHeader', () => {
+  const scanLocal = async (fixture: GGUFFixture) => {
+    const bytes = fixture.build();
+    return scanGGUFHeader(
+      localFileSource('/models/mmproj.gguf', async (_path, len, at) =>
+        Buffer.from(bytes.slice(at, at + len)).toString('base64'),
+      ),
+      {keyFilter: key => key === 'general.architecture'},
+    );
+  };
+
+  it('reads string values with the version-specific length encoding', async () => {
+    for (const version of [1, 2, 3] as const) {
+      const fixture = new GGUFFixture(version).kv('general.architecture', {
+        type: FixtureType.STRING,
+        value: 'clip',
+      });
+      await expect(scanLocal(fixture)).resolves.toEqual({
+        values: {'general.architecture': 'clip'},
+        tensorNames: [],
+      });
+    }
+  });
+
+  it('reads a scalar that follows a skipped array', async () => {
+    const fixture = new GGUFFixture()
+      .kv('tokenizer.ggml.tokens', {
+        type: FixtureType.ARRAY,
+        elemType: FixtureType.STRING,
+        values: Array.from({length: 500}, (_, i) => `token_${i}`),
+      })
+      .kv('general.architecture', {type: FixtureType.STRING, value: 'clip'});
+
+    await expect(scanLocal(fixture)).resolves.toEqual({
+      values: {'general.architecture': 'clip'},
+      tensorNames: [],
+    });
   });
 });

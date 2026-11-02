@@ -557,6 +557,17 @@ export enum ModelType {
 }
 
 /**
+ * What a model can consume or produce, as declared by its projector header.
+ * Kept separate from the legacy `supportsMultimodal` flag so an audio-only
+ * model is not presented as a vision model (and vice versa).
+ */
+export interface MediaSupport {
+  vision: boolean;
+  audioInput: boolean;
+  audioOutput: boolean;
+}
+
+/**
  * GGUF metadata (currently this is used for memory estimation)
  * Parsed from model file using llama.rn's loadLlamaModelInfo()
  */

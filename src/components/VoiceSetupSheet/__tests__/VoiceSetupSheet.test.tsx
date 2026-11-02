@@ -54,8 +54,15 @@ const onClose = jest.fn();
 const asr = asrStore as any;
 const tts = ttsStore as any;
 
-const renderSheet = () =>
-  render(<VoiceSetupSheet isVisible onClose={onClose} onDone={onDone} />);
+const renderSheet = (sttRequired: boolean = true) =>
+  render(
+    <VoiceSetupSheet
+      isVisible
+      onClose={onClose}
+      onDone={onDone}
+      sttRequired={sttRequired}
+    />,
+  );
 
 describe('VoiceSetupSheet', () => {
   beforeEach(() => {
@@ -82,6 +89,18 @@ describe('VoiceSetupSheet', () => {
     expect(getByText(/^Whisper Base · /)).toBeTruthy();
     expect(await findByText('Sarah · ready')).toBeTruthy();
     expect(getByText(strings.micNote)).toBeTruthy();
+  });
+
+  it('leaves whisper out of setup when the model hears the mic itself', async () => {
+    const {queryByText, getByTestId} = renderSheet(false);
+    const downloadsBefore = (asrStore.downloadModel as jest.Mock).calls.length;
+    const doneBefore = onDone.mock.calls.length;
+
+    expect(queryByText(strings.sttRowTitle)).toBeNull();
+    fireEvent.press(getByTestId('voice-setup-continue'));
+
+    await waitFor(() => expect(onDone.mock.calls.length).toBe(doneBefore + 1));
+    expect(asrStore.downloadModel).toHaveBeenCalledTimes(downloadsBefore);
   });
 
   it('shows the in-use tier when it is installed', async () => {

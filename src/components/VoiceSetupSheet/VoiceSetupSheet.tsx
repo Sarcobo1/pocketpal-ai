@@ -30,14 +30,22 @@ interface VoiceSetupSheetProps {
   onClose: () => void;
   /** Called once whisper, a neural voice and the mic are all ready. */
   onDone: () => void;
+  /**
+   * False when the model in memory hears the microphone through its own
+   * projector: asking that session to download Whisper would be asking for a
+   * second model to do what the first already can. Defaults to the cascade
+   * pipeline, which does need one.
+   */
+  sttRequired?: boolean;
 }
 
 /**
  * First-use setup for voice mode: the in-use whisper tier (the default when
- * none is installed), a neural voice, then microphone access.
+ * none is installed), a neural voice, then microphone access — minus whichever
+ * of the two models the active model does not need.
  */
 export const VoiceSetupSheet: React.FC<VoiceSetupSheetProps> = observer(
-  ({isVisible, onClose, onDone}) => {
+  ({isVisible, onClose, onDone, sttRequired = true}) => {
     const theme = useTheme();
     const l10n = useContext(L10nContext);
     const strings = l10n.voiceMode;
@@ -101,7 +109,7 @@ export const VoiceSetupSheet: React.FC<VoiceSetupSheetProps> = observer(
       }
       setBusy(true);
       try {
-        if (!asrStore.isSelectedTierReady) {
+        if (sttRequired && !asrStore.isSelectedTierReady) {
           await asrStore.downloadModel(asrStore.setupTier);
           if (!asrStore.isSelectedTierReady || setupInterrupted()) {
             return;
@@ -201,13 +209,20 @@ export const VoiceSetupSheet: React.FC<VoiceSetupSheetProps> = observer(
 
           <View
             style={[styles.card, {borderColor: theme.colors.outlineVariant}]}>
-            <WhisperModelRow
-              tier={asrStore.setupTier}
-              testIDPrefix="voice-setup"
-            />
-            <View
-              style={[styles.divider, {backgroundColor: theme.colors.border}]}
-            />
+            {sttRequired ? (
+              <>
+                <WhisperModelRow
+                  tier={asrStore.setupTier}
+                  testIDPrefix="voice-setup"
+                />
+                <View
+                  style={[
+                    styles.divider,
+                    {backgroundColor: theme.colors.border},
+                  ]}
+                />
+              </>
+            ) : null}
             <View style={styles.row} testID="voice-setup-voice">
               <View style={styles.rowText}>
                 <Text variant="titleSmall">{strings.voiceRowTitle}</Text>

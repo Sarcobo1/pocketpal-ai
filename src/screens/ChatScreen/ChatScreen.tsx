@@ -346,6 +346,7 @@ export const ChatScreen: React.FC = observer(() => {
         isVisible={voiceMode.sheet?.kind === 'setup'}
         onClose={voiceMode.dismissSheet}
         onDone={voiceMode.setupDone}
+        sttRequired={!modelStore.activeMediaSupport.audioInput}
       />
       <VoiceMemorySheet
         fit={voiceMode.sheet?.kind === 'memory' ? voiceMode.sheet.fit : null}

@@ -51,3 +51,17 @@ jobs:
 
       - name: Voice and chat unit tests
         run: yarn test --ci --runTestsByPath src/utils/__tests__/chat.test.ts src/services/plus/__tests__/gate.test.ts 2>&1 | tail -40
+
+      # The media turn has five moving parts — pairing, resolution, the live
+      # attach, the payload shape and the engine choice — and a phone test costs
+      # a full APK build, so the suites that cover them gate the branch here.
+      - name: Multimodal and voice-mode unit tests
+        run: |
+          set -eo pipefail
+          yarn test --ci --runTestsByPath \
+            src/store/__tests__/ModelStore.localMultimodal.test.ts \
+            src/utils/__tests__/multimodalHelpers.test.ts \
+            src/services/voice/__tests__/omniEngine.test.ts \
+            src/hooks/__tests__/useChatSession.test.ts \
+            src/hooks/__tests__/useChatSession.assistantTurn.test.ts \
+            src/hooks/__tests__/useVoiceMode.test.ts

@@ -544,7 +544,7 @@ describe('ModelStore local projector pairing', () => {
     });
 
     it('keeps a projector that cannot generate audio silent on the record', async () => {
-      const ctx = contextWithProjector();
+      contextWithProjector();
 
       await expect(modelStore.ensureMultimodalActive()).resolves.toBe(true);
       expect(model.mediaSupport).toEqual({

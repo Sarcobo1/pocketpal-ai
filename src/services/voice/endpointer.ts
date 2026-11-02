@@ -4,6 +4,7 @@ import {
   ASR_SEGMENT_LEAD_IN_MS,
 } from '../asr/constants';
 
+import {logPerf} from '../../utils/mediaPerf';
 import {vtrace} from '../../utils/voiceTrace';
 
 import {
@@ -100,15 +101,17 @@ export class Endpointer {
         return 'none';
       }
       if (this.speechBytes > 0) {
-        vtrace('vad.drop', {
+        // Both sinks: the trace lines up with the session, the console line is
+        // what a release APK on a phone that never sent the clip can show.
+        logPerf('utt.drop', {
           reason: 'short',
           speechMs: this.voicedMs,
-          rms,
-          onset,
-          hold,
-          noise,
           ms: Math.round(this.bytes / BYTES_PER_MS),
+          rms: Math.round(rms * 1e4) / 1e4,
+          onset: Math.round(onset * 1e4) / 1e4,
+          hold: Math.round(hold * 1e4) / 1e4,
         });
+        vtrace('vad.drop', {reason: 'short', rms, onset, hold, noise});
       }
       this.clear();
       return 'none';

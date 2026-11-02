@@ -1,15 +1,29 @@
 import {fromByteArray} from 'base64-js';
 import * as RNFS from '@dr.pogodin/react-native-fs';
+import {Platform} from 'react-native';
 
 import {ASR_BITS_PER_SAMPLE, ASR_CHANNELS, ASR_SAMPLE_RATE} from '../asr';
 import {chatSessionStore} from '../../store';
+import {logPerf} from '../../utils/mediaPerf';
+
+import {pcmLevel} from './speechLevel';
 
 const HEADER_BYTES = 44;
 
 /** Voice media is kept for this many turns beyond the ones still in a chat. */
 const KEEP_TURNS = 40;
 
-export const voiceAudioDir = `${RNFS.CachesDirectoryPath}/voice-audio`;
+/**
+ * Android keeps the clips in the app's own external directory so a field
+ * report can be pulled with `adb pull` and listened to; iOS stays in the
+ * cache, which nothing outside the app reads anyway.
+ */
+const pullableDir =
+  Platform.OS === 'android'
+    ? RNFS.ExternalDirectoryPath || RNFS.CachesDirectoryPath
+    : RNFS.CachesDirectoryPath;
+
+export const voiceAudioDir = `${pullableDir}/voice-audio`;
 
 const wavHeader = (dataBytes: number): Uint8Array => {
   const header = new Uint8Array(HEADER_BYTES);
@@ -46,6 +60,34 @@ export const int16PcmToWav = (pcm: Uint8Array): Uint8Array => {
 };
 
 /**
+ * The header a WAV reader will actually see, taken back out of the bytes. The
+ * writer and this reader agree only if the offsets and the little endianness
+ * are right, so a mismatch here is the clip being wrong, not the log.
+ */
+export const readWavHeader = (wav: Uint8Array) => {
+  const view = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
+  const tag = (offset: number) =>
+    String.fromCharCode(
+      view.getUint8(offset),
+      view.getUint8(offset + 1),
+      view.getUint8(offset + 2),
+      view.getUint8(offset + 3),
+    );
+  return {
+    riff:
+      tag(0) === 'RIFF' &&
+      tag(8) === 'WAVE' &&
+      tag(12) === 'fmt ' &&
+      tag(36) === 'data',
+    format: view.getUint16(20, true),
+    channels: view.getUint16(22, true),
+    sampleRate: view.getUint32(24, true),
+    bits: view.getUint16(34, true),
+    dataBytes: view.getUint32(40, true),
+  };
+};
+
+/**
  * Media that a chat still shows must stay: replaying a spoken turn sends its
  * audio again and its bubble redraws the frame. Everything older than
  * `KEEP_TURNS` files of one kind goes.
@@ -74,11 +116,33 @@ export const pruneVoiceMedia = async (dir: string, extension: string) => {
   }
 };
 
-/** Writes one utterance and returns the path a multimodal model reads from. */
+/**
+ * Writes one utterance and returns the path a multimodal model reads from.
+ * Every clip the model is about to hear is reported with the numbers that
+ * describe it, because "the model did not hear me" and "the model heard room
+ * tone" are the same failure from the chat screen and nothing else says which.
+ */
 export const writeUtteranceWav = async (pcm: Uint8Array): Promise<string> => {
   await RNFS.mkdir(voiceAudioDir);
   const path = `${voiceAudioDir}/utt-${Date.now()}.wav`;
-  await RNFS.writeFile(path, fromByteArray(int16PcmToWav(pcm)), 'base64');
+  const wav = int16PcmToWav(pcm);
+  await RNFS.writeFile(path, fromByteArray(wav), 'base64');
+  const header = readWavHeader(wav);
+  const {rms, peak} = pcmLevel(pcm);
+  logPerf('utt.dump', {
+    path,
+    ms: Math.round((pcm.length / 2 / ASR_SAMPLE_RATE) * 1000),
+    sampleRate: header.sampleRate,
+    channels: header.channels,
+    bits: header.bits,
+    format: header.format,
+    headerOk: header.riff,
+    pcmBytes: pcm.length,
+    dataBytes: header.dataBytes,
+    wavBytes: wav.length,
+    rms: Math.round(rms * 1e4) / 1e4,
+    peak: Math.round(peak * 1e4) / 1e4,
+  });
   await pruneVoiceMedia(voiceAudioDir, '.wav').catch(err =>
     console.warn('[voiceMode] utterance cleanup failed:', err),
   );

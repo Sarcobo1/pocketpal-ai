@@ -1,13 +1,13 @@
 import {when} from 'mobx';
 
-import {energyVad, int16PcmToFloat32} from '../asr';
 import {modelStore, ttsStore} from '../../store';
 import {ModelOrigin} from '../../utils/types';
 import {vtrace} from '../../utils/voiceTrace';
 
 import {findTurn} from './chatTurns';
-import {startPerf} from '../../utils/mediaPerf';
+import {logPerf, startPerf} from '../../utils/mediaPerf';
 import {captureVoiceFrame} from './frameSource';
+import {gateUtterance} from './speechLevel';
 import {writeUtteranceWav} from './wav';
 import type {
   VoiceEngine,
@@ -87,13 +87,10 @@ export class OmniVoiceEngine implements VoiceEngine {
 
     const run = async (): Promise<VoiceTurnOutcome> => {
       const lap = startPerf();
-      const vad = energyVad(int16PcmToFloat32(utterance));
-      vtrace('vad', {
-        passed: vad.passed,
-        voicedMs: vad.voicedMs,
-        ms: Math.round(vad.durationMs),
-      });
-      if (!vad.passed) {
+      const gate = gateUtterance(utterance);
+      vtrace('utt.gate', {reason: gate.reason, speechMs: gate.speechMs});
+      logPerf('utt.gate', {...gate});
+      if (!gate.pass) {
         return 'empty';
       }
       let audioUri: string;

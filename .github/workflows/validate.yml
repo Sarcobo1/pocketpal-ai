@@ -59,8 +59,11 @@ jobs:
             src/utils/__tests__/chat.test.ts \
             src/utils/__tests__/multimodalHelpers.test.ts \
             src/services/plus/__tests__/gate.test.ts \
+            src/services/voice/__tests__/endpointer.test.ts \
             src/services/voice/__tests__/frameSource.test.ts \
             src/services/voice/__tests__/omniEngine.test.ts \
+            src/services/voice/__tests__/speechLevel.test.ts \
+            src/services/voice/__tests__/wav.test.ts \
             src/store/__tests__/ModelStore.localMultimodal.test.ts \
             src/store/__tests__/ModelStore.projectorMedia.test.ts \
             src/components/VoiceModeView/__tests__/VoiceModeView.test.tsx \

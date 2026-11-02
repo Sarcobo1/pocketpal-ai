@@ -50,6 +50,7 @@ import {
 } from '../store';
 import type {VoiceError, VoicePhase} from '../store';
 import {acquireKeepAwake} from '../utils/keepAwake';
+import {projectionGapCopy} from '../utils/multimodalHelpers';
 import {ModelOrigin} from '../utils/types';
 import {startVoiceTrace, vtrace} from '../utils/voiceTrace';
 
@@ -199,6 +200,14 @@ class VoiceModeController {
       return;
     }
     this.engine = (await isOmniVoiceModel()) ? this.omni : this.cascade;
+    if (this.engine.id === 'cascade') {
+      // Two extra models are about to do what one omni model could have done
+      // itself. When the app knows which file is missing, that is the answer.
+      const gap = projectionGapCopy(modelStore.projectionGap, uiStore.l10n);
+      if (gap) {
+        warn(gap);
+      }
+    }
   }
 
   async checkMemoryAndEnter(): Promise<void> {

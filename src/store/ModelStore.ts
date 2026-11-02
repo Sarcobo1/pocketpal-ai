@@ -45,8 +45,13 @@ import {
   inferRepoFromModelId,
   parseSizeLabel,
 } from '../utils';
-import {getRecommendedProjectionModel} from '../utils/multimodalHelpers';
-import {isDraftOnlyModel} from '../utils/mtp';
+import {
+  getRecommendedProjectionModel,
+  isProjectionModel,
+  projectorsForLocalModel,
+  type ProjectionGap,
+} from '../utils/multimodalHelpers';
+import {isDraftOnlyFilename, isDraftOnlyModel} from '../utils/mtp';
 import {getOriginalModelName} from '../utils/formatters';
 import {stopQuietly} from '../utils/stopQuietly';
 import type {OnboardingPalModelEntry} from './onboarding/onboardingPals';
@@ -186,6 +191,19 @@ const answersSession = (
 const pairedDraftModel = (config?: DraftConfig): Model | undefined =>
   config?.mode === 'paired' ? config.draftModel : undefined;
 
+/** A model the phone holds as a file, rather than as a repository listing. */
+const isLocalFileModel = (model: Model): boolean =>
+  !!model.isLocal || model.origin === ModelOrigin.LOCAL;
+
+/** What `resolveMultimodalConfig` decided about one load: which projector, if any. */
+interface MultimodalResolution {
+  isMultimodalInit: boolean;
+  resolvedMmProjPath?: string;
+  projectionModel?: Model;
+  /** Set only when nothing resolved: what the user has to do about it. */
+  gap?: ProjectionGap;
+}
+
 // Survives the process it describes: written right before a native load,
 // removed the moment that context answers. A copy found at the next launch
 // means the load never reported back, which is how an out-of-memory kill looks
@@ -308,6 +326,9 @@ class ModelStore {
   // Projection models orphaned by the vision heal, awaiting deletion; drained
   // every launch (see drainPendingProjectionCleanup).
   pendingProjectionCleanupIds: string[] = [];
+  // Why the last media turn had no projector, refreshed by every resolution;
+  // runtime only, and {kind:'none'} once one is attached.
+  projectionGap: ProjectionGap = {kind: 'none'};
 
   constructor() {
     makeAutoObservable<
@@ -858,10 +879,14 @@ class ModelStore {
       this.removeInvalidLocalModels();
     }
 
+    // An imported model's projector is a file, not a repository listing, and
+    // imports predate the folder scan — pair them before any UI can offer a
+    // camera or a mic to a model that has the encoder on disk.
+    await this.healLocalProjectionLinks();
+
     // Upgrade past the bundled floor to the online rules override in the
     // background; reconcile (id-keyed, dedup) folds in any newer set.
     this.upgradeToFetchedRules();
-
     await this.initializeGpuSettings(); // Should be awaited to ensure GPU settings are applied before initializing context
 
     // A load that never reported back is only knowable at the next launch, and
@@ -2057,6 +2082,227 @@ class ModelStore {
   };
 
   /**
+   * Pair a model that arrived as a file with the projector beside it.
+   *
+   * The HF path derives the pairing from the repository listing; "Add model
+   * from device" sees one path and nothing else, so an imported omni model
+   * carries no `supportsMultimodal` — which at load time is indistinguishable
+   * from a model that cannot see at all. Reading the folder is the remaining
+   * evidence, and it is what lets an imported LFM3-Omni take a camera frame and
+   * the mic instead of falling back to a transcript.
+   *
+   * Idempotent. Registers nothing for a model that is already paired, for a
+   * projection file or draft, and for a folder with no matching mmproj.
+   *
+   * @returns the projection model ids now paired with this model
+   */
+  linkLocalProjectionModels = async (model: Model): Promise<string[]> => {
+    if (
+      !isLocalFileModel(model) ||
+      !model.fullPath ||
+      model.supportsMultimodal ||
+      model.modelType === ModelType.PROJECTION ||
+      isProjectionModel(model.filename) ||
+      isDraftOnlyFilename(model.filename)
+    ) {
+      return [];
+    }
+
+    const dir = model.fullPath.slice(0, model.fullPath.lastIndexOf('/'));
+    let folderFiles: string[];
+    try {
+      folderFiles = (await RNFS.readDir(dir)).map(entry => entry.name);
+    } catch (error) {
+      console.warn('[ModelStore] Could not read the model folder:', dir, error);
+      return [];
+    }
+
+    const filenames = projectorsForLocalModel(model.filename, folderFiles);
+    if (filenames.length === 0) {
+      return [];
+    }
+
+    const idsByFilename = new Map<string, string>();
+    for (const filename of filenames) {
+      const fullPath = `${dir}/${filename}`;
+      const byPath = (candidate: Model): boolean =>
+        isLocalFileModel(candidate) && candidate.fullPath === fullPath;
+      const existing = this.models.find(byPath);
+      if (existing) {
+        idsByFilename.set(filename, existing.id);
+        continue;
+      }
+      await this.addLocalModel(fullPath);
+      const created = this.models.find(byPath);
+      if (created) {
+        // A projector is reachable only through the model that owns it, so it
+        // must not present itself as a selectable model.
+        runInAction(() => {
+          created.modelType = ModelType.PROJECTION;
+        });
+        idsByFilename.set(filename, created.id);
+      }
+    }
+    if (idsByFilename.size === 0) {
+      return [];
+    }
+
+    const recommended =
+      getRecommendedProjectionModel(model.filename, [
+        ...idsByFilename.keys(),
+      ]) ?? filenames[0];
+
+    runInAction(() => {
+      const storeModel = this.models.find(m => m.id === model.id);
+      if (!storeModel) {
+        return;
+      }
+      storeModel.supportsMultimodal = true;
+      storeModel.modelType = ModelType.VISION;
+      storeModel.capabilities = [
+        ...new Set([...(storeModel.capabilities ?? []), 'vision']),
+      ];
+      storeModel.compatibleProjectionModels = [...idsByFilename.values()];
+      storeModel.defaultProjectionModel = idsByFilename.get(recommended);
+      if (storeModel.visionEnabled === undefined) {
+        storeModel.visionEnabled = true;
+      }
+    });
+
+    const ids = [...idsByFilename.values()];
+    console.log(
+      '[ModelStore] Paired',
+      model.name,
+      'with',
+      ids.length,
+      'projector(s) from its folder',
+    );
+    return ids;
+  };
+
+  /**
+   * Models imported before their folder was read carry no pairing, and
+   * re-importing them would orphan every chat bound to the old id. Sweep once a
+   * launch, after file statuses settle so a re-anchored path is what gets read.
+   */
+  healLocalProjectionLinks = async () => {
+    const unpaired = this.models.filter(
+      m =>
+        isLocalFileModel(m) &&
+        m.fullPath &&
+        !m.supportsMultimodal &&
+        m.modelType !== ModelType.PROJECTION,
+    );
+    for (const model of unpaired) {
+      try {
+        await this.linkLocalProjectionModels(model);
+      } catch (error) {
+        console.warn(
+          '[ModelStore] Local projector pairing failed:',
+          model.name,
+          error,
+        );
+      }
+    }
+  };
+
+  /**
+   * Load a projector into a context and record what the engine reports.
+   *
+   * The clamp on image_max_tokens is llama.rn's: a projector configured above
+   * the running context window cannot encode a frame it has no tokens for.
+   *
+   * @returns whether the context now has a usable projector
+   */
+  private attachMultimodal = async (
+    ctx: LlamaContext,
+    mmProjPath: string,
+    projectionModelId?: string,
+  ): Promise<boolean> => {
+    // A file the engine refuses is worth naming too: it is the one answer that
+    // distinguishes a wrong quant from a missing download.
+    const refused: ProjectionGap = {
+      kind: 'attach',
+      filename: mmProjPath.split('/').pop() ?? mmProjPath,
+    };
+    try {
+      const success = await ctx.initMultimodal({
+        path: mmProjPath,
+        use_gpu: !this.contextInitParams.no_gpu_devices,
+        image_max_tokens: Math.min(
+          this.contextInitParams.image_max_tokens ?? 512,
+          this.contextInitParams.n_ctx,
+        ),
+      });
+      if (!success) {
+        console.error('Failed to initialize multimodal support');
+        runInAction(() => {
+          this.isMultimodalActive = false;
+          this.activeProjectionModelId = undefined;
+          this.projectionGap = refused;
+        });
+        return false;
+      }
+      const isEnabled = await ctx.isMultimodalEnabled();
+      console.log('Multimodal enabled status:', isEnabled);
+      runInAction(() => {
+        this.isMultimodalActive = isEnabled;
+        this.activeProjectionModelId = isEnabled
+          ? projectionModelId
+          : undefined;
+        this.projectionGap = isEnabled ? {kind: 'none'} : refused;
+      });
+      return isEnabled;
+    } catch (error) {
+      console.error('Error initializing multimodal support:', error);
+      runInAction(() => {
+        this.isMultimodalActive = false;
+        this.activeProjectionModelId = undefined;
+        this.projectionGap = refused;
+      });
+      return false;
+    }
+  };
+
+  /**
+   * Put a projector on the context that is already running.
+   *
+   * llama.rn attaches mmproj to a live context, so a model loaded before its
+   * pairing existed — imported, or loaded while its projector was still
+   * downloading — does not need a reload to see and hear. Every media turn
+   * asks this first, which is also what lets a mid-session camera switch work
+   * on a model the load pass had classified as text-only.
+   */
+  ensureMultimodalActive = async (): Promise<boolean> => {
+    if (this.isMultimodalActive) {
+      return true;
+    }
+    const ctx = this.context;
+    const model = this.activeModel;
+    if (!ctx || !model) {
+      return false;
+    }
+    // A caller asks this on a path that has a worse message to give, so an
+    // unsuccessful probe — including one that cannot read the list — answers
+    // "no" rather than throwing.
+    let resolved: MultimodalResolution;
+    try {
+      resolved = await this.resolveMultimodalConfig(model);
+    } catch (error) {
+      console.warn('[ModelStore] Projector resolution failed:', error);
+      return false;
+    }
+    if (!resolved.isMultimodalInit || !resolved.resolvedMmProjPath) {
+      return false;
+    }
+    return this.attachMultimodal(
+      ctx,
+      resolved.resolvedMmProjPath,
+      resolved.projectionModel?.id,
+    );
+  };
+
+  /**
    * Determines whether multimodal (vision) should be enabled for a model load.
    *
    * Resolves multimodal config: enables vision if model supports it and a projection
@@ -2072,11 +2318,15 @@ class ModelStore {
   private resolveMultimodalConfig = async (
     model: Model,
     mmProjPath?: string,
-  ): Promise<{
-    isMultimodalInit: boolean;
-    resolvedMmProjPath?: string;
-    projectionModel?: Model;
-  }> => {
+  ): Promise<MultimodalResolution> => {
+    // A model that arrived as a file has no repository listing to read the
+    // projector off, so pair it from its folder before asking any preference.
+    let folderHasNoProjector = false;
+    if (!mmProjPath && !model.supportsMultimodal) {
+      const paired = await this.linkLocalProjectionModels(model);
+      folderHasNoProjector = paired.length === 0 && !!model.fullPath;
+    }
+
     const visionEnabled = this.getModelVisionPreference(model);
 
     // Priority 1: Explicit path provided by caller
@@ -2103,8 +2353,77 @@ class ModelStore {
       }
     }
 
+    // Priority 3: a projector that is on the phone but not the auto-match. A
+    // repo carries one mmproj per quant, and the phone rarely holds the one the
+    // quant match asks for — an available projector beats an absent one.
+    if (visionEnabled && model.compatibleProjectionModels?.length) {
+      const alternative = this.models.find(
+        m =>
+          m.modelType === ModelType.PROJECTION &&
+          m.isDownloaded &&
+          model.compatibleProjectionModels?.includes(m.id),
+      );
+      if (alternative) {
+        console.warn(
+          '[ModelStore] Using downloaded projector',
+          alternative.filename,
+          'instead of the recommended',
+          model.defaultProjectionModel,
+        );
+        try {
+          return {
+            isMultimodalInit: true,
+            resolvedMmProjPath: await this.getModelFullPath(alternative),
+            projectionModel: alternative,
+          };
+        } catch (error) {
+          console.warn(
+            '[ModelStore] Could not resolve that projector path:',
+            error,
+          );
+        }
+      }
+    }
+
     // Default: No multimodal support
-    return {isMultimodalInit: false};
+    const missing = this.undownloadedProjectionFile(model);
+    const gap: ProjectionGap = missing
+      ? {kind: 'download', filename: missing}
+      : folderHasNoProjector
+        ? {kind: 'folder'}
+        : {kind: 'none'};
+    runInAction(() => {
+      this.projectionGap = gap;
+    });
+    if (model.supportsMultimodal && visionEnabled) {
+      console.warn(
+        '[ModelStore]',
+        model.name,
+        'declares multimodal but no projector file is on the phone — it needs',
+        missing ?? 'an mmproj from the same repository',
+        'downloaded',
+      );
+    }
+    return {isMultimodalInit: false, gap};
+  };
+
+  /**
+   * The projector this model is paired with in the library but cannot find on
+   * the phone — named, because "multimodal is not enabled" is not a file
+   * anyone can go and download.
+   */
+  private undownloadedProjectionFile = (model: Model): string | undefined => {
+    const ids = [
+      model.defaultProjectionModel,
+      ...(model.compatibleProjectionModels ?? []),
+    ].filter((id): id is string => !!id);
+    for (const id of ids) {
+      const entry = this.models.find(m => m.id === id);
+      if (entry && !entry.isDownloaded) {
+        return entry.filename;
+      }
+    }
+    return undefined;
   };
 
   private resolveDraftConfig = async (model: Model): Promise<DraftConfig> => {
@@ -2694,6 +3013,8 @@ class ModelStore {
     runInAction(() => {
       this.isMultimodalActive = false; // Reset until we confirm it's enabled
       this.activeProjectionModelId = projectionModel?.id;
+      // Whatever the previous context could not find is not this model's story.
+      this.projectionGap = {kind: 'none'};
     });
 
     // Get all effective initialization settings BEFORE try block
@@ -2756,40 +3077,8 @@ class ModelStore {
 
       // Initialize multimodal support if mmproj path was provided
       if (isMultimodalInit && mmProjPath) {
-        try {
-          console.log('Initializing multimodal support with path:', mmProjPath);
-
-          // Initialize multimodal with the new API format
-          // Apply effective value: clamp image_max_tokens to n_ctx
-          const success = await ctx.initMultimodal({
-            path: mmProjPath,
-            use_gpu: !this.contextInitParams.no_gpu_devices,
-            image_max_tokens: Math.min(
-              this.contextInitParams.image_max_tokens ?? 512,
-              this.contextInitParams.n_ctx,
-            ),
-          });
-
-          if (!success) {
-            console.error('Failed to initialize multimodal support');
-          } else {
-            console.log('Multimodal support initialized successfully');
-            // Verify that multimodal is now enabled
-            const isEnabled = await ctx.isMultimodalEnabled();
-            console.log('Multimodal enabled status:', isEnabled);
-
-            // Update the multimodal active flag
-            runInAction(() => {
-              this.isMultimodalActive = isEnabled;
-            });
-          }
-        } catch (error) {
-          console.error('Error initializing multimodal support:', error);
-          runInAction(() => {
-            this.isMultimodalActive = false;
-            this.activeProjectionModelId = undefined;
-          });
-        }
+        console.log('Initializing multimodal support with path:', mmProjPath);
+        await this.attachMultimodal(ctx, mmProjPath, projectionModel?.id);
       }
 
       runInAction(() => {
@@ -3443,6 +3732,8 @@ class ModelStore {
     const observableModel = this.models.find(m => m.id === model.id);
     if (observableModel) {
       await this.fetchAndPersistGGUFMetadata(observableModel);
+      // An imported model is only as multimodal as the file sitting beside it.
+      await this.linkLocalProjectionModels(observableModel);
     }
   };
 
@@ -4224,7 +4515,14 @@ class ModelStore {
 
     // Check if multimodal is enabled
     if (!this.isMultimodalActive) {
-      throw new Error('Multimodal is not enabled for this model');
+      // The projector can still land on the running context — the model may
+      // have been loaded before its pairing was known.
+      await this.ensureMultimodalActive();
+    }
+    if (!this.isMultimodalActive) {
+      throw new Error(
+        'Multimodal is not enabled for this model: no projection model (mmproj) is loaded with it',
+      );
     }
 
     const lease = this.tryAcquireGeneration();

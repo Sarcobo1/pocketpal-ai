@@ -1,9 +1,9 @@
 import {runInAction} from 'mobx';
 
 import {ASR_CHUNK_BYTES} from '../../asr/constants';
-import {chatSessionStore, voiceModeStore} from '../../../store';
+import {chatSessionStore, modelStore, voiceModeStore} from '../../../store';
 
-import {OmniVoiceEngine} from '../omniEngine';
+import {OmniVoiceEngine, isOmniVoiceModel} from '../omniEngine';
 import {setVoiceFrameSource} from '../frameSource';
 import type {VoiceTurnEvents, VoiceTurnPayload} from '../types';
 
@@ -148,5 +148,47 @@ describe('OmniVoiceEngine', () => {
     const turn = engine.runTurn(speech(500), port, events());
 
     await expect(turn.done).resolves.toBe('reply_failed');
+  });
+});
+
+describe('isOmniVoiceModel', () => {
+  const store = modelStore as any;
+
+  const withLoadedModel = (support: {vision: boolean; audio: boolean}) => {
+    runInAction(() => {
+      store.activeModelId = 'model-1';
+      store.context = {
+        getMultimodalSupport: jest.fn().mockResolvedValue(support),
+      };
+    });
+  };
+
+  beforeEach(() => {
+    store.ensureMultimodalActive.mockReset();
+    runInAction(() => {
+      store.isMultimodalActive = false;
+    });
+  });
+
+  it('puts the projector on the model before trusting the load-time flag', async () => {
+    withLoadedModel({vision: true, audio: true});
+    store.ensureMultimodalActive.mockResolvedValue(true);
+
+    await expect(isOmniVoiceModel()).resolves.toBe(true);
+    expect(store.ensureMultimodalActive).toHaveBeenCalledTimes(1);
+  });
+
+  it('is not an omni model while no projector can be attached', async () => {
+    withLoadedModel({vision: true, audio: true});
+    store.ensureMultimodalActive.mockResolvedValue(false);
+
+    await expect(isOmniVoiceModel()).resolves.toBe(false);
+  });
+
+  it('is not an omni model when the projector cannot hear', async () => {
+    withLoadedModel({vision: true, audio: false});
+    store.ensureMultimodalActive.mockResolvedValue(true);
+
+    await expect(isOmniVoiceModel()).resolves.toBe(false);
   });
 });

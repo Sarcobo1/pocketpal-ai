@@ -20,10 +20,13 @@ import type {
  * of the turn.
  */
 export const isOmniVoiceModel = async (): Promise<boolean> => {
-  if (
-    !modelStore.isMultimodalActive ||
-    modelStore.activeModel?.origin === ModelOrigin.REMOTE
-  ) {
+  if (modelStore.activeModel?.origin === ModelOrigin.REMOTE) {
+    return false;
+  }
+  // The projector is what decides whether a model can hear, and llama.rn can
+  // attach it to a context that is already running — so ask for it rather than
+  // reading a flag a model loaded before its pairing never had.
+  if (!(await modelStore.ensureMultimodalActive())) {
     return false;
   }
   const ctx = modelStore.context;

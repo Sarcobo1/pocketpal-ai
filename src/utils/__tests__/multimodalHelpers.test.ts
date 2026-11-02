@@ -4,8 +4,12 @@ import {
   isProjectionModel,
   getRecommendedProjectionModel,
   getLLMFiles,
+  projectorsForLocalModel,
+  projectionGapCopy,
 } from '../multimodalHelpers';
+import {toLocalMediaPath} from '../multimodalPatterns';
 import {ModelFile} from '../types';
+import en from '../../locales/en.json';
 
 describe('multimodalHelpers', () => {
   // Test data for model files
@@ -290,5 +294,114 @@ describe('multimodalHelpers', () => {
       );
       expect(result).toBe('mmproj-llama-3.1-vision-q4_k.gguf');
     });
+  });
+});
+
+describe('projectorsForLocalModel', () => {
+  it('pairs the projector in a folder that holds one model', () => {
+    expect(
+      projectorsForLocalModel('LFM3-Omni-2B-Q8_0.gguf', [
+        'LFM3-Omni-2B-Q8_0.gguf',
+        'mmproj-LFM3-Omni-2B-Q8_0.gguf',
+      ]),
+    ).toEqual(['mmproj-LFM3-Omni-2B-Q8_0.gguf']);
+  });
+
+  it('keeps every projector of that family, so the quant match can choose', () => {
+    expect(
+      projectorsForLocalModel('LFM3-Omni-2B-Q4_K_M.gguf', [
+        'LFM3-Omni-2B-Q4_K_M.gguf',
+        'mmproj-LFM3-Omni-2B-Q4_0.gguf',
+        'mmproj-LFM3-Omni-2B-Q8_0.gguf',
+      ]).sort(),
+    ).toEqual([
+      'mmproj-LFM3-Omni-2B-Q4_0.gguf',
+      'mmproj-LFM3-Omni-2B-Q8_0.gguf',
+    ]);
+  });
+
+  it('separates families in a shared folder instead of pairing any mmproj', () => {
+    expect(
+      projectorsForLocalModel('LFM3-Omni-2B-Q8_0.gguf', [
+        'LFM3-Omni-2B-Q8_0.gguf',
+        'gemma-3n-e4b-it-f16.gguf',
+        'mmproj-LFM3-Omni-2B-Q8_0.gguf',
+        'mmproj-gemma-3n-e4b-it-f16.gguf',
+      ]),
+    ).toEqual(['mmproj-LFM3-Omni-2B-Q8_0.gguf']);
+  });
+
+  it('shares no identity in a quant tag alone', () => {
+    expect(
+      projectorsForLocalModel('alpha-2b-Q4_K_M.gguf', [
+        'alpha-2b-Q4_K_M.gguf',
+        'beta-1b-Q4_K_M.gguf',
+        'mmproj-beta-1b-Q4_K_M.gguf',
+      ]),
+    ).toEqual([]);
+  });
+
+  it('leaves a folder without a projector empty', () => {
+    expect(
+      projectorsForLocalModel('LFM3-Omni-2B-Q8_0.gguf', [
+        'LFM3-Omni-2B-Q8_0.gguf',
+        'README.md',
+      ]),
+    ).toEqual([]);
+  });
+});
+
+describe('toLocalMediaPath', () => {
+  it('drops the scheme llama.rn strips from a url field', () => {
+    expect(toLocalMediaPath('file:///data/cache/turn.wav')).toBe(
+      '/data/cache/turn.wav',
+    );
+  });
+
+  it('leaves a plain path untouched', () => {
+    expect(toLocalMediaPath('/data/cache/turn.wav')).toBe(
+      '/data/cache/turn.wav',
+    );
+  });
+});
+
+describe('projectionGapCopy', () => {
+  // The real English copy, so a renamed or missing key fails here rather than
+  // as a crash on a phone.
+  const l10n = en;
+
+  it('names the file to download', () => {
+    expect(
+      projectionGapCopy(
+        {kind: 'download', filename: 'mmproj-LFM3-Omni-2B-Q8_0.gguf'},
+        l10n,
+      ),
+    ).toContain('mmproj-LFM3-Omni-2B-Q8_0.gguf');
+  });
+
+  it('points an import at its folder', () => {
+    expect(projectionGapCopy({kind: 'folder'}, l10n)).toContain('mmproj');
+  });
+
+  it('names the file the engine refused', () => {
+    expect(
+      projectionGapCopy(
+        {kind: 'attach', filename: 'mmproj-gemma-3n-e4b-it-f16.gguf'},
+        l10n,
+      ),
+    ).toContain('mmproj-gemma-3n-e4b-it-f16.gguf');
+  });
+
+  it('says nothing when there is no gap to report', () => {
+    expect(projectionGapCopy({kind: 'none'}, l10n)).toBeUndefined();
+  });
+
+  it('interpolates every placeholder the copy declares', () => {
+    for (const gap of [
+      {kind: 'download', filename: 'a.gguf'},
+      {kind: 'attach', filename: 'b.gguf'},
+    ] as const) {
+      expect(projectionGapCopy(gap, l10n)).not.toContain('{{file}}');
+    }
   });
 });

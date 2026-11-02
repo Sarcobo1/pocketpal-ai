@@ -102,6 +102,35 @@ describe('convertToChatMessages', () => {
     ] as ChatMessage[]);
   });
 
+  it('sends an utterance as a local audio path, which is what llama.rn opens', () => {
+    const messages: MessageType.Text[] = [
+      {
+        id: '1',
+        author: user,
+        text: 'Listen to this',
+        type: 'text',
+        audioUri: 'file:///data/cache/voice-audio/turn.wav',
+        createdAt: Date.now(),
+      },
+    ];
+
+    const result = convertToChatMessages(messages, true);
+
+    expect(result[0]).toEqual({
+      role: 'user',
+      content: [
+        {type: 'text', text: 'Listen to this'},
+        {
+          type: 'input_audio',
+          input_audio: {
+            url: '/data/cache/voice-audio/turn.wav',
+            format: 'wav',
+          },
+        },
+      ],
+    });
+  });
+
   it('should convert multimodal messages to text-only when multimodal is disabled', () => {
     const messages: MessageType.Text[] = [
       {

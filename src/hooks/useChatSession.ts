@@ -45,7 +45,9 @@ import {
 } from '../utils/chat';
 import {acquireKeepAwake} from '../utils/keepAwake';
 import {vtrace} from '../utils/voiceTrace';
+import {toLocalMediaPath} from '../utils/multimodalPatterns';
 import {LLAMARN_ERROR_PATTERNS} from '../utils/llamaRnErrors';
+import {projectionGapCopy} from '../utils/multimodalHelpers';
 import {
   toApiCompletionParams,
   ApiCompletionParams,
@@ -106,11 +108,19 @@ const prepareCompletion = async ({
   const hasImages = imageUris && imageUris.length > 0;
   const hasAudio = !!audioUri;
 
+  // A projector attaches to a context that is already running, so a turn that
+  // carries media asks for one before being downgraded to plain text. Without
+  // this a model imported from storage — whose pairing lands only when
+  // ModelStore next reads its folder — sends a camera frame as a caption.
+  const multimodalReady =
+    isMultimodalEnabled ||
+    ((hasImages || hasAudio) && (await modelStore.ensureMultimodalActive()));
+
   // Create user message content - use array format only for multimodal,
   // string for text-only.
   let userMessageContent: any;
 
-  if ((hasImages || hasAudio) && isMultimodalEnabled) {
+  if ((hasImages || hasAudio) && multimodalReady) {
     userMessageContent = [
       {
         type: 'text',
@@ -122,17 +132,24 @@ const prepareCompletion = async ({
       })),
     ];
     if (hasAudio) {
+      // `url`, not `data`: llama.rn strips file:// from the former and pushes
+      // the latter verbatim, so a content URI in `data` never opens.
       userMessageContent.push({
         type: 'input_audio',
-        input_audio: {data: audioUri, format: 'wav'},
+        input_audio: {url: toLocalMediaPath(audioUri), format: 'wav'},
       });
     }
   } else {
     userMessageContent = message.text;
 
-    if ((hasImages || hasAudio) && !isMultimodalEnabled) {
+    if ((hasImages || hasAudio) && !multimodalReady) {
+      // The generic copy is the wrong answer when the app knows exactly which
+      // file is missing, which is the usual reason a camera turn lands here.
       uiStore.setChatWarning(
-        createMultimodalWarning(l10n.chat.multimodalNotEnabled),
+        createMultimodalWarning(
+          projectionGapCopy(modelStore.projectionGap, l10n) ??
+            l10n.chat.multimodalNotEnabled,
+        ),
       );
     }
   }
@@ -144,7 +161,7 @@ const prepareCompletion = async ({
   // which expands each step into assistant + tool API messages.
   let chatMessages = convertToChatMessages(
     currentMessages.filter(msg => msg.type !== 'image'),
-    isMultimodalEnabled,
+    multimodalReady,
   );
 
   // Strip thinking parts from assistant context if the user opted out.
@@ -206,11 +223,15 @@ const prepareCompletion = async ({
     modelStore.activeModel,
     serverStore.remoteReasoning,
   );
-  const isReasoningCapable = reasoningCapability.isReasoning !== 'no';
   cleanCompletionParams.reasoning_format = 'auto';
-  // The enable_thinking:false hint only matters for reasoning-capable models;
-  // a non-reasoning model would just ignore it.
-  if (isReasoningCapable && !cleanCompletionParams.enable_thinking) {
+  // Thinking off. It used to be sent only to reasoning-capable models, on the
+  // assumption that a model without reasoning ignores it — but llama.rn defaults
+  // enable_thinking to true, and a template that branches on it (LFM3-Omni ends
+  // the generation prompt with an unclosed <think> unless told off) hands that
+  // model a state it cannot finish. Set at the top level too, because llama.rn
+  // reads params.enable_thinking before it merges chat_template_kwargs.
+  if (!cleanCompletionParams.enable_thinking) {
+    cleanCompletionParams.enable_thinking = false;
     cleanCompletionParams.chat_template_kwargs = {
       ...cleanCompletionParams.chat_template_kwargs,
       enable_thinking: false,

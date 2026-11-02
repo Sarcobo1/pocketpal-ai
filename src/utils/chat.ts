@@ -2,6 +2,7 @@ import {applyTemplate, Templates} from 'chat-formatter';
 import {JinjaFormattedChatResult, LlamaContext} from 'llama.rn';
 import {CompletionParams} from './completionTypes';
 import {defaultCompletionParams} from './completionSettingsVersions';
+import {toLocalMediaPath} from './multimodalPatterns';
 
 import {
   AgentStep,
@@ -234,7 +235,7 @@ export function convertToChatMessages(
           type: 'text' | 'image_url' | 'input_audio';
           text?: string;
           image_url?: {url: string};
-          input_audio?: {data: string; format: string};
+          input_audio?: {url?: string; data?: string; format: string};
         }> = [
           {
             type: 'text',
@@ -255,7 +256,10 @@ export function convertToChatMessages(
         if (textMessage.audioUri) {
           contentArray.push({
             type: 'input_audio' as const,
-            input_audio: {data: textMessage.audioUri, format: 'wav'},
+            input_audio: {
+              url: toLocalMediaPath(textMessage.audioUri),
+              format: 'wav',
+            },
           });
         }
 

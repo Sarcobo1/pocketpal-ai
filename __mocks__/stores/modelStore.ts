@@ -20,6 +20,7 @@ import {
   MemoryEstimateSettings,
   stateCacheBudgetMb,
 } from '../../src/utils/memoryEstimator';
+import type {ProjectionGap} from '../../src/utils/multimodalHelpers';
 import type {
   ExtendedRamSetting,
   MemoryBudget,
@@ -49,6 +50,11 @@ class MockModelStore {
   context: LlamaContext | undefined = undefined;
   engine: CompletionEngine | undefined = undefined;
   isMultimodalActive: boolean = false;
+  // Why a media turn had no projector; 'none' until a test says otherwise.
+  projectionGap: ProjectionGap = {kind: 'none'};
+  // Tests that need a projector on a live context implement this; the default
+  // says there is none, which is what a text-only fixture should report.
+  ensureMultimodalActive: jest.Mock;
   activeContextSettings: ContextInitParams | undefined = undefined;
   activeRemoteBinding: RemoteSessionBinding | undefined = undefined;
 
@@ -135,6 +141,7 @@ class MockModelStore {
       retryDownload: false,
       clearDownloadError: false,
       addLocalModel: false,
+      ensureMultimodalActive: false,
       removeModelByFullPath: false,
       setNContext: false,
       updateUseAutoRelease: false,
@@ -207,6 +214,7 @@ class MockModelStore {
     this.retryDownload = jest.fn();
     this.clearDownloadError = jest.fn();
     this.addLocalModel = jest.fn();
+    this.ensureMultimodalActive = jest.fn(async () => false);
     this.removeModelByFullPath = jest.fn();
     this.setNContext = jest.fn();
     this.updateUseAutoRelease = jest.fn();

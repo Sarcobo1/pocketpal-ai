@@ -2919,6 +2919,7 @@ class ModelStore {
       runInAction(() => {
         this.isMultimodalActive = false;
         this.activeProjectionModelId = undefined;
+        this.multimodalDevice = undefined;
         this.projectionGap = refused;
       });
       return false;
@@ -3677,6 +3678,9 @@ class ModelStore {
     runInAction(() => {
       this.isMultimodalActive = false; // Reset until we confirm it's enabled
       this.activeProjectionModelId = projectionModel?.id;
+      // A new context has not encoded a frame yet, so the device the last one
+      // used is not an answer about this one.
+      this.multimodalDevice = undefined;
       // Whatever the previous context could not find is not this model's story.
       this.projectionGap = {kind: 'none'};
     });

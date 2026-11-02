@@ -30,13 +30,16 @@ export const assistant = {id: assistantId};
  * line (matching the visible block-per-step rendering). Steps with no
  * visible content (e.g. tool-call-only steps) are skipped.
  */
+/** A message as it stands at the end of the API layer, read only for media. */
+type PromptMessage = {content?: string | Array<{type?: string}> | null};
+
 /**
  * Media parts carried by a finished prompt, across every message in it. One
  * frame costs the projector the same whether the user attached it now or three
  * turns ago, so a turn that looks like a text turn can still be re-encoding a
  * gallery — this is the count that explains a slow prefill.
  */
-export function countMediaParts(messages: ChatMessage[] | undefined): {
+export function countMediaParts(messages?: PromptMessage[]): {
   images: number;
   audio: number;
 } {

@@ -296,7 +296,7 @@ const makeAssistantTurn = (
 
 describe('countMediaParts', () => {
   it('counts every media part in the prompt, not just the last turn', () => {
-    const messages: ChatMessage[] = [
+    const messages = [
       {
         role: 'user',
         content: [

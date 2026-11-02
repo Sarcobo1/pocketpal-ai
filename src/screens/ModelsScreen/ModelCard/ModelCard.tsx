@@ -299,6 +299,13 @@ export const ModelCard: React.FC<ModelCardProps> = observer(
           picked.uri,
           filename,
         );
+        // A model that is already running holds no projector until it is told
+        // to attach one, and the attach button only opens for a model whose
+        // projector is on — so attach it now instead of making the user
+        // unload the model they just fixed.
+        if (projector && modelStore.activeModelId === model.id) {
+          await modelStore.ensureMultimodalActive();
+        }
         Alert.alert(
           projector
             ? l10n.models.modelCard.alerts.projectorAddedTitle

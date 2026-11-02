@@ -49,19 +49,18 @@ jobs:
       - name: Lint
         run: yarn lint
 
-      - name: Voice and chat unit tests
-        run: yarn test --ci --runTestsByPath src/utils/__tests__/chat.test.ts src/services/plus/__tests__/gate.test.ts 2>&1 | tail -40
-
-      # The media turn has five moving parts — pairing, resolution, the live
-      # attach, the payload shape and the engine choice — and a phone test costs
-      # a full APK build, so the suites that cover them gate the branch here.
-      - name: Multimodal and voice-mode unit tests
+      # A chosen subset can never reach the 60% floor jest.config.js sets, so
+      # coverage is switched off here and the gate is the suites themselves.
+      # Piping jest into tail would also discard its exit status.
+      - name: Voice, chat and projector unit tests
         run: |
           set -eo pipefail
-          yarn test --ci --runTestsByPath \
-            src/store/__tests__/ModelStore.localMultimodal.test.ts \
+          yarn test --ci --coverage=false --runTestsByPath \
+            src/utils/__tests__/chat.test.ts \
             src/utils/__tests__/multimodalHelpers.test.ts \
+            src/services/plus/__tests__/gate.test.ts \
             src/services/voice/__tests__/omniEngine.test.ts \
+            src/store/__tests__/ModelStore.localMultimodal.test.ts \
             src/hooks/__tests__/useChatSession.test.ts \
             src/hooks/__tests__/useChatSession.assistantTurn.test.ts \
             src/hooks/__tests__/useVoiceMode.test.ts

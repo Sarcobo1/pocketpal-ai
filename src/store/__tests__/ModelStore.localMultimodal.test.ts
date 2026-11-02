@@ -1,7 +1,6 @@
 jest.unmock('../../store');
 
 import * as RNFS from '@dr.pogodin/react-native-fs';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {runInAction} from 'mobx';
 
 import {basicModel} from '../../../jest/fixtures/models';
@@ -66,8 +65,7 @@ describe('ModelStore local projector pairing', () => {
     return ctx;
   };
 
-  beforeEach(async () => {
-    await AsyncStorage.clear();
+  beforeEach(() => {
     jest.spyOn(console, 'warn').mockImplementation();
     jest.spyOn(console, 'log').mockImplementation();
 

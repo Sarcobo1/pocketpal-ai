@@ -2572,6 +2572,15 @@ class ModelStore {
     if (!projector) {
       return undefined;
     }
+    // Whether the picked file is a projector at all is only in its header, and
+    // the header is only readable after the copy — a document URI gives no path
+    // to probe beforehand. A file with no encoder in it would otherwise stay
+    // registered as this model's projector until the engine refused it.
+    if (!projectorIsUsable(projector)) {
+      await RNFS.unlink(destination).catch(() => {});
+      this.removeModelByFullPath(destination);
+      return undefined;
+    }
 
     runInAction(() => {
       projector.modelType = ModelType.PROJECTION;

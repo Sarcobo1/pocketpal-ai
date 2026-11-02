@@ -442,7 +442,11 @@
         "deleteTitle": "Delete Model",
         "deleteMessage": "Are you sure you want to delete this downloaded model?",
         "removeTitle": "Remove Model",
-        "removeMessage": "Are you sure you want to remove this model from the list?"
+        "removeMessage": "Are you sure you want to remove this model from the list?",
+        "projectorAddedTitle": "Projector added",
+        "projectorAddedMessage": "{{file}} is now the projector for this model. It loads with the next image or voice message.",
+        "projectorAddFailedTitle": "Could not add that file",
+        "projectorAddFailedMessage": "{{file}} has no vision or audio encoder in it, so it cannot project for this model."
       },
       "buttons": {
         "settings": "Settings",
@@ -464,6 +468,7 @@
         "author": "Author",
         "requiresProjectionModel": "Requires projection model",
         "downloadProjectionModel": "Download projection model",
+        "addProjector": "Add projector (mmproj)",
         "viewModelCardOnHuggingFace": "View Model Card on Hugging Face",
         "draftOnlyReason": "Draft-only model. Pick it under Settings → Speculative decoding."
       },

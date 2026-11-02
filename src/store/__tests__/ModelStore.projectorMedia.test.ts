@@ -19,7 +19,8 @@ import {Model, ModelOrigin, ModelType} from '../../utils/types';
 import {FixtureType, GGUFFixture} from '../../utils/__tests__/ggufFixture';
 
 const DIR = '/documents/models/local';
-const PROJ_PATH = `${DIR}/mmproj-LFM3-Omni-2B-Q8_0.gguf`;
+const PROJ_NAME = 'mmproj-LFM3-Omni-2B-Q8_0.gguf';
+const PROJ_PATH = `${DIR}/${PROJ_NAME}`;
 
 const model = (overrides: Partial<Model>): Model => ({
   ...basicModel,
@@ -74,6 +75,7 @@ describe('ModelStore projector media capabilities', () => {
     jest.spyOn(console, 'warn').mockImplementation();
     jest.spyOn(console, 'log').mockImplementation();
 
+    (RNFS as any).__setDocumentDirectoryPath('/documents');
     runInAction(() => {
       modelStore.models = [];
     });
@@ -233,5 +235,95 @@ describe('ModelStore projector media capabilities', () => {
     await modelStore.hydrateMediaSupport();
 
     expect(llm.defaultProjectionModel).toBe(q8.id);
+  });
+
+  // A document URI gives no path to read before the copy lands, so `exists`
+  // only answers for the destination once the file is actually there.
+  const stagePickedCopy = () => {
+    let copied = false;
+    (RNFS.copyFile as jest.Mock).mockImplementation(
+      async (_from: string, _to: string) => {
+        copied = true;
+      },
+    );
+    (RNFS.exists as jest.Mock).mockImplementation(
+      async (path: string) => copied || path !== PROJ_PATH,
+    );
+    (RNFS.stat as jest.Mock).mockResolvedValue({size: 300e6});
+    return () => copied;
+  };
+
+  it('pairs a projector the user picked from the device', async () => {
+    serve(
+      new GGUFFixture()
+        .kv('clip.has_vision_encoder', {type: FixtureType.BOOL, value: true})
+        .kv('clip.has_audio_encoder', {type: FixtureType.BOOL, value: true})
+        .kv('clip.has_gen_audio_encoder', {
+          type: FixtureType.BOOL,
+          value: true,
+        })
+        .kv('clip.vision.projector_type', {
+          type: FixtureType.STRING,
+          value: 'lfm3vl',
+        })
+        .kv('clip.audio.projector_type', {
+          type: FixtureType.STRING,
+          value: 'lfm3a',
+        }),
+    );
+    stagePickedCopy();
+    const llm = push(
+      model({
+        id: 'unpaired',
+        filename: 'LFM3-Omni-2B-Q8_0.gguf',
+        fullPath: `${DIR}/LFM3-Omni-2B-Q8_0.gguf`,
+        supportsMultimodal: false,
+      }),
+    );
+
+    const projector = await modelStore.addManualProjector(
+      llm.id,
+      `/storage/emulated/0/Download/${PROJ_NAME}`,
+    );
+
+    expect(RNFS.copyFile).toHaveBeenCalledWith(
+      `/storage/emulated/0/Download/${PROJ_NAME}`,
+      PROJ_PATH,
+    );
+    expect(projector?.modelType).toBe(ModelType.PROJECTION);
+    expect(llm.mmprojPath).toBe(PROJ_PATH);
+    expect(llm.defaultProjectionModel).toBe(projector?.id);
+    expect(llm.mediaSupport).toEqual({
+      vision: true,
+      audioInput: true,
+      audioOutput: true,
+    });
+  });
+
+  it('drops a picked file whose header carries no encoder', async () => {
+    serve(
+      new GGUFFixture().kv('general.architecture', {
+        type: FixtureType.STRING,
+        value: 'lfm3',
+      }),
+    );
+    stagePickedCopy();
+    const llm = push(
+      model({
+        id: 'wrong-pick',
+        filename: 'LFM3-Omni-2B-Q8_0.gguf',
+        fullPath: `${DIR}/LFM3-Omni-2B-Q8_0.gguf`,
+        supportsMultimodal: false,
+      }),
+    );
+
+    await expect(
+      modelStore.addManualProjector(llm.id, `/Download/${PROJ_NAME}`),
+    ).resolves.toBeUndefined();
+
+    expect(RNFS.unlink).toHaveBeenCalledWith(PROJ_PATH);
+    expect(modelStore.models.some(m => m.fullPath === PROJ_PATH)).toBe(false);
+    expect(llm.mmprojPath).toBeUndefined();
+    expect(llm.defaultProjectionModel).toBeUndefined();
   });
 });

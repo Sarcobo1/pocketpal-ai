@@ -12,6 +12,7 @@ import {
 import {observer} from 'mobx-react-lite';
 import {useNavigation} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
+import {pick, types} from '@react-native-documents/picker';
 import {
   Card,
   Icon,
@@ -91,6 +92,7 @@ export const ModelCard: React.FC<ModelCardProps> = observer(
     const [snackbarVisible, setSnackbarVisible] = useState(false); // Snackbar visibility
     const [integrityError, setIntegrityError] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
+    const [isAddingProjector, setIsAddingProjector] = useState(false);
 
     // Mirrors ModelStore.checkMemoryAndConfirm's projection-model resolution.
     const projectionModelForCheck = useMemo(
@@ -143,6 +145,15 @@ export const ModelCard: React.FC<ModelCardProps> = observer(
       model.supportsMultimodal &&
       modelStore.getModelVisionPreference(model) && // Only show warning when vision is enabled
       projectionModelStatus.state === 'missing';
+
+    // A model that arrived as a file is only as multimodal as the mmproj the
+    // folder scan found beside it. When the scan found none, picking the file
+    // is the only way to finish the pair without downloading the model again.
+    const canAddProjector =
+      isDownloaded &&
+      model.origin === ModelOrigin.LOCAL &&
+      model.modelType !== ModelType.PROJECTION &&
+      !model.supportsMultimodal;
 
     // Check integrity when model is downloaded (skip remote models — no local file)
     useEffect(() => {
@@ -267,6 +278,48 @@ export const ModelCard: React.FC<ModelCardProps> = observer(
       }
       // Note: If no default projection model, user can manually select one in the vision controls
     }, [model.defaultProjectionModel]);
+
+    const handleAddProjector = useCallback(async () => {
+      let picked;
+      try {
+        [picked] = await pick({
+          type: Platform.OS === 'ios' ? 'public.data' : types.allFiles,
+        });
+      } catch {
+        return; // dismissed, not failed
+      }
+      if (!picked?.uri) {
+        return;
+      }
+      const filename = picked.name || picked.uri.split('/').pop() || '';
+      setIsAddingProjector(true);
+      try {
+        const projector = await modelStore.addManualProjector(
+          model.id,
+          picked.uri,
+          filename,
+        );
+        Alert.alert(
+          projector
+            ? l10n.models.modelCard.alerts.projectorAddedTitle
+            : l10n.models.modelCard.alerts.projectorAddFailedTitle,
+          projector
+            ? t(l10n.models.modelCard.alerts.projectorAddedMessage, {
+                file: filename,
+              })
+            : t(l10n.models.modelCard.alerts.projectorAddFailedMessage, {
+                file: filename,
+              }),
+        );
+      } catch (error) {
+        Alert.alert(
+          l10n.models.modelCard.alerts.projectorAddFailedTitle,
+          error instanceof Error ? error.message : String(error),
+        );
+      } finally {
+        setIsAddingProjector(false);
+      }
+    }, [l10n, model.id]);
 
     const handleVisionToggle = useCallback(
       async (enabled: boolean) => {
@@ -859,6 +912,25 @@ export const ModelCard: React.FC<ModelCardProps> = observer(
                       {l10n.models.modelCard.labels.capabilities}
                     </Text>
                   </View>
+                )}
+
+                {/* A model that arrived as a file stays a text model until its
+                    projector is supplied. */}
+                {canAddProjector && (
+                  <TouchableOpacity
+                    testID="add-projector-button"
+                    style={styles.addProjectorRow}
+                    onPress={handleAddProjector}
+                    disabled={isAddingProjector}>
+                    <Icon
+                      name={isAddingProjector ? 'loading' : 'file-plus-outline'}
+                      size={16}
+                      color={theme.colors.primary}
+                    />
+                    <Text style={styles.addProjectorLabel}>
+                      {l10n.models.modelCard.labels.addProjector}
+                    </Text>
+                  </TouchableOpacity>
                 )}
 
                 {/* Vision Toggle for multimodal models */}

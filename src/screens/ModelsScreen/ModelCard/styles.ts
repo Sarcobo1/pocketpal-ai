@@ -226,6 +226,18 @@ export const createStyles = (theme: Theme) =>
       borderRadius: 16,
       padding: 12,
     },
+    addProjectorRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 16,
+      padding: 12,
+    },
+    addProjectorLabel: {
+      fontSize: 13,
+      color: theme.colors.primary,
+    },
     warningButton: {
       paddingVertical: 6,
       paddingHorizontal: 8,

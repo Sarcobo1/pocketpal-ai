@@ -201,13 +201,34 @@ const prepareCompletion = async ({
   // every media part it is handed on every completion, so carrying the earlier
   // shots of a live session makes turn N pay for N frames; the words of the
   // conversation stay whole either way.
-  const historyMessages = spoken
-    ? currentMessages.map(msg =>
-        msg.type === 'text' && (msg.imageUris || msg.audioUri)
-          ? {...msg, imageUris: undefined, audioUri: undefined}
-          : msg,
-      )
-    : currentMessages;
+  //
+  // Audio is never replayed, spoken turn or not: the model has already heard
+  // it, and a clip from three turns ago answers whatever is asked now. A row
+  // left with neither text nor media would drop out of the history entirely,
+  // which is worse than a placeholder — the model would find its own last
+  // reply answering a question nobody asked, and fall back to introducing
+  // itself.
+  const stripHistoryMedia = (msg: MessageType.Any): MessageType.Any => {
+    if (msg.type !== 'text') {
+      return msg;
+    }
+    const dropAudio = !!msg.audioUri;
+    const dropImages = spoken && !!msg.imageUris?.length;
+    if (!dropAudio && !dropImages) {
+      return msg;
+    }
+    const next: MessageType.Text = {
+      ...msg,
+      ...(dropAudio ? {audioUri: undefined} : {}),
+      ...(dropImages ? {imageUris: undefined} : {}),
+    };
+    if (!next.text?.trim()) {
+      next.text = dropAudio ? '[voice message]' : '[image]';
+    }
+    return next;
+  };
+
+  const historyMessages = currentMessages.map(stripHistoryMedia);
 
   let chatMessages = convertToChatMessages(
     historyMessages.filter(msg => msg.type !== 'image'),

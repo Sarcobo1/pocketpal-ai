@@ -1025,6 +1025,51 @@ describe('useChatSession', () => {
         restore();
       }
     });
+
+    const voiceRow = (id: string) =>
+      ({
+        id,
+        author: textMessage.author,
+        type: 'text',
+        text: '',
+        audioUri: `/voice-audio/${id}.wav`,
+      }) as MessageType.Text;
+
+    const audioIn = (messages: Array<{role: string; content: any}>) =>
+      messages.flatMap(message =>
+        Array.isArray(message.content)
+          ? message.content.filter(part => part.type === 'input_audio')
+          : [],
+      );
+
+    // A clip the model has already heard is not worth a second encoding: it
+    // costs the turn its first token time and answers a question it was not
+    // asked. The row still has to reach the prompt, or the model finds its own
+    // last reply with no question in front of it.
+    it.each([true, false])(
+      'never replays an answered clip to a %s turn',
+      async spoken => {
+        const restore = withHistory([
+          voiceRow('utt-1'),
+          {
+            id: 'answer-1',
+            author: assistant,
+            type: 'text',
+            text: 'A kettle on the stove.',
+          } as MessageType.Text,
+        ]);
+        try {
+          const messages = await sendFrame(spoken);
+
+          expect(audioIn(messages)).toEqual([]);
+          expect(messages.some(m => m.content === '[voice message]')).toBe(
+            true,
+          );
+        } finally {
+          restore();
+        }
+      },
+    );
   });
 
   it('should use system prompt as-is when pal has no parameters', async () => {

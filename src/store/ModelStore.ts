@@ -2788,8 +2788,8 @@ class ModelStore {
 
   /**
    * What the engine reports for the projector it just loaded. `audio` in
-   * llama.rn means audio *input*; this build exposes no speech synthesis, so
-   * audio output keeps whatever the projector header declared.
+   * llama.rn means audio *input*; `audioGen` is the mtmd audio_gen capability,
+   * which is the projector carrying a speech generator — the model can speak.
    */
   private readRuntimeMediaSupport = async (
     ctx: LlamaContext,
@@ -2799,7 +2799,7 @@ class ModelStore {
       return {
         vision: !!support.vision,
         audioInput: !!support.audio,
-        audioOutput: false,
+        audioOutput: !!support.audioGen,
       };
     } catch (error) {
       console.warn(
@@ -2911,6 +2911,7 @@ class ModelStore {
         imageMaxTokens: params.image_max_tokens,
         vision: runtime?.vision,
         audioInput: runtime?.audioInput,
+        audioGen: runtime?.audioOutput,
         file: refused.filename,
       });
       return isEnabled;

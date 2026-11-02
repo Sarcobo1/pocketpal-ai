@@ -524,6 +524,36 @@ describe('ModelStore local projector pairing', () => {
       );
     });
 
+    // audioGen is the mtmd capability that says the projector carries a speech
+    // generator. Nothing else can invent it, and a model that has one must not
+    // be advertised as silent.
+    it('records speech when the projector carries a generator', async () => {
+      const ctx = contextWithProjector();
+      ctx.getMultimodalSupport.mockResolvedValue({
+        vision: true,
+        audio: true,
+        audioGen: true,
+      });
+
+      await expect(modelStore.ensureMultimodalActive()).resolves.toBe(true);
+      expect(model.mediaSupport).toEqual({
+        vision: true,
+        audioInput: true,
+        audioOutput: true,
+      });
+    });
+
+    it('keeps a projector that cannot generate audio silent on the record', async () => {
+      const ctx = contextWithProjector();
+
+      await expect(modelStore.ensureMultimodalActive()).resolves.toBe(true);
+      expect(model.mediaSupport).toEqual({
+        vision: true,
+        audioInput: true,
+        audioOutput: false,
+      });
+    });
+
     it('says no when there is no context to attach to', async () => {
       await modelStore.linkLocalProjectionModels(model);
 

@@ -250,7 +250,7 @@ index eb52272..9ff97ad 100644
      void invokeAsyncTracked(
          std::shared_ptr<react::CallInvoker> callInvoker,
 diff --git a/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.cpp b/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.cpp
-index ffd7942..57f942c 100644
+index ffd7942..e3c2e9f 100644
 --- a/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.cpp
 +++ b/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.cpp
 @@ -13,11 +13,13 @@
@@ -666,7 +666,67 @@ index ffd7942..57f942c 100644
                          return [audio_data](jsi::Runtime& rt) {
                              return makeFloat32Array(rt, audio_data);
                          };
-@@ -2358,19 +2382,9 @@
+@@ -2331,6 +2355,59 @@
+         );
+         runtime.global().setProperty(runtime, "llamaClearCache", clearCache);
+ 
++        // generateSpeech — the audio_gen model voices `text` itself. Args:
++        //   (contextId, opts)
++        // opts: { text, language?, voice?, maxSeconds?, seed? }
++        // Returns { pcm: Float32Array, sampleRate, frames, seconds, promptMs,
++        //           genMs, aborted, stopReason, prompt }.
++        // The utterance decodes over the chat's own positions, so the caller
++        // clears the cache before the next turn (see llamaClearCache).
++        auto generateSpeech = jsi::Function::createFromHostFunction(runtime,
++            jsi::PropNameID::forAscii(runtime, "llamaGenerateSpeech"),
++            2,
++            [callInvoker](jsi::Runtime& runtime, const jsi::Value& thisValue, const jsi::Value* arguments, size_t count) -> jsi::Value {
++                int contextId = (int)arguments[0].asNumber();
++                auto opts = optionsFromJson<rnllama::llama_rn_speech_options>(
++                    runtime, toJson(runtime, arguments[1]), "generateSpeech");
++
++                return createPromiseTask(runtime, callInvoker, [contextId, opts]() -> PromiseResultGenerator {
++                    auto ctx = getContextOrThrow(contextId);
++                    // Same single-sequence state the completion runs on.
++                    ContextClaim claim(ctx);
++                    auto res = ctx->generate_speech(opts);
++                    return [res](jsi::Runtime& rt) {
++                        jsi::Object out(rt);
++                        out.setProperty(rt, "pcm", makeFloat32Array(rt, res.pcm));
++                        out.setProperty(rt, "sampleRate", (double) res.sample_rate);
++                        out.setProperty(rt, "frames", (double) res.frames);
++                        out.setProperty(rt, "seconds", res.sample_rate > 0
++                            ? (double) res.pcm.size() / (double) res.sample_rate : 0.0);
++                        out.setProperty(rt, "promptMs", (double) res.prompt_us / 1000.0);
++                        out.setProperty(rt, "genMs", (double) res.gen_us / 1000.0);
++                        out.setProperty(rt, "aborted", res.aborted);
++                        out.setProperty(rt, "stopReason", jsi::String::createFromUtf8(rt, res.stop_reason));
++                        out.setProperty(rt, "prompt", jsi::String::createFromUtf8(rt, res.prompt));
++                        return out;
++                    };
++                }, contextId);
++            }
++        );
++        runtime.global().setProperty(runtime, "llamaGenerateSpeech", generateSpeech);
++
++        // Synchronous on purpose: the speech task holds the context, so a stop
++        // that queued behind it would only arrive once the reply has been said.
++        auto stopSpeech = jsi::Function::createFromHostFunction(runtime,
++            jsi::PropNameID::forAscii(runtime, "llamaStopSpeech"),
++            1,
++            [callInvoker](jsi::Runtime& runtime, const jsi::Value& thisValue, const jsi::Value* arguments, size_t count) -> jsi::Value {
++                int contextId = (int)arguments[0].asNumber();
++                auto ctx = getContextOrThrow(contextId);
++                ctx->speech_interrupted.store(true);
++                return jsi::Value::undefined();
++            }
++        );
++        runtime.global().setProperty(runtime, "llamaStopSpeech", stopSpeech);
++
+         auto releaseVocoder = jsi::Function::createFromHostFunction(runtime,
+             jsi::PropNameID::forAscii(runtime, "llamaReleaseVocoder"),
+             1,
+@@ -2358,19 +2435,9 @@
          llama_log_set(llama_log_callback_default, nullptr);
  
          RequestManager::getInstance().clearAll();
@@ -689,7 +749,7 @@ index ffd7942..57f942c 100644
          }
  
          if (contexts.empty()) {
-@@ -2379,12 +2393,9 @@
+@@ -2379,12 +2446,9 @@
          }
          ThreadPool::getInstance().shutdown();
  
@@ -879,10 +939,18 @@ index d152478..13c490f 100644
      void startGenerationTiming();
      void updateGenerationTiming();
 diff --git a/node_modules/llama.rn/cpp/rn-llama.cpp b/node_modules/llama.rn/cpp/rn-llama.cpp
-index 87e7ec8..7aa2b66 100644
+index 87e7ec8..8a32d57 100644
 --- a/node_modules/llama.rn/cpp/rn-llama.cpp
 +++ b/node_modules/llama.rn/cpp/rn-llama.cpp
-@@ -128,6 +128,28 @@
+@@ -12,6 +12,7 @@
+ #include "tools/mtmd/clip.h"
+ 
+ #include <algorithm>
++#include <chrono>
+ #include <cstdarg>
+ #include <cstdio>
+ #include <fstream>
+@@ -128,6 +129,31 @@
      ggml_set_abort_callback(ggml_abort_log_callback);
  }
  
@@ -904,6 +972,9 @@ index 87e7ec8..7aa2b66 100644
 +    if (releasing.load(std::memory_order_relaxed)) {
 +        return true;
 +    }
++    if (speech_active.load(std::memory_order_relaxed)) {
++        return speech_interrupted.load(std::memory_order_relaxed);
++    }
 +    return completion_active.load(std::memory_order_relaxed) &&
 +        completion->is_interrupted.load(std::memory_order_relaxed);
 +}
@@ -911,7 +982,7 @@ index 87e7ec8..7aa2b66 100644
  static const std::vector<ggml_type> kv_cache_types = {
      GGML_TYPE_F32,
      GGML_TYPE_F16,
-@@ -519,6 +541,13 @@
+@@ -519,6 +545,13 @@
  }
  
  llama_rn_context::~llama_rn_context() {
@@ -925,7 +996,7 @@ index 87e7ec8..7aa2b66 100644
      // Disable parallel mode first (cleans up slot_manager)
      disableParallelMode();
  
-@@ -570,6 +599,7 @@
+@@ -570,6 +603,7 @@
          }
          return false;
      }
@@ -933,7 +1004,7 @@ index 87e7ec8..7aa2b66 100644
  
      // Load the draft model for embedded MTP drafts and for classic standalone draft models
      // (draft-simple) alike. Gating this on MTP alone silently disabled speculation for
-@@ -724,7 +754,13 @@
+@@ -724,7 +758,13 @@
      cparams.type_k = params_for_context.speculative.draft.cache_type_k;
      cparams.type_v = params_for_context.speculative.draft.cache_type_v;
  
@@ -948,7 +1019,7 @@ index 87e7ec8..7aa2b66 100644
  }
  
  
-@@ -900,6 +936,15 @@
+@@ -900,6 +940,15 @@
      return isMultimodalEnabled() && mtmd_wrapper->supportAudio();
  }
  
@@ -964,11 +1035,201 @@ index 87e7ec8..7aa2b66 100644
  void llama_rn_context::releaseMultimodal() {
      if (mtmd_wrapper != nullptr) {
          delete mtmd_wrapper;
+@@ -1044,4 +1093,161 @@
+     }
+ }
+ 
++namespace {
++
++// The gen loop reads the backbone's last hidden state out of the embeddings
++// output, which a chat context leaves off. Restored on every exit path.
++struct scoped_speech_embeddings {
++    llama_context * ctx;
++    explicit scoped_speech_embeddings(llama_context * c) : ctx(c) {
++        llama_set_embeddings(ctx, true);
++    }
++    ~scoped_speech_embeddings() { llama_set_embeddings(ctx, false); }
++    scoped_speech_embeddings(const scoped_speech_embeddings &) = delete;
++    scoped_speech_embeddings & operator=(const scoped_speech_embeddings &) = delete;
++};
++
++// Frees the gen context and lets the next op claim the context again.
++struct scoped_speech_session {
++    llama_rn_context * self;
++    mtmd_helper_gen_audio * gen;
++    ~scoped_speech_session() {
++        mtmd_helper_gen_audio_free(gen);
++        self->speech_active.store(false);
++    }
++};
++
++int64_t speech_now_us() {
++    return std::chrono::duration_cast<std::chrono::microseconds>(
++        std::chrono::steady_clock::now().time_since_epoch()).count();
++}
++
++} // namespace
++
++llama_rn_speech_result llama_rn_context::generate_speech(const llama_rn_speech_options & opts) {
++    llama_rn_speech_result res;
++    // mtmd answers whether this projector can speak; isMultimodalEnabled() is
++    // what guarantees the mtmd_context the calls below dereference.
++    if (!isMultimodalEnabled() || ctx == nullptr || !isMultimodalSupportAudioGen()) {
++        res.stop_reason = "unsupported";
++        return res;
++    }
++    if (opts.text.empty()) {
++        res.stop_reason = "failed";
++        return res;
++    }
++    // Only the model's own "tts" template ends the prompt with the speech-start
++    // token, which is the token the pipeline reads the mode off.
++    res.prompt = common_chat_get_tts_prompt(templates.get(), opts.text, opts.language, opts.voice);
++    if (res.prompt.empty()) {
++        res.stop_reason = "no-tts-template";
++        return res;
++    }
++
++    mtmd_helper_gen_audio * gen = mtmd_helper_gen_audio_init(ctx, mtmd_wrapper->mtmd_ctx);
++    mtmd_helper_gen_audio_inp inp = mtmd_helper_gen_audio_inp_default();
++    inp.stream     = true;   // pull each frame as it lands, for the per-frame timing
++    inp.seq_id     = 0;
++    inp.prompt     = res.prompt.data();
++    inp.prompt_len = res.prompt.size();
++    inp.n_past     = 0;      // a stand-alone utterance, not a continuation
++    inp.out_mode   = MTMD_HELPER_GEN_AUDIO_OUT_AUTO;
++    inp.speaker_ref = nullptr;
++    inp.lang       = opts.language.empty() ? nullptr : opts.language.c_str();
++    inp.voice      = opts.voice.empty() ? nullptr : opts.voice.c_str();
++    inp.seed       = opts.seed;
++    inp.out_type   = MTMD_HELPER_GEN_AUDIO_OUTTYPE_PCM;
++
++    // init always allocates: a projector without a gen pipeline fails here.
++    if (mtmd_helper_gen_audio_set_input(gen, &inp) != 0) {
++        mtmd_helper_gen_audio_free(gen);
++        res.stop_reason = "unsupported";
++        return res;
++    }
++    scoped_speech_session session{this, gen};
++    speech_interrupted.store(false);
++    speech_active.store(true);
++    // The utterance decodes over the positions the chat's own prefix owns, so
++    // the caller clears the cache once this returns.
++    scoped_speech_embeddings embeddings(ctx);
++
++    const int64_t prompt_start = speech_now_us();
++    for (;;) {
++        const int32_t left = mtmd_helper_gen_audio_step_prompt(gen, std::max(1, params.n_batch));
++        if (left == 0) {
++            break;
++        }
++        if (left < 0 || speech_interrupted.load()) {
++            res.aborted = speech_interrupted.load();
++            res.stop_reason = res.aborted ? "aborted" : "failed";
++            return res;
++        }
++    }
++    res.prompt_us = speech_now_us() - prompt_start;
++
++    const float * h_state = llama_get_embeddings_ith(ctx, -1);
++    if (h_state == nullptr) {
++        res.stop_reason = "failed";
++        return res;
++    }
++    res.stop_reason = "eos";
++    bool stop = false;
++    while (!stop) {
++        const int64_t frame_start = speech_now_us();
++        const float * next_state = nullptr;
++        if (mtmd_helper_gen_audio_step_gen(gen, LLAMA_TOKEN_NULL, h_state, &next_state, &stop) != 0) {
++            res.aborted = speech_interrupted.load();
++            res.stop_reason = res.aborted ? "aborted" : "failed";
++            break;
++        }
++        if (next_state != nullptr) {
++            h_state = next_state;
++        }
++        res.frames++;
++        int32_t sample_rate = 0;
++        const char * data = nullptr;
++        size_t data_len = 0;
++        int64_t n_samples = 0;
++        if (mtmd_helper_gen_audio_get_output(gen, &sample_rate, &data, &data_len, &n_samples) != 0) {
++            res.stop_reason = "failed";
++            break;
++        }
++        res.sample_rate = sample_rate;
++        const float * pcm = reinterpret_cast<const float *>(data);
++        res.pcm.insert(res.pcm.end(), pcm, pcm + n_samples);
++        res.gen_us += speech_now_us() - frame_start;
++        if (stop) {
++            break;
++        }
++        if (speech_interrupted.load()) {
++            res.aborted = true;
++            res.stop_reason = "aborted";
++            break;
++        }
++        // A model that switches to text is the interleaved path, not this one.
++        if (mtmd_helper_gen_audio_next_is_text(gen)) {
++            res.stop_reason = "failed";
++            break;
++        }
++        const int64_t cap = (int64_t) ((double) opts.max_seconds * (double) sample_rate);
++        if (cap > 0 && (int64_t) res.pcm.size() >= cap) {
++            res.stop_reason = "max";
++            break;
++        }
++    }
++    if (res.stop_reason != "failed") {
++        // the ISTFT holds back the overlap of the last frame
++        int32_t sample_rate = 0;
++        const char * data = nullptr;
++        size_t data_len = 0;
++        int64_t n_samples = 0;
++        if (mtmd_helper_gen_audio_flush(gen) == 0 &&
++            mtmd_helper_gen_audio_get_output(gen, &sample_rate, &data, &data_len, &n_samples) == 0) {
++            const float * pcm = reinterpret_cast<const float *>(data);
++            res.pcm.insert(res.pcm.end(), pcm, pcm + n_samples);
++        }
++    }
++    return res;
++}
++
+ }
 diff --git a/node_modules/llama.rn/cpp/rn-llama.h b/node_modules/llama.rn/cpp/rn-llama.h
-index 8236f13..1a3f01d 100644
+index 8236f13..6b6bf6b 100644
 --- a/node_modules/llama.rn/cpp/rn-llama.h
 +++ b/node_modules/llama.rn/cpp/rn-llama.h
-@@ -196,6 +196,9 @@
+@@ -101,6 +101,27 @@
+ 
+ struct llama_rn_slot_manager;
+ 
++// One reply the model voices itself, through mtmd's audio_gen pipeline.
++struct llama_rn_speech_options {
++    std::string text;
++    std::string language;              // "" = the "tts" template's default
++    std::string voice;                 // "" = the "tts" template's default
++    float max_seconds = 20.0f;
++    uint32_t seed = UINT32_MAX;        // random
++};
++
++struct llama_rn_speech_result {
++    std::vector<float> pcm;            // mono, at sample_rate
++    int32_t sample_rate = 0;
++    int32_t frames = 0;
++    int64_t prompt_us = 0;             // prefill of the tts prompt
++    int64_t gen_us = 0;                // the frame loop, prompt excluded
++    bool aborted = false;
++    // eos | max | aborted | no-tts-template | unsupported | failed
++    std::string stop_reason = "failed";
++    std::string prompt;                // what the "tts" template rendered
++};
++
+ struct llama_rn_tokenize_result {
+   std::vector<llama_token> tokens;
+   bool has_media = false;
+@@ -196,6 +217,9 @@
      bool isMultimodalEnabled() const;
      bool isMultimodalSupportVision() const;
      bool isMultimodalSupportAudio() const;
@@ -978,14 +1239,21 @@ index 8236f13..1a3f01d 100644
      void releaseMultimodal();
      // Media identity hashes tracked by the multimodal wrapper (empty when
      // multimodal is disabled); persisted alongside session/state files
-@@ -222,6 +225,13 @@
+@@ -222,6 +246,20 @@
  
      // Cache management
      void clearCache(bool clear_data = false);
 +
++    // Speaks opts.text with the model's own voice. Shares the completion's
++    // context and KV, so the caller holds the claim for the whole call and the
++    // cache is invalidated when it ends.
++    llama_rn_speech_result generate_speech(const llama_rn_speech_options & opts);
++
 +    // Read by the llama abort callback on compute threads; see abortRequested().
 +    std::atomic<bool> releasing{false};
 +    std::atomic<bool> completion_active{false};
++    std::atomic<bool> speech_active{false};
++    std::atomic<bool> speech_interrupted{false};
 +    // Set when the callback aborted a decode; the completion recovers on end
 +    mutable std::atomic<bool> decode_aborted{false};
 +    bool abortRequested() const;
@@ -1036,10 +1304,19 @@ index 1362325..1542d02 100644
        "#{llama_cpp}/common/**/*.{h,cpp}",
        "#{llama_cpp}/tools/mtmd/**/*.{h,cpp}",
 diff --git a/node_modules/llama.rn/src/index.ts b/node_modules/llama.rn/src/index.ts
-index 039933f..6852791 100644
+index 039933f..3c2afa8 100644
 --- a/node_modules/llama.rn/src/index.ts
 +++ b/node_modules/llama.rn/src/index.ts
-@@ -432,6 +432,10 @@
+@@ -161,6 +161,8 @@
+   'llamaGetTTSCapabilities',
+   'llamaDecodeAudioTokens',
+   'llamaGenerateAudioCodes',
++  'llamaGenerateSpeech',
++  'llamaStopSpeech',
+   'llamaCreateSpeaker',
+   'llamaBakeSpeaker',
+   'llamaReleaseSpeaker',
+@@ -432,6 +434,10 @@
  export class LlamaContext {
    id: number
  
@@ -1050,7 +1327,7 @@ index 039933f..6852791 100644
    gpu: boolean = false
  
    reasonNoGPU: string = ''
-@@ -911,6 +915,7 @@
+@@ -911,6 +917,7 @@
      params: CompletionParams & { speaker?: LlamaSpeaker },
      callback?: (data: TokenData) => void,
    ): Promise<NativeCompletionResult> {
@@ -1058,7 +1335,7 @@ index 039933f..6852791 100644
      const nativeParams: NativeCompletionRequestParams & {
        speakerId?: number
      } = {
-@@ -998,11 +1003,16 @@
+@@ -998,11 +1005,16 @@
      if (!nativeParams.prompt && !params.embedding && !nativeParams.media_paths)
        throw new Error('Prompt is required')
  
@@ -1077,7 +1354,7 @@ index 039933f..6852791 100644
      const { llamaStopCompletion } = getJsi()
      return llamaStopCompletion(this.id)
    }
-@@ -1157,6 +1167,7 @@
+@@ -1157,6 +1169,7 @@
    async getMultimodalSupport(): Promise<{
      vision: boolean
      audio: boolean
@@ -1085,6 +1362,52 @@ index 039933f..6852791 100644
    }> {
      const { llamaGetMultimodalSupport } = getJsi()
      return await llamaGetMultimodalSupport(this.id)
+@@ -1407,6 +1420,45 @@
+   }
+ 
+   /**
++   * Speak `text` with the model's own voice, when its projector reports the
++   * mtmd `audio_gen` capability (see `getMultimodalSupport().audioGen`).
++   *
++   * The utterance is decoded over the conversation's own positions, so clear
++   * the cache (`clearCache()`) before the next turn — the reply text stays
++   * correct either way, but a reused prefix would not be.
++   *
++   * `language` and `voice` are passed to the model's "tts" chat template,
++   * which defines their defaults; a model without that template answers
++   * `stopReason: 'no-tts-template'` and produces no audio.
++   */
++  async generateSpeech(options: {
++    text: string
++    language?: string
++    voice?: string
++    maxSeconds?: number
++    seed?: number
++  }): Promise<{
++    pcm: Float32Array
++    sampleRate: number
++    frames: number
++    seconds: number
++    promptMs: number
++    genMs: number
++    aborted: boolean
++    stopReason: 'eos' | 'max' | 'aborted' | 'no-tts-template' | 'unsupported' | 'failed'
++    prompt: string
++  }> {
++    const { llamaGenerateSpeech } = getJsi()
++    return await llamaGenerateSpeech(this.id, options)
++  }
++
++  /** Stop a running `generateSpeech()`; keeps the audio said so far. */
++  stopSpeech(): void {
++    const { llamaStopSpeech } = getJsi()
++    return llamaStopSpeech(this.id)
++  }
++
++  /**
+    * Clear the KV cache and reset conversation state
+    * @param clearData If true, clears both metadata and tensor data buffers (slower). If false, only clears metadata (faster).
+    * @returns Promise that resolves when cache is cleared
 diff --git a/node_modules/llama.rn/vendor/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.m b/node_modules/llama.rn/vendor/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.m
 index 451f652..54fb9ff 100644
 --- a/node_modules/llama.rn/vendor/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.m
@@ -1112,7 +1435,7 @@ index 451f652..54fb9ff 100644
      NSString * path_resource = [[NSProcessInfo processInfo].environment objectForKey:@"GGML_METAL_PATH_RESOURCES"];
      if (path_resource) {
 diff --git a/node_modules/llama.rn/src/jsi.ts b/node_modules/llama.rn/src/jsi.ts
-index 5a83ed7..9c6b871 100644
+index 5a83ed7..d7fb73d 100644
 --- a/node_modules/llama.rn/src/jsi.ts
 +++ b/node_modules/llama.rn/src/jsi.ts
 @@ -114,7 +114,7 @@
@@ -1124,8 +1447,42 @@ index 5a83ed7..9c6b871 100644
    var llamaReleaseMultimodal: (contextId: number) => Promise<void>
    var llamaInitVocoder: (
      contextId: number,
+@@ -218,6 +218,33 @@
+   var llamaGetAudioSampleRate: (contextId: number) => Promise<number>
+   var llamaReleaseVocoder: (contextId: number) => Promise<void>
+   var llamaClearCache: (contextId: number, clearData: boolean) => Promise<void>
++  var llamaGenerateSpeech: (
++    contextId: number,
++    opts: {
++      text: string
++      language?: string
++      voice?: string
++      maxSeconds?: number
++      seed?: number
++    },
++  ) => Promise<{
++    pcm: Float32Array
++    sampleRate: number
++    frames: number
++    seconds: number
++    promptMs: number
++    genMs: number
++    aborted: boolean
++    stopReason:
++      | 'eos'
++      | 'max'
++      | 'aborted'
++      | 'no-tts-template'
++      | 'unsupported'
++      | 'failed'
++    prompt: string
++  }>
++  var llamaStopSpeech: (contextId: number) => void
+ 
+   // Parallel decoding
+   var llamaEnableParallelMode: (
 diff --git a/node_modules/llama.rn/lib/typescript/index.d.ts b/node_modules/llama.rn/lib/typescript/index.d.ts
-index aa0e7c3..6ee92b0 100644
+index aa0e7c3..8e72546 100644
 --- a/node_modules/llama.rn/lib/typescript/index.d.ts
 +++ b/node_modules/llama.rn/lib/typescript/index.d.ts
 @@ -280,6 +280,7 @@
@@ -1136,8 +1493,46 @@ index aa0e7c3..6ee92b0 100644
      }>;
      releaseMultimodal(): Promise<void>;
      /**
+@@ -370,6 +371,37 @@
+     getAudioSampleRate(): Promise<number>;
+     releaseVocoder(): Promise<void>;
+     /**
++     * Speak `text` with the model's own voice, when its projector reports the
++     * mtmd `audio_gen` capability (see `getMultimodalSupport().audioGen`).
++     *
++     * The utterance is decoded over the conversation's own positions, so clear
++     * the cache (`clearCache()`) before the next turn — the reply text stays
++     * correct either way, but a reused prefix would not be.
++     *
++     * `language` and `voice` are passed to the model's "tts" chat template,
++     * which defines their defaults; a model without that template answers
++     * `stopReason: 'no-tts-template'` and produces no audio.
++     */
++    generateSpeech(options: {
++        text: string;
++        language?: string;
++        voice?: string;
++        maxSeconds?: number;
++        seed?: number;
++    }): Promise<{
++        pcm: Float32Array;
++        sampleRate: number;
++        frames: number;
++        seconds: number;
++        promptMs: number;
++        genMs: number;
++        aborted: boolean;
++        stopReason: 'eos' | 'max' | 'aborted' | 'no-tts-template' | 'unsupported' | 'failed';
++        prompt: string;
++    }>;
++    /** Stop a running `generateSpeech()`; keeps the audio said so far. */
++    stopSpeech(): void;
++    /**
+      * Clear the KV cache and reset conversation state
+      * @param clearData If true, clears both metadata and tensor data buffers (slower). If false, only clears metadata (faster).
+      * @returns Promise that resolves when cache is cleared
 diff --git a/node_modules/llama.rn/lib/typescript/jsi.d.ts b/node_modules/llama.rn/lib/typescript/jsi.d.ts
-index 1173e79..bcf475a 100644
+index 1173e79..2105ca7 100644
 --- a/node_modules/llama.rn/lib/typescript/jsi.d.ts
 +++ b/node_modules/llama.rn/lib/typescript/jsi.d.ts
 @@ -51,6 +51,7 @@
@@ -1148,3 +1543,48 @@ index 1173e79..bcf475a 100644
      }>;
      var llamaReleaseMultimodal: (contextId: number) => Promise<void>;
      var llamaInitVocoder: (contextId: number, params: {
+@@ -107,6 +108,24 @@
+     var llamaGetAudioSampleRate: (contextId: number) => Promise<number>;
+     var llamaReleaseVocoder: (contextId: number) => Promise<void>;
+     var llamaClearCache: (contextId: number, clearData: boolean) => Promise<void>;
++    var llamaGenerateSpeech: (contextId: number, opts: {
++        text: string;
++        language?: string;
++        voice?: string;
++        maxSeconds?: number;
++        seed?: number;
++    }) => Promise<{
++        pcm: Float32Array;
++        sampleRate: number;
++        frames: number;
++        seconds: number;
++        promptMs: number;
++        genMs: number;
++        aborted: boolean;
++        stopReason: 'eos' | 'max' | 'aborted' | 'no-tts-template' | 'unsupported' | 'failed';
++        prompt: string;
++    }>;
++    var llamaStopSpeech: (contextId: number) => void;
+     var llamaEnableParallelMode: (contextId: number, params: {
+         enabled: boolean;
+         n_parallel?: number;
+diff --git a/node_modules/llama.rn/cpp/jsi/JSIParams.h b/node_modules/llama.rn/cpp/jsi/JSIParams.h
+index 35a9399..6f9f2ba 100644
+--- a/node_modules/llama.rn/cpp/jsi/JSIParams.h
++++ b/node_modules/llama.rn/cpp/jsi/JSIParams.h
+@@ -102,4 +102,15 @@
+         o.top_k       = j.value("topK",        d.top_k);
+         o.seed        = j.value("seed",        d.seed);
+     }
++
++    // Same shim for generateSpeech (camelCase in JS, snake_case in the core).
++    template <typename BasicJsonType>
++    void from_json(const BasicJsonType& j, llama_rn_speech_options& o) {
++        const llama_rn_speech_options d{};
++        o.text        = j.value("text",       d.text);
++        o.language    = j.value("language",   d.language);
++        o.voice       = j.value("voice",      d.voice);
++        o.max_seconds = j.value("maxSeconds", d.max_seconds);
++        o.seed        = j.value("seed",       d.seed);
++    }
+ }

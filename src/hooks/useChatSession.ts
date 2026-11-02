@@ -196,8 +196,21 @@ const prepareCompletion = async ({
   // their images via imageUris on the Text row, not a separate Image
   // message). AssistantTurn rows pass through to convertToChatMessages,
   // which expands each step into assistant + tool API messages.
+  //
+  // A spoken turn reads its own frame and nothing else. The projector encodes
+  // every media part it is handed on every completion, so carrying the earlier
+  // shots of a live session makes turn N pay for N frames; the words of the
+  // conversation stay whole either way.
+  const historyMessages = spoken
+    ? currentMessages.map(msg =>
+        msg.type === 'text' && (msg.imageUris || msg.audioUri)
+          ? {...msg, imageUris: undefined, audioUri: undefined}
+          : msg,
+      )
+    : currentMessages;
+
   let chatMessages = convertToChatMessages(
-    currentMessages.filter(msg => msg.type !== 'image'),
+    historyMessages.filter(msg => msg.type !== 'image'),
     multimodalReady,
   );
 

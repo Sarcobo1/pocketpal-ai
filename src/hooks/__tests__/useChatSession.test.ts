@@ -27,7 +27,7 @@ import {
 
 import {l10n} from '../../locales';
 import {assistant} from '../../utils/chat';
-import {ModelOrigin} from '../../utils/types';
+import {MessageType, ModelOrigin} from '../../utils/types';
 import {
   RemoteModelNotReadyError,
   RemoteModelRequestWithdrawnError,
@@ -913,6 +913,117 @@ describe('useChatSession', () => {
     runInAction(() => {
       serverStore.remoteCaps = {};
       modelStore.activeModelId = undefined;
+    });
+  });
+
+  describe('a camera turn', () => {
+    const frameRow = (id: string, url: string) =>
+      ({
+        id,
+        author: textMessage.author,
+        type: 'text',
+        text: `what is in ${id}`,
+        imageUris: [url],
+      }) as MessageType.Text;
+
+    const withHistory = (messages: MessageType.Any[]) => {
+      const original = Object.getOwnPropertyDescriptor(
+        chatSessionStore,
+        'currentSessionMessages',
+      );
+      Object.defineProperty(chatSessionStore, 'currentSessionMessages', {
+        get: () => messages,
+        configurable: true,
+      });
+      return () => {
+        if (original) {
+          Object.defineProperty(
+            chatSessionStore,
+            'currentSessionMessages',
+            original,
+          );
+        }
+      };
+    };
+
+    // The projector re-encodes every media part in the prompt, so the number of
+    // frames in what was sent is the number of frames a turn pays for.
+    const sendFrame = async (spoken: boolean) => {
+      runInAction(() => {
+        modelStore.models = [
+          {
+            id: 'srv-1/gemma-4-e2b',
+            origin: ModelOrigin.REMOTE,
+            serverId: 'srv-1',
+            remoteModelId: 'gemma-4-e2b',
+          } as any,
+        ];
+        modelStore.activeModelId = 'srv-1/gemma-4-e2b';
+        serverStore.remoteCaps = {'srv-1/gemma-4-e2b': {supportsVision: true}};
+      });
+      if (modelStore.context) {
+        modelStore.context.completion = jest
+          .fn()
+          .mockResolvedValue({text: 'ok', content: 'ok', timings: {}});
+      }
+      const {result} = renderHook(() =>
+        useChatSession({current: null}, textMessage.author, mockAssistant),
+      );
+      await act(async () => {
+        await result.current.handleSendPress(
+          {text: 'look at this', type: 'text', imageUris: ['file:///new.jpg']},
+          {spoken},
+        );
+      });
+      const sent = (modelStore.engine!.completion as jest.Mock).mock
+        .calls[0][0] as {messages: Array<{role: string; content: any}>};
+      runInAction(() => {
+        serverStore.remoteCaps = {};
+        modelStore.activeModelId = undefined;
+      });
+      return sent.messages;
+    };
+
+    const framesIn = (messages: Array<{role: string; content: any}>) =>
+      messages.flatMap(message =>
+        Array.isArray(message.content)
+          ? message.content
+              .filter(part => part.type === 'image_url')
+              .map(part => part.image_url.url)
+          : [],
+      );
+
+    it('speaks from the frame it was sent, not the ones already answered', async () => {
+      const restore = withHistory([
+        frameRow('shot-1', 'file:///old.jpg'),
+        {
+          id: 'answer-1',
+          author: assistant,
+          type: 'text',
+          text: 'A kettle on the stove.',
+        } as MessageType.Text,
+      ]);
+      try {
+        const messages = await sendFrame(true);
+        expect(framesIn(messages)).toEqual(['file:///new.jpg']);
+        expect(messages.some(m => m.content === 'A kettle on the stove.')).toBe(
+          true,
+        );
+      } finally {
+        restore();
+      }
+    });
+
+    it('keeps every frame of a typed chat in view', async () => {
+      const restore = withHistory([frameRow('shot-1', 'file:///old.jpg')]);
+      try {
+        const messages = await sendFrame(false);
+        expect(framesIn(messages).sort()).toEqual(
+          ['file:///new.jpg', 'file:///old.jpg'].sort(),
+        );
+      } finally {
+        restore();
+      }
     });
   });
 

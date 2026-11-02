@@ -43,6 +43,7 @@ import {
   MicrophoneIcon,
   MicrophoneOffIcon,
 } from '../../assets/icons';
+import {startPerf} from '../../utils/mediaPerf';
 import {
   setVoiceFrameSource,
   storeVoiceFrame,
@@ -83,10 +84,12 @@ export const VoiceModeView: React.FC = observer(() => {
   const showPreview = cameraOn && !!device;
 
   const takeFrame = useCallback(async (): Promise<string | null> => {
+    const lap = startPerf();
     const shot = await camera.current?.takePhoto({
       flash: 'off',
       enableShutterSound: false,
     });
+    lap('camera.shot', {px: shot ? `${shot.width}x${shot.height}` : 'none'});
     return shot ? storeVoiceFrame(shot.path) : null;
   }, []);
 

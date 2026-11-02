@@ -41,11 +41,13 @@ import {
 } from '../utils/systemPromptResolver';
 import {
   convertToChatMessages,
+  countMediaParts,
   removeThinkingParts,
   visibleStepContent,
 } from '../utils/chat';
 import {acquireKeepAwake} from '../utils/keepAwake';
 import {vtrace} from '../utils/voiceTrace';
+import {logPerf} from '../utils/mediaPerf';
 import {toLocalMediaPath} from '../utils/multimodalPatterns';
 import {LLAMARN_ERROR_PATTERNS} from '../utils/llamaRnErrors';
 import {projectionGapCopy} from '../utils/multimodalHelpers';
@@ -246,6 +248,13 @@ const prepareCompletion = async ({
     completionParamsWithAppProps as CompletionParams,
   );
 
+  // Every media part in the finished prompt, not just this turn's: a projector
+  // re-encodes what it is handed on each completion.
+  const promptMedia =
+    hasImages || hasAudio
+      ? countMediaParts(cleanCompletionParams.messages)
+      : undefined;
+
   // Settles the question every media turn raises: did the frame reach the
   // prompt, or was it dropped because no projector could take it?
   if (hasImages || hasAudio) {
@@ -260,6 +269,7 @@ const prepareCompletion = async ({
           ...(hasImages && !canImages ? ['image'] : []),
           ...(hasAudio && !canAudio ? ['audio'] : []),
         ],
+        inPrompt: promptMedia,
         messageCount: cleanCompletionParams.messages?.length ?? 0,
       }),
     );
@@ -343,7 +353,7 @@ const prepareCompletion = async ({
     sessionId: chatSessionStore.activeSessionId!,
   };
 
-  return {cleanCompletionParams, messageInfo};
+  return {cleanCompletionParams, messageInfo, promptMedia};
 };
 
 // Per-run TTS streaming state. The runner emits content/reasoning
@@ -498,6 +508,7 @@ async function applyEventToStore(
     timeToFirstTokenMs: {value: number | null};
     hasImages: boolean;
     isMultimodalEnabled: boolean;
+    promptMedia: {images: number; audio: number} | undefined;
     tts: TtsRunState;
     stopped: boolean;
   },
@@ -641,6 +652,25 @@ async function applyEventToStore(
         time_to_first_token_ms: ctx.timeToFirstTokenMs.value,
         ...draftTimings,
       };
+      // The one number a media turn is really judged by: how long the prompt
+      // took, next to how much media the prompt carried. Prefill grows with the
+      // frames the projector is handed, not with the words.
+      if (ctx.promptMedia) {
+        logPerf('turn.eval', {
+          images: ctx.promptMedia.images,
+          audio: ctx.promptMedia.audio,
+          promptN: timings.prompt_n,
+          promptMs: timings.prompt_ms,
+          ppTokSec: timings.prompt_per_second,
+          cached: timings.cache_n,
+          genMs: timings.predicted_ms,
+          tokens: timings.predicted_n,
+          tokSec: timings.predicted_per_second,
+          ttft: timings.time_to_first_token_ms,
+          projector: modelStore.multimodalDevice,
+          nCtx: modelStore.activeContextSettings?.n_ctx,
+        });
+      }
       await chatSessionStore.updateMessage(ctx.messageId, ctx.sessionId, {
         metadata: {
           timings,
@@ -901,18 +931,19 @@ export const useChatSession = (
       model: modelStore.activeModel,
     });
 
-    const {cleanCompletionParams, messageInfo} = await prepareCompletion({
-      imageUris: imageUris || [],
-      audioUri,
-      message,
-      systemMessages,
-      contextId,
-      assistant,
-      conversationIdRef: conversationIdRef.current,
-      l10n,
-      currentMessages,
-      spoken: !!opts.spoken,
-    });
+    const {cleanCompletionParams, messageInfo, promptMedia} =
+      await prepareCompletion({
+        imageUris: imageUris || [],
+        audioUri,
+        message,
+        systemMessages,
+        contextId,
+        assistant,
+        conversationIdRef: conversationIdRef.current,
+        l10n,
+        currentMessages,
+        spoken: !!opts.spoken,
+      });
 
     currentMessageInfo.current = messageInfo;
     opts.onTurnCreated?.(messageInfo.id);
@@ -1055,6 +1086,7 @@ export const useChatSession = (
           // covers both kinds of session — an attached projector locally, the
           // probed binding remotely.
           isMultimodalEnabled: modelStore.activeModelCaps.visionActive,
+          promptMedia,
           tts,
           stopped: lease.signal.aborted,
         });

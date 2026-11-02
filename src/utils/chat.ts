@@ -30,6 +30,31 @@ export const assistant = {id: assistantId};
  * line (matching the visible block-per-step rendering). Steps with no
  * visible content (e.g. tool-call-only steps) are skipped.
  */
+/**
+ * Media parts carried by a finished prompt, across every message in it. One
+ * frame costs the projector the same whether the user attached it now or three
+ * turns ago, so a turn that looks like a text turn can still be re-encoding a
+ * gallery — this is the count that explains a slow prefill.
+ */
+export function countMediaParts(messages: ChatMessage[] | undefined): {
+  images: number;
+  audio: number;
+} {
+  let images = 0;
+  let audio = 0;
+  for (const message of messages ?? []) {
+    const parts = Array.isArray(message.content) ? message.content : undefined;
+    for (const part of parts ?? []) {
+      if (part.type === 'image_url') {
+        images += 1;
+      } else if (part.type === 'input_audio') {
+        audio += 1;
+      }
+    }
+  }
+  return {images, audio};
+}
+
 export function derivedText(message: MessageType.Any): string {
   if (message.type === 'assistant_turn') {
     return ((message as MessageType.AssistantTurn).steps ?? [])

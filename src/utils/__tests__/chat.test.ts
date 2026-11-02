@@ -2,6 +2,7 @@ import {Templates} from 'chat-formatter';
 import {
   applyChatTemplate,
   convertToChatMessages,
+  countMediaParts,
   derivedText,
   user,
   assistant,
@@ -291,6 +292,36 @@ const makeAssistantTurn = (
   createdAt: 0,
   steps,
   metadata: {},
+});
+
+describe('countMediaParts', () => {
+  it('counts every media part in the prompt, not just the last turn', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'user',
+        content: [
+          {type: 'text', text: 'first'},
+          {type: 'image_url', image_url: {url: 'file:///a.jpg'}},
+          {type: 'input_audio', input_audio: {url: '/a.wav', format: 'wav'}},
+        ],
+      },
+      {role: 'assistant', content: 'ok'},
+      {
+        role: 'user',
+        content: [
+          {type: 'text', text: 'second'},
+          {type: 'image_url', image_url: {url: 'file:///b.jpg'}},
+        ],
+      },
+    ];
+
+    expect(countMediaParts(messages)).toEqual({images: 2, audio: 1});
+  });
+
+  it('reads a text-only prompt as carrying no media', () => {
+    expect(countMediaParts(conversationWSystem)).toEqual({images: 0, audio: 0});
+    expect(countMediaParts(undefined)).toEqual({images: 0, audio: 0});
+  });
 });
 
 describe('convertToChatMessages — AssistantTurn', () => {

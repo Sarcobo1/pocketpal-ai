@@ -38,6 +38,7 @@ import type {
   VoiceTurnPort,
 } from '../services/voice';
 import {CascadeVoiceEngine} from '../services/voice/cascadeEngine';
+import {startPerf} from '../utils/mediaPerf';
 import {OmniVoiceEngine, isOmniVoiceModel} from '../services/voice/omniEngine';
 import {
   asrStore,
@@ -199,7 +200,13 @@ class VoiceModeController {
       this.engine = this.pinnedEngine;
       return;
     }
-    this.engine = (await isOmniVoiceModel()) ? this.omni : this.cascade;
+    // Asking the projector whether the model can hear is not free: it may attach
+    // one to a context that is already running. The session-start cost belongs
+    // in the same report as the per-turn numbers.
+    const lap = startPerf();
+    const omni = await isOmniVoiceModel();
+    this.engine = omni ? this.omni : this.cascade;
+    lap('engine.pick', {omni});
     if (this.engine.id === 'cascade') {
       // Two extra models are about to do what one omni model could have done
       // itself. When the app knows which file is missing, that is the answer.

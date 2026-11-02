@@ -4,6 +4,7 @@ import {ModelOrigin} from '../../utils/types';
 import {vtrace} from '../../utils/voiceTrace';
 
 import {findTurn} from './chatTurns';
+import {startPerf} from '../../utils/mediaPerf';
 import {captureVoiceFrame} from './frameSource';
 import {writeUtteranceWav} from './wav';
 import type {
@@ -81,6 +82,7 @@ export class OmniVoiceEngine implements VoiceEngine {
     };
 
     const run = async (): Promise<VoiceTurnOutcome> => {
+      const lap = startPerf();
       const vad = energyVad(int16PcmToFloat32(utterance));
       vtrace('vad', {
         passed: vad.passed,
@@ -97,10 +99,12 @@ export class OmniVoiceEngine implements VoiceEngine {
         console.warn('[voiceMode] utterance write failed:', err);
         return 'reply_failed';
       }
+      lap('utt.wav', {bytes: utterance.length});
       if (aborted) {
         return 'interrupted';
       }
       const imageUris = await captureVoiceFrame();
+      lap('utt.frame', {frames: imageUris.length});
       if (aborted) {
         return 'interrupted';
       }
@@ -127,6 +131,7 @@ export class OmniVoiceEngine implements VoiceEngine {
         console.warn('[voiceMode] reply failed:', err);
         sendFailed = true;
       }
+      lap('turn.reply', {turnId, failed: sendFailed});
       vtrace('turn.sent', {turnId, failed: sendFailed});
 
       if (interrupting) {

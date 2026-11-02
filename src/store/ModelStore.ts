@@ -67,6 +67,7 @@ import {
 import {isDraftOnlyFilename, isDraftOnlyModel} from '../utils/mtp';
 import {getOriginalModelName} from '../utils/formatters';
 import {stopQuietly} from '../utils/stopQuietly';
+import {logPerf} from '../utils/mediaPerf';
 import type {OnboardingPalModelEntry} from './onboarding/onboardingPals';
 
 import {downloadManager, DownloadCancelledError} from '../services/downloads';
@@ -264,6 +265,11 @@ class ModelStore {
   // Flag to track if multimodal is currently active
   isMultimodalActive: boolean = false;
   activeProjectionModelId: string | undefined = undefined;
+
+  // Which device the attached projector's encoder actually runs on. A GPU
+  // request that fell back to CPU is invisible in the frame rate unless it is
+  // recorded, and it is the single biggest per-frame cost.
+  multimodalDevice: 'gpu' | 'cpu' | undefined = undefined;
 
   // Track initialization settings for the active context
   activeContextSettings: ContextInitParams | undefined = undefined;
@@ -2827,6 +2833,7 @@ class ModelStore {
       runInAction(() => {
         this.isMultimodalActive = false;
         this.activeProjectionModelId = undefined;
+        this.multimodalDevice = undefined;
         this.projectionGap = {kind: 'noRam', filename: refused.filename};
       });
       return false;
@@ -2841,9 +2848,13 @@ class ModelStore {
       };
       const useGPU = !this.contextInitParams.no_gpu_devices;
       let success = false;
+      let device: 'gpu' | 'cpu' | undefined;
       let failure: unknown;
       try {
         success = await ctx.initMultimodal({...params, use_gpu: useGPU});
+        if (success) {
+          device = useGPU ? 'gpu' : 'cpu';
+        }
       } catch (error) {
         failure = error;
       }
@@ -2858,6 +2869,9 @@ class ModelStore {
         failure = undefined;
         try {
           success = await ctx.initMultimodal({...params, use_gpu: false});
+          if (success) {
+            device = 'cpu';
+          }
         } catch (error) {
           failure = error;
         }
@@ -2867,6 +2881,7 @@ class ModelStore {
         runInAction(() => {
           this.isMultimodalActive = false;
           this.activeProjectionModelId = undefined;
+          this.multimodalDevice = undefined;
           this.projectionGap = refused;
         });
         return false;
@@ -2887,7 +2902,16 @@ class ModelStore {
         this.activeProjectionModelId = isEnabled
           ? projectionModelId
           : undefined;
+        this.multimodalDevice = isEnabled ? device : undefined;
         this.projectionGap = isEnabled ? {kind: 'none'} : refused;
+      });
+      logPerf('projector.attach', {
+        device,
+        gpuRequested: useGPU,
+        imageMaxTokens: params.image_max_tokens,
+        vision: runtime?.vision,
+        audioInput: runtime?.audioInput,
+        file: refused.filename,
       });
       return isEnabled;
     } catch (error) {

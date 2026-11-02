@@ -1,5 +1,5 @@
 import * as RNFS from '@dr.pogodin/react-native-fs';
-import {toUint8} from 'base64-js';
+import {toByteArray} from 'base64-js';
 
 import {ASR_SAMPLE_RATE} from '../../asr/constants';
 import {int16PcmToWav, readWavHeader, writeUtteranceWav} from '../wav';
@@ -51,6 +51,6 @@ describe('writeUtteranceWav', () => {
     const written = (RNFS.writeFile as jest.Mock).mock.calls.at(
       -1,
     )![1] as string;
-    expect(toUint8(written).subarray(44)).toEqual(pcm);
+    expect(toByteArray(written).subarray(44)).toEqual(pcm);
   });
 });

@@ -31,11 +31,12 @@ import {
   Camera,
   getCameraDevice,
   useCameraDevices,
+  useCameraFormat,
   useCameraPermission,
 } from 'react-native-vision-camera';
 
 import {useTheme} from '../../hooks';
-import {voiceModeStore} from '../../store';
+import {modelStore, voiceModeStore} from '../../store';
 import {L10nContext} from '../../utils';
 import {
   CameraIcon,
@@ -45,6 +46,7 @@ import {
 } from '../../assets/icons';
 import {startPerf} from '../../utils/mediaPerf';
 import {
+  liveFramePx,
   setVoiceFrameSource,
   storeVoiceFrame,
 } from '../../services/voice/frameSource';
@@ -83,15 +85,29 @@ export const VoiceModeView: React.FC = observer(() => {
   const camera = useRef<Camera>(null);
   const showPreview = cameraOn && !!device;
 
+  // Ask the sensor for a frame the projector can actually use instead of a
+  // full-resolution one it has to throw most of away. The budget is the same
+  // setting that caps a frame's vision tokens, so a larger picture is not paid
+  // for twice: Settings → Image max tokens moves both.
+  const framePx = liveFramePx(modelStore.contextInitParams.image_max_tokens);
+  const frameFormat = useCameraFormat(device, [
+    {photoResolution: {width: framePx, height: framePx}},
+  ]);
+
   const takeFrame = useCallback(async (): Promise<string | null> => {
     const lap = startPerf();
     const shot = await camera.current?.takePhoto({
       flash: 'off',
       enableShutterSound: false,
     });
-    lap('camera.shot', {px: shot ? `${shot.width}x${shot.height}` : 'none'});
+    // `want` against `px` is the answer to "did this sensor give us the small
+    // frame we asked for, or the nearest thing it has".
+    lap('camera.shot', {
+      px: shot ? `${shot.width}x${shot.height}` : 'none',
+      want: framePx,
+    });
     return shot ? storeVoiceFrame(shot.path) : null;
-  }, []);
+  }, [framePx]);
 
   useEffect(() => {
     if (!showPreview) {
@@ -249,6 +265,8 @@ export const VoiceModeView: React.FC = observer(() => {
             <Camera
               ref={camera}
               device={device}
+              format={frameFormat}
+              photoQualityBalance="speed"
               photo={true}
               isActive={true}
               style={StyleSheet.absoluteFill}

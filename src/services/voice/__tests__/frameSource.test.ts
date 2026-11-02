@@ -5,9 +5,30 @@ import {voiceModeStore} from '../../../store';
 
 import {
   captureVoiceFrame,
+  liveFramePx,
   setVoiceFrameSource,
   storeVoiceFrame,
 } from '../frameSource';
+
+describe('live frame size', () => {
+  it('asks the camera for the frame the token budget can actually use', () => {
+    // 512 tokens at a 16 px patch is a ~362 px square; a sensor frame is many
+    // times that and the encoder throws the difference away after decoding it.
+    expect(liveFramePx(512)).toBe(384);
+    expect(liveFramePx(256)).toBe(256);
+    expect(liveFramePx(1024)).toBe(512);
+  });
+
+  it('stays inside the band a projector can serve', () => {
+    expect(liveFramePx(undefined)).toBe(384);
+    expect(liveFramePx(1)).toBe(192);
+    expect(liveFramePx(64)).toBe(192);
+    // The token budget is what bounds the frame, so a wild setting still lands
+    // on the largest square that budget can fill.
+    expect(liveFramePx(2048)).toBe(736);
+    expect(liveFramePx(100000)).toBe(736);
+  });
+});
 
 describe('voice camera frame', () => {
   afterEach(() => {
@@ -33,6 +54,32 @@ describe('voice camera frame', () => {
     setVoiceFrameSource(async () => 'file:///frame.jpg');
 
     await expect(captureVoiceFrame()).resolves.toEqual(['file:///frame.jpg']);
+  });
+
+  it('drops a second request while a frame is still being taken', async () => {
+    runInAction(() => {
+      voiceModeStore.cameraOn = true;
+    });
+    let releaseShot: () => void = () => {};
+    const shotTaken = new Promise<void>(resolve => {
+      releaseShot = resolve;
+    });
+    const source = jest.fn(async () => {
+      await shotTaken;
+      return 'file:///frame.jpg';
+    });
+    setVoiceFrameSource(source);
+
+    const first = captureVoiceFrame();
+    await expect(captureVoiceFrame()).resolves.toEqual([]);
+    expect(source).toHaveBeenCalledTimes(1);
+
+    releaseShot();
+    await expect(first).resolves.toEqual(['file:///frame.jpg']);
+
+    // The guard goes with the frame, so the turn after this one is served.
+    await expect(captureVoiceFrame()).resolves.toEqual(['file:///frame.jpg']);
+    expect(source).toHaveBeenCalledTimes(2);
   });
 
   it('sends nothing when the camera has no shot to give', async () => {

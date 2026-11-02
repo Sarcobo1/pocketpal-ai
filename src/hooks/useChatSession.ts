@@ -148,8 +148,10 @@ const prepareCompletion = async ({
       },
       ...(canImages
         ? imageUris.map(path => ({
+            // The raw URI: llama.rn strips file:// off an image url itself, and
+            // a remote server expects the URL it was always given.
             type: 'image_url',
-            image_url: {url: toLocalMediaPath(path)},
+            image_url: {url: path},
           }))
         : []),
     ];

@@ -61,6 +61,8 @@ jobs:
             src/services/plus/__tests__/gate.test.ts \
             src/services/voice/__tests__/omniEngine.test.ts \
             src/store/__tests__/ModelStore.localMultimodal.test.ts \
+            src/store/__tests__/ModelStore.projectorMedia.test.ts \
+            src/components/VoiceSetupSheet/__tests__/VoiceSetupSheet.test.tsx \
             src/hooks/__tests__/useChatSession.test.ts \
             src/hooks/__tests__/useChatSession.assistantTurn.test.ts \
             src/hooks/__tests__/useVoiceMode.test.ts

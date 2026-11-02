@@ -380,7 +380,7 @@ describe('ModelStore local projector pairing', () => {
       });
     });
 
-    it('reports a content:// path it cannot scan', async () => {
+    it('pairs a content:// import from the folders it can still read', async () => {
       const saf = push({
         ...unpairedLocalModel(),
         id: 'local-saf',
@@ -389,10 +389,15 @@ describe('ModelStore local projector pairing', () => {
       });
       (RNFS.readDir as jest.Mock).mockClear();
 
-      await expect(modelStore.linkLocalProjectionModels(saf)).resolves.toEqual(
-        [],
-      );
-      expect(RNFS.readDir).not.toHaveBeenCalled();
+      const ids = await modelStore.linkLocalProjectionModels(saf);
+
+      // The document tree is not listable, so the folder that holds the app's
+      // own copies is searched instead — and the unreadable folder is still
+      // named, because "it found one elsewhere" is not the same as "there was
+      // none beside the model".
+      expect(ids).toHaveLength(1);
+      expect(saf.defaultProjectionModel).toBeDefined();
+      expect(RNFS.readDir).toHaveBeenCalledWith(DIR);
       expect(modelStore.projectionScanIssue).toBe('saf');
       expect(modelStore.projectionScanError).toMatch(/content:\/\//);
     });
@@ -421,7 +426,7 @@ describe('ModelStore local projector pairing', () => {
     });
 
     it('says the folder is short when an import has no mmproj beside it', async () => {
-      (RNFS.readDir as jest.Mock).mockResolvedValue([{name: MODEL_NAME}]);
+      fakeFolders({[DIR]: [MODEL_NAME]});
 
       await expect(resolve(model)).resolves.toMatchObject({
         gap: {kind: 'folder'},
@@ -562,7 +567,7 @@ describe('ModelStore local projector pairing', () => {
     });
 
     it('names the missing projector when a turn cannot be served', async () => {
-      (RNFS.readDir as jest.Mock).mockResolvedValue([{name: MODEL_NAME}]);
+      fakeFolders({[DIR]: [MODEL_NAME]});
       contextWithProjector();
 
       await expect(

@@ -21,6 +21,11 @@ import {
   stateCacheBudgetMb,
 } from '../../src/utils/memoryEstimator';
 import type {ProjectionGap} from '../../src/utils/multimodalHelpers';
+import {
+  EMPTY_MEDIA_SUPPORT,
+  mediaSupportOf,
+} from '../../src/utils/ggufCapabilities';
+import type {MediaSupport} from '../../src/utils/types';
 import type {
   ExtendedRamSetting,
   MemoryBudget,
@@ -381,6 +386,16 @@ class MockModelStore {
 
   get activeModelCaps(): ModelCapabilityView {
     return this.capsFor(this.activeModel);
+  }
+
+  // Mirrors the real getter: what the attached projector can take, and nothing
+  // until one is attached.
+  get activeMediaSupport(): MediaSupport {
+    if (!this.isMultimodalActive) {
+      return EMPTY_MEDIA_SUPPORT;
+    }
+    const model = this.activeModel;
+    return model ? mediaSupportOf(model) : EMPTY_MEDIA_SUPPORT;
   }
 
   get activeSamplerDefaults(): Samplers | undefined {

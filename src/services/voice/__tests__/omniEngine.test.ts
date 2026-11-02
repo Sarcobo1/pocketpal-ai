@@ -1,7 +1,12 @@
 import {runInAction} from 'mobx';
 
 import {ASR_CHUNK_BYTES} from '../../asr/constants';
-import {chatSessionStore, modelStore, voiceModeStore} from '../../../store';
+import {
+  chatSessionStore,
+  modelStore,
+  ttsStore,
+  voiceModeStore,
+} from '../../../store';
 
 import {OmniVoiceEngine, isOmniVoiceModel} from '../omniEngine';
 import {setVoiceFrameSource} from '../frameSource';
@@ -57,6 +62,9 @@ describe('OmniVoiceEngine', () => {
     setVoiceFrameSource(null);
     runInAction(() => {
       voiceModeStore.cameraOn = false;
+      ttsStore.voiceSpeechStarted = null;
+      ttsStore.voiceStreamFailed = null;
+      ttsStore.playbackState = {mode: 'idle'};
     });
     jest.clearAllMocks();
   });
@@ -114,6 +122,73 @@ describe('OmniVoiceEngine', () => {
     port.settle();
 
     await expect(turn.done).resolves.toBe('answered');
+  });
+
+  const answerWith = (turnId: string) => {
+    chat.sessions = [
+      {
+        id: 'session-1',
+        messages: [
+          {id: turnId, type: 'assistant_turn', steps: [], metadata: {}},
+        ],
+      },
+    ];
+  };
+
+  it('holds the turn until the voice has finished the reply', async () => {
+    const port = makePort();
+    const turn = engine.runTurn(speech(500), port, events());
+    await flush();
+    answerWith('turn-1');
+    port.onTurn!('turn-1');
+    runInAction(() => {
+      ttsStore.playbackState = {mode: 'streaming', messageId: 'turn-1'};
+    });
+    port.settle();
+
+    let outcome = 'pending';
+    turn.done.then(value => {
+      outcome = value;
+    });
+    await flush();
+    expect(outcome).toBe('pending');
+
+    runInAction(() => {
+      ttsStore.playbackState = {mode: 'idle'};
+    });
+    await expect(turn.done).resolves.toBe('answered');
+  });
+
+  it('calls the turn spoken once its voice begins to play', async () => {
+    const on = events();
+    const port = makePort();
+    const turn = engine.runTurn(speech(500), port, on);
+    await flush();
+    answerWith('turn-1');
+    port.onTurn!('turn-1');
+
+    runInAction(() => {
+      ttsStore.voiceSpeechStarted = 'turn-1';
+    });
+    await flush();
+    expect(on.speechStarted).toHaveBeenCalledTimes(1);
+
+    port.settle();
+    await expect(turn.done).resolves.toBe('answered');
+  });
+
+  it('reports a reply the voice could not speak', async () => {
+    const port = makePort();
+    const turn = engine.runTurn(speech(500), port, events());
+    await flush();
+    answerWith('turn-1');
+    port.onTurn!('turn-1');
+    runInAction(() => {
+      ttsStore.voiceStreamFailed = 'turn-1';
+    });
+    port.settle();
+
+    await expect(turn.done).resolves.toBe('speech_failed');
   });
 
   it('sends nothing for audio the VAD rejects', async () => {

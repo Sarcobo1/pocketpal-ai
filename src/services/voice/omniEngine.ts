@@ -1,5 +1,7 @@
+import {when} from 'mobx';
+
 import {energyVad, int16PcmToFloat32} from '../asr';
-import {modelStore} from '../../store';
+import {modelStore, ttsStore} from '../../store';
 import {ModelOrigin} from '../../utils/types';
 import {vtrace} from '../../utils/voiceTrace';
 
@@ -75,8 +77,10 @@ export class OmniVoiceEngine implements VoiceEngine {
         if (!sending) {
           return;
         }
+        const stopping = ttsStore.stop('interrupt').catch(() => {});
         port.stop();
         await sending.catch(() => {});
+        await stopping;
       })();
       return interrupting;
     };
@@ -114,6 +118,15 @@ export class OmniVoiceEngine implements VoiceEngine {
         frames: imageUris.length,
       });
       on.transcribed('');
+      // The reply is text until the model can voice itself, so the turn is not
+      // over when the tokens stop: it is over when the voice stops with them.
+      const stopWatching = when(
+        () => {
+          const startedId = ttsStore.voiceSpeechStarted;
+          return startedId !== null && startedId === turnId;
+        },
+        () => on.speechStarted(),
+      );
       sending = port.send(
         {
           text: '',
@@ -132,6 +145,9 @@ export class OmniVoiceEngine implements VoiceEngine {
         sendFailed = true;
       }
       lap('turn.reply', {turnId, failed: sendFailed});
+      await when(() => ttsStore.playbackState.mode === 'idle');
+      vtrace('turn.idle');
+      stopWatching();
       vtrace('turn.sent', {turnId, failed: sendFailed});
 
       if (interrupting) {
@@ -141,6 +157,9 @@ export class OmniVoiceEngine implements VoiceEngine {
       const turn = turnId ? findTurn(turnId) : null;
       if (sendFailed || !turn || turn.message.metadata?.interrupted) {
         return 'reply_failed';
+      }
+      if (ttsStore.voiceStreamFailed === turnId) {
+        return 'speech_failed';
       }
       return 'answered';
     };

@@ -38,7 +38,7 @@ import type {
   VoiceTurnPort,
 } from '../services/voice';
 import {CascadeVoiceEngine} from '../services/voice/cascadeEngine';
-import {startPerf} from '../utils/mediaPerf';
+import {logPerf, startPerf} from '../utils/mediaPerf';
 import {OmniVoiceEngine, isOmniVoiceModel} from '../services/voice/omniEngine';
 import {
   asrStore,
@@ -193,7 +193,8 @@ class VoiceModeController {
 
   /**
    * An omni model reads the utterance as audio through its own projector, so
-   * Whisper and the TTS voice drop out of the turn.
+   * Whisper drops out of the turn. The TTS voice stays: until the model can
+   * voice its own reply, it is the only way the answer is heard.
    */
   private async selectEngine(): Promise<void> {
     if (this.pinnedEngine) {
@@ -303,12 +304,20 @@ class VoiceModeController {
     this.open = true;
     const session = ++this.session;
     startVoiceTrace();
-    if (this.engine.id === 'cascade') {
-      ttsStore.setVoiceOutputActive(true, {
-        holdFirstChunk: modelStore.activeModel?.origin !== ModelOrigin.REMOTE,
-      });
-      ttsStore.stop('voice_enter').catch(() => {});
-    }
+    // Whichever engine answers, the reply is text the user cannot read on a
+    // phone held to the ear, so the voice output opens for both. An omni model
+    // that speaks for itself (mediaSupport.audioOutput) goes through the same
+    // gate: until it does, the selected TTS voice is what makes it audible.
+    ttsStore.setVoiceOutputActive(true, {
+      holdFirstChunk: modelStore.activeModel?.origin !== ModelOrigin.REMOTE,
+    });
+    ttsStore.stop('voice_enter').catch(() => {});
+    // A session with no neural voice to speak with stays silent, so record
+    // which of the two reasons a quiet reply has.
+    logPerf('voice.output', {
+      engine: this.engine.id,
+      voice: ttsStore.currentVoice?.name ?? 'none',
+    });
     this.releaseAwake = acquireKeepAwake();
     this.setPhase('starting', 'enter');
     voiceModeStore.setPresentation('full');

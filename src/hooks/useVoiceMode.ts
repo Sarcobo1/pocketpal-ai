@@ -40,7 +40,11 @@ import type {
 import {CascadeVoiceEngine} from '../services/voice/cascadeEngine';
 import {logPerf, startPerf} from '../utils/mediaPerf';
 import {OmniVoiceEngine, isOmniVoiceModel} from '../services/voice/omniEngine';
-import {modelCanVoiceReplies} from '../services/voice/omniSpeech';
+import {
+  modelCanVoiceReplies,
+  speakWithModel,
+  stopModelSpeech,
+} from '../services/voice/omniSpeech';
 import {
   asrStore,
   chatSessionStore,
@@ -194,8 +198,8 @@ class VoiceModeController {
 
   /**
    * An omni model reads the utterance as audio through its own projector, so
-   * Whisper drops out of the turn. The TTS voice stays: until the model can
-   * voice its own reply, it is the only way the answer is heard.
+   * Whisper drops out of the turn. Whether it also *answers* in its own voice
+   * is a separate capability, settled per session in `enter`.
    */
   private async selectEngine(): Promise<void> {
     if (this.pinnedEngine) {
@@ -313,9 +317,12 @@ class VoiceModeController {
       return;
     }
     // Whichever engine answers, the reply is text the user cannot read on a
-    // phone held to the ear, so the voice output opens for both. An omni model
-    // that speaks for itself (mediaSupport.audioOutput) goes through the same
-    // gate: until it does, the selected TTS voice is what makes it audible.
+    // phone held to the ear, so the voice output opens for both. A model that
+    // can speak for itself gets the pipeline installed, and a TTS voice stays
+    // behind it as the voice that says the replies the model will not.
+    ttsStore.setModelVoice(
+      modelVoice ? {speak: speakWithModel, stop: stopModelSpeech} : null,
+    );
     ttsStore.setVoiceOutputActive(true, {
       holdFirstChunk: modelStore.activeModel?.origin !== ModelOrigin.REMOTE,
     });
@@ -380,6 +387,7 @@ class VoiceModeController {
         console.warn('[voiceMode] interrupt on exit failed:', err);
       }
       ttsStore.setVoiceOutputActive(false);
+      ttsStore.setModelVoice(null);
       try {
         // Freeing the models blocks the JS thread; let a scroll start first.
         await new Promise<void>(resolve =>

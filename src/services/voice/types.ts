@@ -65,3 +65,28 @@ export interface VoiceEngine {
     on: VoiceTurnEvents,
   ): VoiceTurn;
 }
+
+/**
+ * The pipeline that voices a reply with the model's own voice, for one session.
+ * The store holds it behind this contract instead of importing the speech
+ * module, which reaches back to the stores it is installed in.
+ */
+export interface ModelVoiceSink {
+  /**
+   * Say `text` and resolve once the audio has played out — or once it is clear
+   * the audio is not coming, which is when the TTS voice takes the reply.
+   * `onPlaying` fires the moment a sample is on its way, so a long synthesis
+   * does not look like a session that has nothing to say.
+   */
+  speak(
+    text: string,
+    onPlaying: () => void,
+  ): Promise<{
+    /** The reply was heard. False leaves it to the TTS voice. */
+    spoken: boolean;
+    /** False when this model should not be asked again this session. */
+    keepModelVoice: boolean;
+  }>;
+  /** Cut the utterance in flight short. */
+  stop(): void;
+}

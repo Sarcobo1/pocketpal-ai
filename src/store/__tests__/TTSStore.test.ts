@@ -929,6 +929,222 @@ describe('TTSStore', () => {
     });
   });
 
+  describe('model voice', () => {
+    type Sink = {
+      speak: jest.Mock;
+      stop: jest.Mock;
+      onPlaying: (() => void) | null;
+    };
+
+    const makeSink = (
+      report: {spoken: boolean; keepModelVoice: boolean} = {
+        spoken: true,
+        keepModelVoice: true,
+      },
+    ): Sink => {
+      const sink: Sink = {
+        speak: jest.fn(),
+        stop: jest.fn(),
+        onPlaying: null,
+      };
+      sink.speak.mockImplementation(
+        async (_text: string, onPlaying: () => void) => {
+          sink.onPlaying = onPlaying;
+          return report;
+        },
+      );
+      return sink;
+    };
+
+    /** A sink whose answer arrives when the test says so. */
+    const makePendingSink = (
+      report: {spoken: boolean; keepModelVoice: boolean} = {
+        spoken: true,
+        keepModelVoice: true,
+      },
+    ) => {
+      const sink = makeSink(report);
+      let settle: () => void = () => {};
+      sink.speak.mockImplementation((_text: string, onPlaying: () => void) => {
+        sink.onPlaying = onPlaying;
+        return new Promise(resolve => {
+          settle = () => resolve(report);
+        });
+      });
+      return {sink, finish: () => settle()};
+    };
+
+    const makeModelStore = async (sink: Sink, voice?: Voice) => {
+      const store = await makeStore();
+      if (voice) {
+        store.setCurrentVoice(voice);
+      }
+      store.setModelVoice(sink);
+      store.setVoiceOutputActive(true);
+      return store;
+    };
+
+    /** A streamed reply, said with the model's own voice to its end. */
+    const speakReply = async (
+      store: TTSStore,
+      text = 'Paris is the capital.',
+    ) => {
+      store.onAssistantMessageStart('msg-1');
+      store.onAssistantMessageChunk('msg-1', text);
+      store.onAssistantMessageComplete('msg-1', text);
+      await flush();
+    };
+
+    it('needs no TTS voice to be installed to be heard', async () => {
+      const store = await makeModelStore(makeSink());
+
+      store.onAssistantMessageStart('msg-1');
+
+      expect(store.usesModelVoice).toBe(true);
+      expect(store.playbackState.mode).toBe('streaming');
+      expect(mockSystemPlayStreaming).not.toHaveBeenCalled();
+      expect(mockSupertonicPlayStreaming).not.toHaveBeenCalled();
+    });
+
+    it('asks for the whole reply, and not before it is finished', async () => {
+      const sink = makeSink();
+      const store = await makeModelStore(sink);
+      store.onAssistantMessageStart('msg-1');
+      store.onAssistantMessageChunk('msg-1', 'Paris ');
+      store.onAssistantMessageChunk('msg-1', 'is the capital.');
+      expect(sink.speak).not.toHaveBeenCalled();
+
+      store.onAssistantMessageComplete('msg-1', 'Paris is the capital.');
+      await flush();
+
+      expect(sink.speak.mock.calls[0]![0]).toBe('Paris is the capital.');
+      expect(store.playbackState.mode).toBe('idle');
+    });
+
+    it('says the reply with its reasoning left out', async () => {
+      const sink = makeSink();
+      const store = await makeModelStore(sink);
+      store.onAssistantMessageStart('msg-1');
+      store.onAssistantMessageChunk('msg-1', '<think>hmm</think>Paris.');
+      store.onAssistantMessageComplete('msg-1', '<think>hmm</think>Paris.');
+      await flush();
+
+      expect(sink.speak.mock.calls[0]![0]).not.toContain('hmm');
+    });
+
+    it('marks the reply begun only once its audio is on its way', async () => {
+      const {sink, finish} = makePendingSink();
+      const store = await makeModelStore(sink);
+      store.onAssistantMessageStart('msg-1');
+      store.onAssistantMessageChunk('msg-1', 'Paris.');
+
+      store.onAssistantMessageComplete('msg-1', 'Paris.');
+      await flush();
+      expect(store.voiceSpeechStarted).toBeNull();
+
+      sink.onPlaying!();
+      expect(store.voiceSpeechStarted).toBe('msg-1');
+      finish();
+      await flush();
+      expect(store.playbackState.mode).toBe('idle');
+    });
+
+    it('hands a reply the model would not say to the installed voice', async () => {
+      const sink = makeSink({spoken: false, keepModelVoice: true});
+      const store = await makeModelStore(sink, SYSTEM_VOICE);
+
+      await speakReply(store);
+
+      expect(mockSystemPlay).toHaveBeenCalledWith(
+        'Paris is the capital.',
+        SYSTEM_VOICE,
+      );
+      expect(store.voiceStreamFailed).toBeNull();
+    });
+
+    it('stops asking a model whose voice declined for good', async () => {
+      const sink = makeSink({spoken: false, keepModelVoice: false});
+      const store = await makeModelStore(sink, SYSTEM_VOICE);
+
+      await speakReply(store);
+      expect(store.usesModelVoice).toBe(false);
+
+      store.onAssistantMessageStart('msg-2');
+      expect(mockSystemPlayStreaming).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports a reply neither voice could say', async () => {
+      const sink = makeSink({spoken: false, keepModelVoice: true});
+      const store = await makeModelStore(sink);
+
+      await speakReply(store);
+
+      expect(store.voiceStreamFailed).toBe('msg-1');
+    });
+
+    it('cuts the utterance and stays quiet when the session stops', async () => {
+      const {sink, finish} = makePendingSink({
+        spoken: false,
+        keepModelVoice: true,
+      });
+      const store = await makeModelStore(sink, SYSTEM_VOICE);
+      store.onAssistantMessageStart('msg-1');
+      store.onAssistantMessageChunk('msg-1', 'Paris.');
+      store.onAssistantMessageComplete('msg-1', 'Paris.');
+      await flush();
+
+      await store.stop('barge_in');
+      expect(sink.stop).toHaveBeenCalledTimes(1);
+      finish();
+      await flush();
+
+      expect(mockSystemPlay).not.toHaveBeenCalled();
+    });
+
+    it('keeps the installed voice when the debug switch is on', async () => {
+      const sink = makeSink();
+      const store = await makeModelStore(sink, SUPERTONIC_VOICE);
+      store.setForceTTSFallback(true);
+
+      store.onAssistantMessageStart('msg-1');
+
+      expect(store.usesModelVoice).toBe(false);
+      expect(mockSupertonicPlayStreaming).toHaveBeenCalledTimes(1);
+      expect(sink.speak).not.toHaveBeenCalled();
+    });
+
+    it('is left out of a chat that only auto-speaks', async () => {
+      const store = await makeStore();
+      store.setCurrentVoice(SUPERTONIC_VOICE);
+      store.setModelVoice(makeSink());
+      store.setAutoSpeak(true);
+
+      store.onAssistantMessageStart('msg-1');
+
+      expect(store.usesModelVoice).toBe(false);
+      expect(mockSupertonicPlayStreaming).toHaveBeenCalledTimes(1);
+    });
+
+    it('says a reply whose start it never saw', async () => {
+      const sink = makeSink();
+      const store = await makeModelStore(sink);
+
+      store.onAssistantMessageComplete('msg-1', 'Paris is the capital.');
+      await flush();
+
+      expect(sink.speak.mock.calls[0]![0]).toBe('Paris is the capital.');
+    });
+
+    it('stays quiet for a reply with nothing in it', async () => {
+      const sink = makeSink();
+      const store = await makeModelStore(sink);
+
+      await speakReply(store, '   ');
+
+      expect(sink.speak).not.toHaveBeenCalled();
+    });
+  });
+
   describe('thinking-tag stripping', () => {
     const setupEligible = async () => {
       const store = await makeStore();

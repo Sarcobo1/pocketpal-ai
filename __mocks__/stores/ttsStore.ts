@@ -1,4 +1,4 @@
-import {makeAutoObservable, runInAction} from 'mobx';
+import {makeAutoObservable, observable, runInAction} from 'mobx';
 
 type DownloadState = 'not_installed' | 'downloading' | 'ready' | 'error';
 
@@ -30,6 +30,17 @@ class MockTTSStore {
     );
   }
   currentVoice: any = null;
+  // Mirrors the real store: the sink is installed by a voice session whose
+  // model can voice its own replies, and `usesModelVoice` is what consumers
+  // read instead of probing the model themselves.
+  modelVoice: any = null;
+  get usesModelVoice(): boolean {
+    return (
+      this.voiceOutputActive &&
+      this.modelVoice !== null &&
+      !this.forceTTSFallback
+    );
+  }
   isSetupSheetOpen = false;
   lastSpokenMessageId: string | null = null;
   forceTTSFallback = false;
@@ -62,6 +73,7 @@ class MockTTSStore {
   stop: jest.Mock;
   setAutoSpeak: jest.Mock;
   setVoiceOutputActive: jest.Mock;
+  setModelVoice: jest.Mock;
   setUserTTSOverride: jest.Mock;
   setCurrentVoice: jest.Mock;
   setSupertonicSteps: jest.Mock;
@@ -100,6 +112,8 @@ class MockTTSStore {
       stop: false,
       setAutoSpeak: false,
       setVoiceOutputActive: false,
+      setModelVoice: false,
+      modelVoice: observable.shallow,
       setUserTTSOverride: false,
       setCurrentVoice: false,
       setSupertonicSteps: false,
@@ -134,6 +148,11 @@ class MockTTSStore {
     this.setVoiceOutputActive = jest.fn((active: boolean) => {
       runInAction(() => {
         this.voiceOutputActive = active;
+      });
+    });
+    this.setModelVoice = jest.fn((sink: unknown) => {
+      runInAction(() => {
+        this.modelVoice = sink;
       });
     });
     this.setUserTTSOverride = jest.fn();

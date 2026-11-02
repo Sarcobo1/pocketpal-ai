@@ -1,6 +1,6 @@
 import {AppState, AppStateStatus} from 'react-native';
 
-import {makeAutoObservable, reaction, runInAction} from 'mobx';
+import {makeAutoObservable, observable, reaction, runInAction} from 'mobx';
 import {makePersistable} from 'mobx-persist-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DeviceInfo from 'react-native-device-info';
@@ -36,6 +36,7 @@ import {
   pickThinkingPlaceholder,
 } from '../services/tts/thinkingStripper';
 import {VOICE_FIRST_CHUNK_HOLD_MS} from '../services/voice/constants';
+import type {ModelVoiceSink} from '../services/voice/types';
 import {vtrace} from '../utils/voiceTrace';
 import {chatSessionStore} from './ChatSessionStore';
 
@@ -105,6 +106,11 @@ type VoiceStream = {
  * second feeds deltas into it, the third flushes the remaining buffer. If
  * `start` is missed (e.g., voice picked mid-message) `complete` falls back
  * to the full-text `play()` path.
+ *
+ * A voice session whose model voices its own replies (`setModelVoice`) keeps
+ * the same three hooks and the same handle contract, but buffers: the model
+ * needs the finished text before it can make a single sample. A reply the
+ * model's voice declines goes to `play()` without a word about it.
  */
 export class TTSStore {
   // Set once in init() from getTotalMemory() >= TTS_MIN_RAM_BYTES; never
@@ -215,10 +221,24 @@ export class TTSStore {
   private streamStripper: ThinkingStripper | null = null;
   private streamPlaceholderEmitted: boolean = false;
 
+  /**
+   * Set for a voice session whose model voices its own replies. A reference,
+   * not a deep object: the sink is a pair of callbacks owned by the session
+   * controller, which installs it on the way in and clears it on the way out.
+   */
+  private modelVoice: ModelVoiceSink | null = null;
+
   constructor() {
-    makeAutoObservable<TTSStore, 'holdFirstChunk' | 'voiceStream'>(
+    makeAutoObservable<
+      TTSStore,
+      'holdFirstChunk' | 'voiceStream' | 'modelVoice'
+    >(
       this,
-      {holdFirstChunk: false, voiceStream: false},
+      {
+        holdFirstChunk: false,
+        voiceStream: false,
+        modelVoice: observable.shallow,
+      },
       {autoBind: true},
     );
     makePersistable(this, {
@@ -362,6 +382,23 @@ export class TTSStore {
   ) {
     this.voiceOutputActive = active;
     this.holdFirstChunk = active && holdFirstChunk;
+  }
+
+  setModelVoice(sink: ModelVoiceSink | null) {
+    this.modelVoice = sink;
+  }
+
+  /**
+   * True while a voice session has a model that speaks for itself. Only voice
+   * mode asks: a chat that auto-speaks has no session to decide for, and the
+   * debug switch hands every reply to the installed voice.
+   */
+  get usesModelVoice(): boolean {
+    return (
+      this.voiceOutputActive &&
+      this.modelVoice !== null &&
+      !this.forceTTSFallback
+    );
   }
 
   isEngineOffered(id: EngineId): boolean {
@@ -624,6 +661,20 @@ export class TTSStore {
   }
 
   /**
+   * What a finished reply is said as: its text with the reasoning taken out,
+   * and a spoken marker in place of what was hidden.
+   */
+  private spokenReplyText(text: string, hadReasoning?: boolean): string {
+    const {text: cleanText, hadNonEmptyThink} = ThinkingStripper.stripFinal(
+      text,
+      {hadReasoning},
+    );
+    return hadNonEmptyThink
+      ? `${pickThinkingPlaceholder()} ${cleanText}`
+      : cleanText;
+  }
+
+  /**
    * Speak `text` as a single utterance (replay path).
    */
   async play(
@@ -641,13 +692,7 @@ export class TTSStore {
 
     await this.stop();
 
-    const {text: cleanText, hadNonEmptyThink} = ThinkingStripper.stripFinal(
-      text,
-      {hadReasoning: opts?.hadReasoning},
-    );
-    const spokenText = hadNonEmptyThink
-      ? `${pickThinkingPlaceholder()} ${cleanText}`
-      : cleanText;
+    const spokenText = this.spokenReplyText(text, opts?.hadReasoning);
 
     const playing = runInAction(() => {
       this.playbackState = {mode: 'playing', messageId};
@@ -746,11 +791,11 @@ export class TTSStore {
 
   /** First token / message creation. Opens a streaming session. */
   onAssistantMessageStart(messageId: string): void {
-    if (
-      !this.streamsReplies ||
-      this.currentVoice == null ||
-      messageId === this.lastSpokenMessageId
-    ) {
+    if (!this.streamsReplies || messageId === this.lastSpokenMessageId) {
+      return;
+    }
+    const sink = this.usesModelVoice ? this.modelVoice : null;
+    if (sink == null && this.currentVoice == null) {
       return;
     }
     // Stop ANY prior playback before opening the new session. The stop
@@ -761,14 +806,25 @@ export class TTSStore {
       console.warn('[TTSStore] stop before new stream failed:', err);
     });
 
-    const voice = this.currentVoice;
-    const voiceReady = stopDone
-      .then(() => ensureVoiceFile(voice))
-      .then(() => undefined);
     this.lastSpokenMessageId = messageId;
     this.streamStripper = new ThinkingStripper();
     this.streamPlaceholderEmitted = false;
     const voiceOpts = this.openVoiceStream(messageId);
+    if (sink) {
+      // The model needs the whole reply before it can make a single sample,
+      // so this stream only accumulates; it speaks when the reply finishes.
+      const handle = this.modelVoiceHandle(sink, messageId);
+      runInAction(() => {
+        this.playbackState = {mode: 'streaming', messageId, handle};
+      });
+      vtrace('tts.open', {model: true});
+      return;
+    }
+
+    const voice = this.currentVoice!;
+    const voiceReady = stopDone
+      .then(() => ensureVoiceFile(voice))
+      .then(() => undefined);
     const engine = getEngine(voice.engine);
     let engineHandle: StreamingHandle;
     if (voice.engine === 'supertonic') {
@@ -820,6 +876,65 @@ export class TTSStore {
       firstChunk: 'clause',
       onProgress: event => this.onVoiceProgress(messageId, event),
     };
+  }
+
+  /**
+   * The streaming session of a model that speaks for itself. It has the same
+   * contract as an engine's handle, because everything around a handle — the
+   * stripper, the hold, the UI's "speaking" state, `stop()` for a barge-in —
+   * already means exactly the right thing here. Only `finalize` differs: the
+   * text arrives whole rather than already having been spoken as it came.
+   */
+  private modelVoiceHandle(
+    sink: ModelVoiceSink,
+    messageId: string,
+  ): StreamingHandle {
+    let text = '';
+    let cancelled = false;
+    return {
+      appendText: chunk => {
+        text += chunk;
+      },
+      finalize: async () => {
+        if (cancelled || text.trim().length === 0) {
+          return;
+        }
+        const said = text;
+        const report = await sink.speak(said, () => {
+          if (this.voiceStream?.messageId === messageId) {
+            runInAction(() => {
+              this.voiceSpeechStarted = messageId;
+            });
+          }
+        });
+        if (cancelled) {
+          return;
+        }
+        if (!report.keepModelVoice) {
+          runInAction(() => {
+            this.modelVoice = null;
+          });
+        }
+        if (!report.spoken) {
+          await this.sayWithFallbackVoice(messageId, said);
+        }
+      },
+      cancel: async () => {
+        cancelled = true;
+        sink.stop();
+      },
+    };
+  }
+
+  /** A reply the model's voice would not say: the installed voice, or nobody. */
+  private async sayWithFallbackVoice(messageId: string, text: string) {
+    if (this.currentVoice && this.isTTSAvailable) {
+      await this.play(messageId, text);
+      return;
+    }
+    runInAction(() => {
+      this.voiceStreamFailed = messageId;
+    });
   }
 
   private onVoiceProgress(messageId: string, event: StreamProgressEvent) {
@@ -966,14 +1081,26 @@ export class TTSStore {
       return;
     }
 
+    const sink = this.usesModelVoice ? this.modelVoice : null;
     if (
       !this.streamsReplies ||
-      this.currentVoice == null ||
-      messageId === this.lastSpokenMessageId
+      messageId === this.lastSpokenMessageId ||
+      (sink == null && this.currentVoice == null)
     ) {
       return;
     }
     this.lastSpokenMessageId = messageId;
+    if (sink) {
+      const handle = this.modelVoiceHandle(sink, messageId);
+      handle.appendText(this.spokenReplyText(text, opts?.hadReasoning));
+      handle.finalize().catch(err => {
+        console.warn('[TTSStore] model reply failed:', err);
+        runInAction(() => {
+          this.voiceStreamFailed = messageId;
+        });
+      });
+      return;
+    }
     this.play(messageId, text, {hadReasoning: opts?.hadReasoning}).catch(() => {
       // play() already logs and recovers; swallow to satisfy no-floating-promises.
     });

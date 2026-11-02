@@ -46,11 +46,8 @@ describe('writeUtteranceWav', () => {
     const path = await writeUtteranceWav(pcm);
 
     expect(path).toMatch(/voice-audio\/utt-\d+\.wav$/);
-    const [, encoding] = (RNFS.writeFile as jest.Mock).mock.calls.at(-1);
+    const [, data, encoding] = (RNFS.writeFile as jest.Mock).mock.calls.at(-1)!;
     expect(encoding).toBe('base64');
-    const written = (RNFS.writeFile as jest.Mock).mock.calls.at(
-      -1,
-    )![1] as string;
-    expect(toByteArray(written).subarray(44)).toEqual(pcm);
+    expect(toByteArray(data as string).subarray(44)).toEqual(pcm);
   });
 });

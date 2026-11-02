@@ -27,6 +27,7 @@ import {
   ModelOrigin,
   User,
   type AgentToolCall,
+  type MediaSupport,
 } from '../utils/types';
 import {
   RemoteModelNotReadyError,
@@ -110,8 +111,22 @@ const prepareCompletion = async ({
   // carries media asks for one before being downgraded to plain text. Without
   // this a model imported from storage — whose pairing lands only when
   // ModelStore next reads its folder — sends a camera frame as a caption.
-  let media = modelStore.activeMediaSupport;
-  if ((hasImages || hasAudio) && !media.vision && !media.audioInput) {
+  // A remote binding has no projector at all: its answer is the probe the
+  // capability view already holds.
+  const remoteActive = modelStore.activeModel?.origin === ModelOrigin.REMOTE;
+  let media: MediaSupport = remoteActive
+    ? {
+        vision: modelStore.activeModelCaps.visionActive,
+        audioInput: false,
+        audioOutput: false,
+      }
+    : modelStore.activeMediaSupport;
+  if (
+    !remoteActive &&
+    (hasImages || hasAudio) &&
+    !media.vision &&
+    !media.audioInput
+  ) {
     await modelStore.ensureMultimodalActive();
     media = modelStore.activeMediaSupport;
   }
@@ -1034,8 +1049,10 @@ export const useChatSession = (
           hasImages,
           // Read as the turn runs: the projector that answers this is attached
           // inside prepareCompletion, so a value captured before it would be
-          // the one from a session that could not see.
-          isMultimodalEnabled: modelStore.activeMediaSupport.vision,
+          // the one from a session that could not see. The capability view
+          // covers both kinds of session — an attached projector locally, the
+          // probed binding remotely.
+          isMultimodalEnabled: modelStore.activeModelCaps.visionActive,
           tts,
           stopped: lease.signal.aborted,
         });

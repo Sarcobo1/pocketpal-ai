@@ -142,7 +142,7 @@ describe('OmniVoiceEngine', () => {
     answerWith('turn-1');
     port.onTurn!('turn-1');
     runInAction(() => {
-      ttsStore.playbackState = {mode: 'streaming', messageId: 'turn-1'};
+      ttsStore.playbackState = {mode: 'playing', messageId: 'turn-1'};
     });
     port.settle();
 

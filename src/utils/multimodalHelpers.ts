@@ -128,6 +128,20 @@ const identityTokens = (filename: string): string[] =>
     );
 
 /**
+ * How many family tokens a model name and a projector name share. Zero means
+ * the names describe different models, which is the one pairing mistake that
+ * loads a foreign encoder into a context.
+ */
+export function familyTokenMatch(
+  modelFilename: string,
+  projectorFilename: string,
+): number {
+  const tokens = new Set(identityTokens(modelFilename));
+  return identityTokens(projectorFilename).filter(token => tokens.has(token))
+    .length;
+}
+
+/**
  * Picks the projectors in a local model folder that plausibly belong to this
  * model.
  *
@@ -153,13 +167,10 @@ export function projectorsForLocalModel(
     return projectors;
   }
 
-  const tokens = new Set(identityTokens(modelFilename));
   const names: string[] = [];
   let best = 0;
   for (const projector of projectors) {
-    const hits = identityTokens(projector).filter(token =>
-      tokens.has(token),
-    ).length;
+    const hits = familyTokenMatch(modelFilename, projector);
     if (hits > best) {
       best = hits;
       names.length = 0;

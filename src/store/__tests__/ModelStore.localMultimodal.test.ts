@@ -19,10 +19,28 @@ import {modelStore} from '..';
 import {Model, ModelOrigin, ModelType} from '../../utils/types';
 
 const DIR = '/documents/models/local';
+const HF_ROOT = '/documents/models/hf';
+const REPO_DIR = `${HF_ROOT}/LiquidAI`;
 const MODEL_NAME = 'LFM3-Omni-2B-Q8_0.gguf';
 const PROJ_NAME = 'mmproj-LFM3-Omni-2B-Q8_0.gguf';
 const MODEL_PATH = `${DIR}/${MODEL_NAME}`;
 const PROJ_PATH = `${DIR}/${PROJ_NAME}`;
+
+// The store looks for a stray projector under the app's own model root, so the
+// fake filesystem has to hang off the same path the mocked RNFS reports.
+(RNFS as any).__setDocumentDirectoryPath('/documents');
+
+/** Path-aware `readDir`: each folder answers with the names it holds. */
+const fakeFolders = (contents: Record<string, string[]>) => {
+  (RNFS.readDir as jest.Mock).mockReset();
+  (RNFS.readDir as jest.Mock).mockImplementation(async (path: string) =>
+    (contents[path] ?? []).map(name => ({
+      name,
+      path: `${path}/${name}`,
+      isDirectory: () => !name.toLowerCase().endsWith('.gguf'),
+    })),
+  );
+};
 
 const unpairedLocalModel = (): Model => ({
   ...basicModel,
@@ -95,14 +113,12 @@ describe('ModelStore local projector pairing', () => {
       modelStore.projectionGap = {kind: 'none'};
       modelStore.projectionScanIssue = undefined;
       modelStore.projectionScanError = undefined;
+      modelStore.projectionScanFolder = undefined;
+      modelStore.projectionScanFiles = undefined;
     });
     model = push(unpairedLocalModel());
 
-    (RNFS.readDir as jest.Mock).mockReset();
-    (RNFS.readDir as jest.Mock).mockResolvedValue([
-      {name: MODEL_NAME},
-      {name: PROJ_NAME},
-    ]);
+    fakeFolders({[DIR]: [MODEL_NAME, PROJ_NAME]});
     (RNFS.stat as jest.Mock).mockReset();
     (RNFS.stat as jest.Mock).mockResolvedValue({size: 500e6});
 
@@ -145,7 +161,7 @@ describe('ModelStore local projector pairing', () => {
     });
 
     it('pairs nothing when the folder holds no projector', async () => {
-      (RNFS.readDir as jest.Mock).mockResolvedValue([{name: MODEL_NAME}]);
+      fakeFolders({[DIR]: [MODEL_NAME]});
 
       await expect(
         modelStore.linkLocalProjectionModels(model),
@@ -155,16 +171,74 @@ describe('ModelStore local projector pairing', () => {
     });
 
     it('leaves a foreign-family projector alone in a shared folder', async () => {
-      (RNFS.readDir as jest.Mock).mockResolvedValue([
-        {name: MODEL_NAME},
-        {name: 'gemma-3n-e4b-it-f16.gguf'},
-        {name: 'mmproj-gemma-3n-e4b-it-f16.gguf'},
-      ]);
+      fakeFolders({
+        [DIR]: [
+          MODEL_NAME,
+          'gemma-3n-e4b-it-f16.gguf',
+          'mmproj-gemma-3n-e4b-it-f16.gguf',
+        ],
+      });
 
       await expect(
         modelStore.linkLocalProjectionModels(model),
       ).resolves.toEqual([]);
       expect(model.supportsMultimodal).toBeUndefined();
+    });
+
+    it('records the folder it read and what was in it', async () => {
+      fakeFolders({[DIR]: [MODEL_NAME, 'readme.txt']});
+
+      await modelStore.linkLocalProjectionModels(model);
+
+      expect(modelStore.projectionScanFolder).toBe(DIR);
+      expect(modelStore.projectionScanFiles).toEqual([
+        MODEL_NAME,
+        'readme.txt',
+      ]);
+      expect(modelStore.projectionScanIssue).toBe('empty');
+    });
+
+    it('says so when a document URI cannot be listed', async () => {
+      fakeFolders({[DIR]: [MODEL_NAME]});
+      runInAction(() => {
+        model.fullPath =
+          'content://com.android.externalstorage.documents/tree/primary%3Amodels';
+      });
+
+      await expect(
+        modelStore.linkLocalProjectionModels(model),
+      ).resolves.toEqual([]);
+      expect(modelStore.projectionScanIssue).toBe('saf');
+    });
+
+    it('pairs a projector that sits in the repository folder instead', async () => {
+      fakeFolders({
+        [DIR]: [MODEL_NAME],
+        [HF_ROOT]: ['LiquidAI'],
+        [REPO_DIR]: [PROJ_NAME],
+      });
+
+      const ids = await modelStore.linkLocalProjectionModels(model);
+
+      expect(ids).toHaveLength(1);
+      expect(addLocalModel).toHaveBeenCalledWith(`${REPO_DIR}/${PROJ_NAME}`);
+      expect(model.defaultProjectionModel).toBe(ids[0]);
+    });
+
+    it('prefers the Q8_0 mmproj when a repository folder carries quants', async () => {
+      fakeFolders({
+        [DIR]: [MODEL_NAME],
+        [HF_ROOT]: ['LiquidAI'],
+        [REPO_DIR]: [
+          'mmproj-LFM3-Omni-2B-BF16.gguf',
+          'mmproj-LFM3-Omni-2B-F16.gguf',
+          'mmproj-LFM3-Omni-2B-Q8_0.gguf',
+        ],
+      });
+
+      await modelStore.linkLocalProjectionModels(model);
+
+      expect(addLocalModel).toHaveBeenCalledWith(`${REPO_DIR}/${PROJ_NAME}`);
     });
 
     it('is idempotent — a paired model keeps one projector of each name', async () => {

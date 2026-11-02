@@ -47,6 +47,7 @@ import {
   type SkillKey,
 } from '../utils';
 import {
+  familyTokenMatch,
   getRecommendedProjectionModel,
   isProjectionModel,
   preferredProjectorModel,
@@ -344,8 +345,11 @@ class ModelStore {
   projectionGap: ProjectionGap = {kind: 'none'};
   // Why the last local-folder scan could not list projectors. Runtime only, so
   // the media-support sheet can say "pick the file" instead of "none found".
-  projectionScanIssue: 'saf' | 'unreadable' | undefined = undefined;
+  projectionScanIssue: 'saf' | 'unreadable' | 'empty' | undefined = undefined;
   projectionScanError: string | undefined = undefined;
+  /** The folder the last scan read and what it contained, for diagnostics. */
+  projectionScanFolder: string | undefined = undefined;
+  projectionScanFiles: string[] | undefined = undefined;
 
   constructor() {
     makeAutoObservable<
@@ -2294,7 +2298,9 @@ class ModelStore {
    * the mic instead of falling back to a transcript.
    *
    * Idempotent. Registers nothing for a model that is already paired, for a
-   * projection file or draft, and for a folder with no matching mmproj.
+   * projection file or draft, and when no folder the app owns holds a projector
+   * of this model's family. Records what it read, because "no mmproj beside the
+   * model" is only actionable if the user can see which folder was checked.
    *
    * @returns the projection model ids now paired with this model
    */
@@ -2311,44 +2317,100 @@ class ModelStore {
     }
 
     const dir = model.fullPath.slice(0, model.fullPath.lastIndexOf('/'));
+    const fromDocumentUri = model.fullPath.startsWith('content://');
     runInAction(() => {
       this.projectionScanIssue = undefined;
       this.projectionScanError = undefined;
+      this.projectionScanFolder = undefined;
+      this.projectionScanFiles = undefined;
     });
-    if (model.fullPath.startsWith('content://')) {
+
+    let filenames: string[] = [];
+    if (fromDocumentUri) {
       runInAction(() => {
         this.projectionScanIssue = 'saf';
         this.projectionScanError =
           'a content:// document cannot be listed for a sibling projector';
       });
-      return [];
-    }
-    let folderFiles: string[];
-    try {
-      folderFiles = (await RNFS.readDir(dir)).map(entry => entry.name);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      console.warn(
+        '[ModelStore] Projector scan: the model is a document URI, so its folder cannot be listed:',
+        model.fullPath,
+      );
+    } else {
+      let folderFiles: string[] = [];
+      try {
+        folderFiles = (await RNFS.readDir(dir)).map(entry => entry.name);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        runInAction(() => {
+          this.projectionScanIssue = 'unreadable';
+          this.projectionScanError = message;
+        });
+        console.warn(
+          '[ModelStore] Projector scan: could not read the model folder:',
+          dir,
+          error,
+        );
+      }
       runInAction(() => {
-        this.projectionScanIssue = 'unreadable';
-        this.projectionScanError = message;
+        this.projectionScanFolder = dir;
+        this.projectionScanFiles = folderFiles;
       });
-      console.warn('[ModelStore] Could not read the model folder:', dir, error);
-      return [];
+      console.log(
+        '[ModelStore] Projector scan:',
+        dir,
+        'holds',
+        folderFiles.length > 0 ? folderFiles.join(', ') : '(no files)',
+      );
+      filenames = projectorsForLocalModel(model.filename, folderFiles);
     }
 
-    const filenames = projectorsForLocalModel(model.filename, folderFiles);
+    // A projector downloaded from the repository does not sit beside a model
+    // imported from storage, so one folder scan never sees both files.
+    let foundOutsideFolder = false;
+    const folderOf = new Map<string, string>();
     if (filenames.length === 0) {
+      const elsewhere = await this.findProjectorInOtherModelFolders(
+        model.filename,
+        dir,
+      );
+      if (elsewhere) {
+        filenames = [elsewhere.filename];
+        folderOf.set(elsewhere.filename, elsewhere.dir);
+        foundOutsideFolder = true;
+      }
+    }
+    if (filenames.length === 0) {
+      if (!fromDocumentUri) {
+        runInAction(() => {
+          this.projectionScanIssue = 'empty';
+        });
+      }
       return [];
     }
 
     const idsByFilename = new Map<string, string>();
     for (const filename of filenames) {
-      const fullPath = `${dir}/${filename}`;
+      const fullPath = `${folderOf.get(filename) ?? dir}/${filename}`;
       const byPath = (candidate: Model): boolean =>
         isLocalFileModel(candidate) && candidate.fullPath === fullPath;
       const existing = this.models.find(byPath);
       if (existing) {
         idsByFilename.set(filename, existing.id);
+        continue;
+      }
+      // One file, one record: the same projector can already be in the library
+      // under its repository entry, and a duplicate would let deleting either
+      // model remove the file the other still needs.
+      const registered = this.models.find(
+        m =>
+          m.isDownloaded &&
+          m.filename === filename &&
+          (m.modelType === ModelType.PROJECTION ||
+            isProjectionModel(m.filename)),
+      );
+      if (registered) {
+        idsByFilename.set(filename, registered.id);
         continue;
       }
       await this.addLocalModel(fullPath);
@@ -2407,9 +2469,62 @@ class ModelStore {
       model.name,
       'with',
       ids.length,
-      'projector(s) from its folder',
+      'projector(s)',
+      foundOutsideFolder ? 'found in another model folder' : 'from its folder',
     );
     return ids;
+  };
+
+  /**
+   * Look for this model's projector in the app's other model folders. The
+   * "a folder with one GGUF is unambiguous" shortcut cannot apply to a folder
+   * the model does not live in, so the names have to share a family token and
+   * the best quant wins.
+   */
+  private findProjectorInOtherModelFolders = async (
+    modelFilename: string,
+    ownFolder: string,
+  ): Promise<{dir: string; filename: string} | undefined> => {
+    const modelsRoot = `${RNFS.DocumentDirectoryPath}/models`;
+    for (const root of [`${modelsRoot}/local`, `${modelsRoot}/hf`]) {
+      let entries: RNFS.ReadDirItem[];
+      try {
+        entries = await RNFS.readDir(root);
+      } catch {
+        continue;
+      }
+      const folders = [
+        root,
+        ...entries
+          .filter(entry => entry.isDirectory())
+          .map(entry => entry.path),
+      ];
+      for (const folder of folders) {
+        if (folder === ownFolder) {
+          continue;
+        }
+        let names: string[];
+        try {
+          names = (await RNFS.readDir(folder)).map(entry => entry.name);
+        } catch {
+          continue;
+        }
+        const matching = names
+          .filter(name => isProjectionModel(name))
+          .filter(name => familyTokenMatch(modelFilename, name) > 0);
+        const filename = preferredProjectorModel(matching);
+        if (filename) {
+          console.log(
+            '[ModelStore] Found a projector for',
+            modelFilename,
+            'in',
+            folder,
+          );
+          return {dir: folder, filename};
+        }
+      }
+    }
+    return undefined;
   };
 
   /**

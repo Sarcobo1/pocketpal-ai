@@ -1296,6 +1296,7 @@
     "multimodalNeedsProjection": "This model needs its projector file, {{file}}, to see or hear. Download it in the Models tab.",
     "multimodalNeedsProjectorFolder": "No projector file (mmproj) sits beside this model, so it cannot see or hear. Put the matching mmproj in the same folder as the model.",
     "multimodalProjectionRejected": "The engine refused the projector file {{file}} — it is probably not the one that belongs to this model.",
+    "multimodalProjectionTooBig": "There is no room to load {{file}} beside the running model. Close other apps, unload the model, or use a smaller projector file.",
     "spokenTurn": "Voice message",
     "cannotSendWithoutModel": "Load a model first",
     "toolCompatWarning": "This model may not support tool calling. Results may be unreliable.",

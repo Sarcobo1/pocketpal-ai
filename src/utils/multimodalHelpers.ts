@@ -196,7 +196,9 @@ export type ProjectionGap =
   /** A model that arrived as a file, whose folder holds no projector. */
   | {kind: 'folder'}
   /** The file is there and the engine refused it. */
-  | {kind: 'attach'; filename: string};
+  | {kind: 'attach'; filename: string}
+  /** The file is there, but loading it beside the running model is hopeless. */
+  | {kind: 'noRam'; filename: string};
 
 /** The four chat strings the gap can be answered with. */
 interface ProjectionGapCopy {
@@ -204,6 +206,7 @@ interface ProjectionGapCopy {
     multimodalNeedsProjection: string;
     multimodalNeedsProjectorFolder: string;
     multimodalProjectionRejected: string;
+    multimodalProjectionTooBig: string;
   };
 }
 
@@ -226,6 +229,11 @@ export function projectionGapCopy(
       return l10n.chat.multimodalNeedsProjectorFolder;
     case 'attach':
       return l10n.chat.multimodalProjectionRejected.replace(
+        '{{file}}',
+        gap.filename,
+      );
+    case 'noRam':
+      return l10n.chat.multimodalProjectionTooBig.replace(
         '{{file}}',
         gap.filename,
       );

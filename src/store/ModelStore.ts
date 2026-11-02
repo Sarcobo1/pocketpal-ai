@@ -2208,6 +2208,48 @@ class ModelStore {
   };
 
   /**
+   * Can the phone still take this projector on top of the model that is
+   * running? A projector is weights too, and asking for more than the kernel
+   * has — backing store included — is how the app gets killed instead of
+   * answering, which is the one failure a chat turn must not produce.
+   *
+   * Deliberately permissive: the refusal needs `MemAvailable` plus the whole
+   * swap credit to be exceeded, and a file-backed projector that only just
+   * fits is worth loading. Unknown sizes or counters never refuse.
+   */
+  private projectorFitsMemory = async (
+    mmProjPath: string,
+  ): Promise<boolean> => {
+    let bytes = 0;
+    try {
+      bytes = Number((await RNFS.stat(mmProjPath)).size);
+    } catch (error) {
+      console.warn('[ModelStore] Could not size the projector:', error);
+      return true;
+    }
+    if (!Number.isFinite(bytes) || bytes <= 0) {
+      return true;
+    }
+    await this.refreshMemoryStats();
+    const headroom =
+      (this.memoryStats?.availableBytes ?? 0) +
+      (this.memoryBudget?.virtualBytes ?? 0);
+    if (headroom <= 0 || bytes <= headroom) {
+      return true;
+    }
+    console.warn(
+      '[ModelStore] Projector',
+      mmProjPath,
+      'needs',
+      Math.round(bytes / 1e6),
+      'MB and only',
+      Math.round(headroom / 1e6),
+      'MB is free — not loading it',
+    );
+    return false;
+  };
+
+  /**
    * Load a projector into a context and record what the engine reports.
    *
    * The clamp on image_max_tokens is llama.rn's: a projector configured above
@@ -2226,6 +2268,14 @@ class ModelStore {
       kind: 'attach',
       filename: mmProjPath.split('/').pop() ?? mmProjPath,
     };
+    if (!(await this.projectorFitsMemory(mmProjPath))) {
+      runInAction(() => {
+        this.isMultimodalActive = false;
+        this.activeProjectionModelId = undefined;
+        this.projectionGap = {kind: 'noRam', filename: refused.filename};
+      });
+      return false;
+    }
     try {
       const success = await ctx.initMultimodal({
         path: mmProjPath,

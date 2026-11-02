@@ -47,6 +47,25 @@ describe('ModelStore local projector pairing', () => {
   let model: Model;
   let addLocalModel: jest.Mock;
 
+  // A context that already runs the model, so the only thing left to ask for
+  // is the projector on top of it.
+  const contextWithProjector = () => {
+    const ctx = {
+      initMultimodal: jest.fn().mockResolvedValue(true),
+      isMultimodalEnabled: jest.fn().mockResolvedValue(true),
+      getMultimodalSupport: jest
+        .fn()
+        .mockResolvedValue({vision: true, audio: true}),
+      completion: jest.fn().mockResolvedValue({text: 'a cat'}),
+      stopCompletion: jest.fn(),
+    };
+    runInAction(() => {
+      modelStore.context = ctx as any;
+      modelStore.activeModelId = model.id;
+    });
+    return ctx;
+  };
+
   beforeEach(async () => {
     await AsyncStorage.clear();
     jest.spyOn(console, 'warn').mockImplementation();
@@ -67,6 +86,8 @@ describe('ModelStore local projector pairing', () => {
       {name: MODEL_NAME},
       {name: PROJ_NAME},
     ]);
+    (RNFS.stat as jest.Mock).mockReset();
+    (RNFS.stat as jest.Mock).mockResolvedValue({size: 500e6});
 
     // Register the file the way addLocalModel would, without the GGUF header
     // read that has nothing to do with pairing.
@@ -328,26 +349,41 @@ describe('ModelStore local projector pairing', () => {
       await expect(modelStore.ensureMultimodalActive()).resolves.toBe(true);
       expect(modelStore.projectionGap).toEqual({kind: 'none'});
     });
+
+    // A projector is weights on top of the model that is already running, and
+    // the kill for asking too much is silent — so it is refused, not attempted.
+    it('refuses a projector larger than the memory the phone has', async () => {
+      const ctx = contextWithProjector();
+      (RNFS.stat as jest.Mock).mockResolvedValue({size: 4e9});
+
+      await expect(modelStore.ensureMultimodalActive()).resolves.toBe(false);
+      expect(ctx.initMultimodal).not.toHaveBeenCalled();
+      expect(modelStore.projectionGap).toEqual({
+        kind: 'noRam',
+        filename: PROJ_NAME,
+      });
+    });
+
+    it('loads one that fits inside what is free', async () => {
+      const ctx = contextWithProjector();
+      (RNFS.stat as jest.Mock).mockResolvedValue({size: 500e6});
+
+      await expect(modelStore.ensureMultimodalActive()).resolves.toBe(true);
+      expect(ctx.initMultimodal).toHaveBeenCalledWith(
+        expect.objectContaining({path: PROJ_PATH}),
+      );
+    });
+
+    it('does not refuse on a size it could not read', async () => {
+      const ctx = contextWithProjector();
+      (RNFS.stat as jest.Mock).mockRejectedValue(new Error('unreadable'));
+
+      await expect(modelStore.ensureMultimodalActive()).resolves.toBe(true);
+      expect(ctx.initMultimodal).toHaveBeenCalled();
+    });
   });
 
   describe('ensureMultimodalActive', () => {
-    const contextWithProjector = () => {
-      const ctx = {
-        initMultimodal: jest.fn().mockResolvedValue(true),
-        isMultimodalEnabled: jest.fn().mockResolvedValue(true),
-        getMultimodalSupport: jest
-          .fn()
-          .mockResolvedValue({vision: true, audio: true}),
-        completion: jest.fn().mockResolvedValue({text: 'a cat'}),
-        stopCompletion: jest.fn(),
-      };
-      runInAction(() => {
-        modelStore.context = ctx as any;
-        modelStore.activeModelId = model.id;
-      });
-      return ctx;
-    };
-
     it('puts the projector on the context that is already running', async () => {
       const ctx = contextWithProjector();
 

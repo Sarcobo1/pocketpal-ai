@@ -159,6 +159,18 @@ export class TTSStore {
    */
   supertonicLanguage: SupertonicLanguage = DEFAULT_SUPERTONIC_LANGUAGE;
 
+  /**
+   * Debug: never use the model's own voice, even when it has one, so a device
+   * run can compare the two voices of the same reply. Persisted because the
+   * comparison spans restarts.
+   */
+  forceTTSFallback: boolean = false;
+  /**
+   * Debug: the language handed to the model's `tts` template. Empty lets the
+   * template use its own default, which is what a model is shipped to do.
+   */
+  speechLanguage: string = '';
+
   // UI state
   isSetupSheetOpen: boolean = false;
   /** Free disk bytes, refreshed each time the setup sheet opens. */
@@ -217,6 +229,8 @@ export class TTSStore {
         'supertonicSteps',
         'supertonicLanguage',
         'userTTSOverride',
+        'forceTTSFallback',
+        'speechLanguage',
       ],
       storage: AsyncStorage,
     });
@@ -459,6 +473,20 @@ export class TTSStore {
    */
   setSupertonicLanguage(language: SupertonicLanguage) {
     this.supertonicLanguage = language;
+  }
+
+  /**
+   * Force the TTS voice even on a model that speaks for itself. Takes effect
+   * on the next voice-mode entry, which is where the capability is probed;
+   * an utterance already in the player is not interrupted.
+   */
+  setForceTTSFallback(on: boolean) {
+    this.forceTTSFallback = on;
+  }
+
+  /** The `lang` for the model's own voice; empty leaves it to the template. */
+  setSpeechLanguage(language: string) {
+    this.speechLanguage = language;
   }
 
   openSetupSheet() {

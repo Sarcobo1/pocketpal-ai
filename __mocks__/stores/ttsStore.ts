@@ -32,6 +32,8 @@ class MockTTSStore {
   currentVoice: any = null;
   isSetupSheetOpen = false;
   lastSpokenMessageId: string | null = null;
+  forceTTSFallback = false;
+  speechLanguage = '';
 
   supertonicDownloadState: DownloadState = 'not_installed';
   supertonicDownloadProgress = 0;
@@ -64,6 +66,8 @@ class MockTTSStore {
   setCurrentVoice: jest.Mock;
   setSupertonicSteps: jest.Mock;
   setSupertonicLanguage: jest.Mock;
+  setForceTTSFallback: jest.Mock;
+  setSpeechLanguage: jest.Mock;
   openSetupSheet: jest.Mock;
   closeSetupSheet: jest.Mock;
   onAssistantMessageStart: jest.Mock;
@@ -100,6 +104,8 @@ class MockTTSStore {
       setCurrentVoice: false,
       setSupertonicSteps: false,
       setSupertonicLanguage: false,
+      setForceTTSFallback: false,
+      setSpeechLanguage: false,
       openSetupSheet: false,
       closeSetupSheet: false,
       onAssistantMessageStart: false,
@@ -134,6 +140,16 @@ class MockTTSStore {
     this.setCurrentVoice = jest.fn();
     this.setSupertonicSteps = jest.fn();
     this.setSupertonicLanguage = jest.fn();
+    this.setForceTTSFallback = jest.fn((on: boolean) => {
+      runInAction(() => {
+        this.forceTTSFallback = on;
+      });
+    });
+    this.setSpeechLanguage = jest.fn((value: string) => {
+      runInAction(() => {
+        this.speechLanguage = value;
+      });
+    });
     this.openSetupSheet = jest.fn();
     this.closeSetupSheet = jest.fn();
     this.onAssistantMessageStart = jest.fn();

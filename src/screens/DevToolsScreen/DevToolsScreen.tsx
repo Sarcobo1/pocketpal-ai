@@ -1,7 +1,15 @@
 import React from 'react';
 import {View, ScrollView, Alert} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {Card, Text, Button, IconButton} from 'react-native-paper';
+import {observer} from 'mobx-react-lite';
+import {
+  Card,
+  Text,
+  Button,
+  IconButton,
+  Switch,
+  TextInput,
+} from 'react-native-paper';
 import {createStackNavigator} from '@react-navigation/stack';
 import {useNavigation, ParamListBase} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
@@ -9,6 +17,7 @@ import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {useTheme} from '../../hooks';
 import {createStyles} from './styles';
 import {chatSessionRepository} from '../../repositories/ChatSessionRepository';
+import {ttsStore} from '../../store';
 import {TestCompletionScreen, DatabaseInspectorScreen} from './screens';
 
 // Define the stack navigator param list
@@ -52,7 +61,7 @@ const MenuButton = ({
 }) => <IconButton icon="menu" onPress={() => navigation.openDrawer()} />;
 
 // Main DevTools Home Screen
-const DevToolsHomeScreen: React.FC = () => {
+const DevToolsHomeScreen: React.FC = observer(() => {
   const navigation = useNavigation();
   const theme = useTheme();
   const styles = createStyles(theme);
@@ -82,6 +91,44 @@ const DevToolsHomeScreen: React.FC = () => {
             <Text variant="bodyMedium" style={styles.description}>
               These tools are for development and debugging purposes only. They
               will not be available in the release version of the app.
+            </Text>
+          </Card.Content>
+        </Card>
+
+        {/* Model voice card */}
+        <Card elevation={1} style={styles.card}>
+          <Card.Title title="Model voice" />
+          <Card.Content>
+            <Text variant="bodyMedium" style={styles.description}>
+              An omni model that carries a speech decoder can say its own reply,
+              with no TTS voice involved. Both settings are saved and apply to
+              the next voice-mode entry.
+            </Text>
+            <View style={styles.row}>
+              <Text variant="bodyMedium" style={styles.rowLabel}>
+                Force TTS fallback
+              </Text>
+              <Switch
+                testID="force-tts-fallback"
+                value={ttsStore.forceTTSFallback}
+                onValueChange={value => ttsStore.setForceTTSFallback(value)}
+              />
+            </View>
+            <TextInput
+              testID="speech-language"
+              mode="outlined"
+              label="Speech language"
+              value={ttsStore.speechLanguage}
+              onChangeText={ttsStore.setSpeechLanguage}
+              placeholder="empty = template default"
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={styles.field}
+            />
+            <Text variant="bodyMedium" style={styles.description}>
+              Each voiced reply logs the language it spoke, the milliseconds per
+              frame and the real-time factor: look for [framePerf] speech.reply
+              in logcat.
             </Text>
           </Card.Content>
         </Card>
@@ -169,7 +216,7 @@ const DevToolsHomeScreen: React.FC = () => {
       </ScrollView>
     </SafeAreaView>
   );
-};
+});
 
 // Stack Navigator for DevTools
 export const DevToolsScreen: React.FC = () => {

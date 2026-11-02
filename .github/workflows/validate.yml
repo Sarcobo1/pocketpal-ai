@@ -62,6 +62,7 @@ jobs:
             src/services/voice/__tests__/endpointer.test.ts \
             src/services/voice/__tests__/frameSource.test.ts \
             src/services/voice/__tests__/omniEngine.test.ts \
+            src/services/voice/__tests__/omniSpeech.test.ts \
             src/services/voice/__tests__/speechLevel.test.ts \
             src/services/voice/__tests__/wav.test.ts \
             src/store/__tests__/ModelStore.localMultimodal.test.ts \

@@ -40,6 +40,7 @@ import type {
 import {CascadeVoiceEngine} from '../services/voice/cascadeEngine';
 import {logPerf, startPerf} from '../utils/mediaPerf';
 import {OmniVoiceEngine, isOmniVoiceModel} from '../services/voice/omniEngine';
+import {modelCanVoiceReplies} from '../services/voice/omniSpeech';
 import {
   asrStore,
   chatSessionStore,
@@ -304,6 +305,13 @@ class VoiceModeController {
     this.open = true;
     const session = ++this.session;
     startVoiceTrace();
+    // Whether this model can voice its own reply decides what the session
+    // needs to have installed to be heard, so it is settled once, here.
+    const modelVoice =
+      this.engine.id === 'omni' ? await modelCanVoiceReplies() : false;
+    if (session !== this.session) {
+      return;
+    }
     // Whichever engine answers, the reply is text the user cannot read on a
     // phone held to the ear, so the voice output opens for both. An omni model
     // that speaks for itself (mediaSupport.audioOutput) goes through the same
@@ -317,6 +325,7 @@ class VoiceModeController {
     logPerf('voice.output', {
       engine: this.engine.id,
       voice: ttsStore.currentVoice?.name ?? 'none',
+      modelVoice,
     });
     this.releaseAwake = acquireKeepAwake();
     this.setPhase('starting', 'enter');

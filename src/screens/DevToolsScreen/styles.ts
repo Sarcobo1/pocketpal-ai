@@ -28,6 +28,20 @@ export const createStyles = (theme: Theme) =>
       flexDirection: 'row',
       justifyContent: 'flex-end',
     },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 12,
+    },
+    rowLabel: {
+      flex: 1,
+      paddingRight: 12,
+      color: theme.colors.onSurface,
+    },
+    field: {
+      marginBottom: 16,
+    },
     button: {
       marginLeft: 8,
     },

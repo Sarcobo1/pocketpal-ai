@@ -93,6 +93,8 @@ describe('ModelStore local projector pairing', () => {
       modelStore.activeModelId = undefined;
       modelStore.activeProjectionModelId = undefined;
       modelStore.projectionGap = {kind: 'none'};
+      modelStore.projectionScanIssue = undefined;
+      modelStore.projectionScanError = undefined;
     });
     model = push(unpairedLocalModel());
 
@@ -290,6 +292,35 @@ describe('ModelStore local projector pairing', () => {
         isMultimodalInit: false,
         gap: {kind: 'none'},
       });
+    });
+
+    it('lets a manually picked projector win over the paired default', async () => {
+      await modelStore.linkLocalProjectionModels(model);
+      runInAction(() => {
+        model.mmprojPath = '/picked/mmproj-manual.gguf';
+      });
+
+      await expect(resolve(model)).resolves.toMatchObject({
+        isMultimodalInit: true,
+        resolvedMmProjPath: '/picked/mmproj-manual.gguf',
+      });
+    });
+
+    it('reports a content:// path it cannot scan', async () => {
+      const saf = push({
+        ...unpairedLocalModel(),
+        id: 'local-saf',
+        fullPath:
+          'content://com.android.externalstorage.documents/tree/primary%3ADownload/document/primary%3ADownload%2FLFM3-Omni-2B-Q8_0.gguf',
+      });
+      (RNFS.readDir as jest.Mock).mockClear();
+
+      await expect(modelStore.linkLocalProjectionModels(saf)).resolves.toEqual(
+        [],
+      );
+      expect(RNFS.readDir).not.toHaveBeenCalled();
+      expect(modelStore.projectionScanIssue).toBe('saf');
+      expect(modelStore.projectionScanError).toMatch(/content:\/\//);
     });
   });
 

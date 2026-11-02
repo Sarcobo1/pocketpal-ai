@@ -94,6 +94,39 @@ export const isMediaGGUFKey = (key: string): boolean => MEDIA_KEY_SET.has(key);
 export const hasMedia = (support: MediaSupport | undefined): boolean =>
   !!support && (support.vision || support.audioInput || support.audioOutput);
 
+/**
+ * The support to gate UI on. A model persisted before projector headers were
+ * read has no `mediaSupport`; it must keep its old vision-only behaviour until
+ * the migration probes its projector.
+ */
+export const mediaSupportOf = (model: {
+  mediaSupport?: MediaSupport;
+  supportsMultimodal?: boolean;
+}): MediaSupport =>
+  model.mediaSupport ?? {
+    vision: !!model.supportsMultimodal,
+    audioInput: false,
+    audioOutput: false,
+  };
+
+/**
+ * A projector is usable when its header has not declared it broken or
+ * incompatible, and it carries at least one encoder once scanned. An unscanned
+ * legacy projector is given the benefit of the doubt.
+ */
+export const projectorIsUsable = (projector: {
+  mediaSupport?: MediaSupport;
+  unsupportedMediaArchitecture?: string;
+  mediaSupportError?: string;
+}): boolean => {
+  if (projector.unsupportedMediaArchitecture || projector.mediaSupportError) {
+    return false;
+  }
+  return (
+    projector.mediaSupport === undefined || hasMedia(projector.mediaSupport)
+  );
+};
+
 export const mergeMediaSupport = (
   declared: MediaSupport | undefined,
   runtime: MediaSupport | undefined,

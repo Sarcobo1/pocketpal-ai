@@ -175,7 +175,6 @@ describe('multimodalHelpers', () => {
   });
 
   describe('getRecommendedProjectionModel', () => {
-    // Test case 1: Empty array of projection models
     it('returns undefined when no projection models are available', () => {
       const result = getRecommendedProjectionModel(
         'llama-3.1-8b-instruct-q4_0.gguf',
@@ -184,7 +183,6 @@ describe('multimodalHelpers', () => {
       expect(result).toBeUndefined();
     });
 
-    // Test case 2: Only one projection model available
     it('returns the only available projection model when only one exists', () => {
       const result = getRecommendedProjectionModel(
         'llama-3.1-8b-instruct-q4_0.gguf',
@@ -193,106 +191,55 @@ describe('multimodalHelpers', () => {
       expect(result).toBe('mmproj-llama-3.1-vision-q5_k_m.gguf');
     });
 
-    // Test case 3: Exact quantization match
-    it('returns the projection model with exact quantization match', () => {
-      const result = getRecommendedProjectionModel(
-        'llama-3.1-8b-instruct-q4_0.gguf',
-        [
-          'mmproj-llama-3.1-vision-q5_k_m.gguf',
+    it('prefers Q8_0 regardless of the LLM quant', () => {
+      for (const llm of ['q4_0', 'q8_0', 'f16']) {
+        expect(
+          getRecommendedProjectionModel(`llama-3.1-8b-instruct-${llm}.gguf`, [
+            'mmproj-llama-3.1-vision-q4_0.gguf',
+            'mmproj-llama-3.1-vision-f16.gguf',
+            'mmproj-llama-3.1-vision-q8_0.gguf',
+          ]),
+        ).toBe('mmproj-llama-3.1-vision-q8_0.gguf');
+      }
+    });
+
+    it('prefers F16 when no Q8_0 projector is available', () => {
+      expect(
+        getRecommendedProjectionModel('llama-3.1-8b-instruct-q8_0.gguf', [
           'mmproj-llama-3.1-vision-q4_0.gguf',
-          'mmproj-llama-3.1-vision-q8_0.gguf',
-        ],
-      );
-      expect(result).toBe('mmproj-llama-3.1-vision-q4_0.gguf');
+          'mmproj-llama-3.1-vision-q6_k.gguf',
+          'mmproj-llama-3.1-vision-f16.gguf',
+        ]),
+      ).toBe('mmproj-llama-3.1-vision-f16.gguf');
     });
 
-    // Test case 4: Higher quality quantization when exact match not found
-    it('returns a higher quality projection model when exact match not found', () => {
-      const result = getRecommendedProjectionModel(
-        'llama-3.1-8b-instruct-q4_0.gguf',
-        [
-          'mmproj-llama-3.1-vision-q5_k_m.gguf',
-          'mmproj-llama-3.1-vision-q8_0.gguf',
-        ],
-      );
-      expect(result).toBe('mmproj-llama-3.1-vision-q5_k_m.gguf');
-    });
-
-    // Test case 5: First available when no match or higher quality found
-    it('returns the first available projection model when no match or higher quality found', () => {
-      const result = getRecommendedProjectionModel(
-        'llama-3.1-8b-instruct-q6_k.gguf',
-        [
+    it('falls back to the highest-quality remaining quant', () => {
+      expect(
+        getRecommendedProjectionModel('llama-3.1-8b-instruct-q4_0.gguf', [
           'mmproj-llama-3.1-vision-q4_0.gguf',
           'mmproj-llama-3.1-vision-q5_k_m.gguf',
-        ],
-      );
-      // this fails since q5 is the highest quality that should have been returned in cases of no match or higher quality found but Received: "mmproj-llama-3.1-vision-q4_0.gguf"
-      expect(result).toBe('mmproj-llama-3.1-vision-q5_k_m.gguf');
+          'mmproj-llama-3.1-vision-q6_k.gguf',
+        ]),
+      ).toBe('mmproj-llama-3.1-vision-q6_k.gguf');
     });
 
-    // Test case 6: Case insensitivity
-    it('handles case insensitivity in quantization levels', () => {
-      const result = getRecommendedProjectionModel(
-        'llama-3.1-8b-instruct-q4_0.gguf',
-        [
-          'mmproj-llama-3.1-vision-q5_k_m.gguf',
-          'mmproj-llama-3.1-vision-Q4.gguf',
-          'mmproj-llama-3.1-vision-q8_0.gguf',
-        ],
-      );
-      expect(result).toBe('mmproj-llama-3.1-vision-Q4.gguf');
+    it('handles case-insensitivity in quantization levels', () => {
+      expect(
+        getRecommendedProjectionModel('llama-3.1-8b-instruct-q4_0.gguf', [
+          'mmproj-llama-3.1-vision-Q5_K_M.gguf',
+          'mmproj-llama-3.1-vision-Q8_0.gguf',
+          'mmproj-llama-3.1-vision-F16.gguf',
+        ]),
+      ).toBe('mmproj-llama-3.1-vision-Q8_0.gguf');
     });
 
-    // Test case 7: Different quantization formats
-    it('handles different quantization formats correctly', () => {
-      const result = getRecommendedProjectionModel(
-        'llama-3.1-8b-instruct-q4.gguf', // Using dot instead of underscore
-        [
-          'mmproj-llama-3.1-vision-q4_0.gguf',
-          'mmproj-llama-3.1-vision-q5_k_m.gguf',
-        ],
-      );
-      expect(result).toBe('mmproj-llama-3.1-vision-q4_0.gguf');
-    });
-
-    // Test case 8: No quantization in LLM filename
-    it('returns first available when LLM has no quantization in filename', () => {
-      const result = getRecommendedProjectionModel(
-        'llama-3.1-8b-instruct.gguf', // No quantization
-        [
-          'mmproj-llama-3.1-vision-q4_0.gguf',
-          'mmproj-llama-3.1-vision-q5_k_m.gguf',
-          'mmproj-llama-3.1-vision-q8_0.gguf',
-        ],
-      );
-      // this fails since q8 is the highest quality but Received: "mmproj-llama-3.1-vision-q4_0.gguf"
-      expect(result).toBe('mmproj-llama-3.1-vision-q8_0.gguf');
-    });
-
-    // Test case 9: Different quantization prefixes (iq vs q)
-    it('handles different quantization prefixes correctly', () => {
-      const result = getRecommendedProjectionModel(
-        'llama-3.1-8b-instruct-iq4_xs.gguf', // Using iq prefix
-        [
-          'mmproj-llama-3.1-vision-q3_0.gguf',
-          'mmproj-llama-3.1-vision-Q4.gguf',
-          'mmproj-llama-3.1-vision-q8_0.gguf',
-        ],
-      );
-      expect(result).toBe('mmproj-llama-3.1-vision-Q4.gguf');
-    });
-
-    // Test case 10: Edge case with unusual quantization format
-    it('handles edge cases with unusual quantization formats', () => {
-      const result = getRecommendedProjectionModel(
-        'llama-3.1-8b-instruct-Q4-K.gguf', // Using hyphen instead of underscore
-        [
-          'mmproj-llama-3.1-vision-q4_k.gguf',
-          'mmproj-llama-3.1-vision-q5_k_m.gguf',
-        ],
-      );
-      expect(result).toBe('mmproj-llama-3.1-vision-q4_k.gguf');
+    it('keeps the input order when no quant is recognizable', () => {
+      expect(
+        getRecommendedProjectionModel('llama-3.1-8b-instruct.gguf', [
+          'mmproj-llama-3.1-vision.gguf',
+          'mmproj-llama-3.1-vision-copy.gguf',
+        ]),
+      ).toBe('mmproj-llama-3.1-vision.gguf');
     });
   });
 });

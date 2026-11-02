@@ -177,4 +177,61 @@ describe('ModelStore projector media capabilities', () => {
     expect(projector.unsupportedMediaArchitecture).toBeUndefined();
     expect(projector.mediaSupportError).toMatch(/read failed/);
   });
+
+  it('hydrates a projector persisted before header capabilities were read', async () => {
+    serve(
+      new GGUFFixture()
+        .kv('clip.has_vision_encoder', {type: FixtureType.BOOL, value: true})
+        .kv('clip.has_audio_encoder', {type: FixtureType.BOOL, value: true})
+        .kv('clip.vision.projector_type', {
+          type: FixtureType.STRING,
+          value: 'lfm3vl',
+        }),
+    );
+    const {projector, llm} = pushPair();
+
+    expect(projector.mediaSupport).toBeUndefined();
+    await modelStore.hydrateMediaSupport();
+
+    expect(projector.mediaSupport).toEqual({
+      vision: true,
+      audioInput: true,
+      audioOutput: false,
+    });
+    expect(llm.mediaSupport).toEqual({
+      vision: true,
+      audioInput: true,
+      audioOutput: false,
+    });
+  });
+
+  it('repairs a missing default projector with the Q8_0 file', async () => {
+    const projector = (id: string, filename: string) =>
+      push(
+        model({
+          id,
+          filename,
+          fullPath: `${DIR}/${filename}`,
+          modelType: ModelType.PROJECTION,
+          mediaSupport: {vision: true, audioInput: false, audioOutput: false},
+        }),
+      );
+    const q4 = projector('proj-q4_0', 'mmproj-model-q4_0.gguf');
+    const f16 = projector('proj-f16', 'mmproj-model-f16.gguf');
+    const q8 = projector('proj-q8_0', 'mmproj-model-q8_0.gguf');
+    const llm = push(
+      model({
+        id: 'needs-default',
+        filename: 'model.gguf',
+        fullPath: `${DIR}/model.gguf`,
+        supportsMultimodal: true,
+        compatibleProjectionModels: [q4.id, f16.id, q8.id],
+        defaultProjectionModel: undefined,
+      }),
+    );
+
+    await modelStore.hydrateMediaSupport();
+
+    expect(llm.defaultProjectionModel).toBe(q8.id);
+  });
 });

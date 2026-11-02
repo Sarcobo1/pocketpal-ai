@@ -43,68 +43,55 @@ export function isProjectionModel(filename: string): boolean {
 }
 
 /**
- * Gets the recommended projection model for a vision model
- * @param visionModelFilename Vision model filename
- * @param availableProjModels Array of available projection model filenames
- * @returns The recommended projection model filename or undefined if none found
+ * The projector this build wants to run with a model: Q8_0 first, F16 second,
+ * then the best remaining quant. Projector quality matters more than matching
+ * the LLM's own quant — an mmproj is a small encoder, and a Q8_0 one produces
+ * better frames than the Q4 file that happens to share the LLM's tag.
  */
-export function getRecommendedProjectionModel(
-  visionModelFilename: string,
+export function preferredProjectorModel(
   availableProjModels: string[],
 ): string | undefined {
   if (availableProjModels.length === 0) {
     return undefined;
   }
-  if (availableProjModels.length === 1) {
-    return availableProjModels[0];
-  }
-
-  // Helper function to get the highest quality projection model
-  const getHighestQualityModel = (): string => {
-    return [...availableProjModels].sort((a, b) => {
-      const rankA = getQuantRank(extractModelPrecision(a) || '');
-      const rankB = getQuantRank(extractModelPrecision(b) || '');
-      return rankB - rankA; // Sort in descending order (highest quality first)
-    })[0];
+  const tier = (filename: string): number => {
+    const precision = extractModelPrecision(filename);
+    if (precision === 'q8') {
+      return 2;
+    }
+    if (precision === 'f16') {
+      return 1;
+    }
+    return 0;
   };
+  return [...availableProjModels].sort((a, b) => {
+    const byTier = tier(b) - tier(a);
+    if (byTier !== 0) {
+      return byTier;
+    }
+    return (
+      getQuantRank(extractModelPrecision(b) ?? '') -
+      getQuantRank(extractModelPrecision(a) ?? '')
+    );
+  })[0];
+}
 
-  const llmQuant = extractModelPrecision(visionModelFilename);
-  if (!llmQuant) {
-    // If no quantization detected, return the highest quality projection model
-    return getHighestQualityModel();
-  }
-
-  const llmRank = getQuantRank(llmQuant);
-  if (llmRank === -1) {
-    // If quantization not recognized, return the highest quality projection model
-    return getHighestQualityModel();
-  }
-
-  // First: exact match
-  const exactMatch = availableProjModels.find(
-    p => extractModelPrecision(p)?.toLowerCase() === llmQuant.toLowerCase(),
-  );
-  if (exactMatch) {
-    return exactMatch;
-  }
-
-  // Second: find closest higher or equal quality match
-  const sortedByProximity = [...availableProjModels].sort((a, b) => {
-    const rankA = getQuantRank(extractModelPrecision(a) || '');
-    const rankB = getQuantRank(extractModelPrecision(b) || '');
-    const diffA =
-      rankA - llmRank >= 0 ? rankA - llmRank : Number.MAX_SAFE_INTEGER;
-    const diffB =
-      rankB - llmRank >= 0 ? rankB - llmRank : Number.MAX_SAFE_INTEGER;
-    return diffA - diffB;
-  });
-
-  const closestMatch = sortedByProximity.find(
-    p => getQuantRank(extractModelPrecision(p) || '') >= llmRank,
-  );
-
-  // If no higher quality match found, return the highest quality available
-  return closestMatch ?? getHighestQualityModel();
+/**
+ * Gets the recommended projection model for a vision model.
+ *
+ * The LLM filename is retained for callers that pass it, but it no longer picks
+ * the projector: the preference is capability-based (Q8_0 > F16 > others), not
+ * a quant-string match.
+ *
+ * @param _visionModelFilename Vision model filename (kept for API stability)
+ * @param availableProjModels Array of available projection model filenames
+ * @returns The recommended projection model filename or undefined if none found
+ */
+export function getRecommendedProjectionModel(
+  _visionModelFilename: string,
+  availableProjModels: string[],
+): string | undefined {
+  return preferredProjectorModel(availableProjModels);
 }
 
 /** Name parts that say nothing about which model a file belongs to. */

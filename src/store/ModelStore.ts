@@ -49,6 +49,7 @@ import {
 import {
   getRecommendedProjectionModel,
   isProjectionModel,
+  preferredProjectorModel,
   projectorsForLocalModel,
   type ProjectionGap,
 } from '../utils/multimodalHelpers';
@@ -58,7 +59,9 @@ import {
   hasMedia,
   isMediaGGUFKey,
   mediaCapabilitiesFromGGUFValues,
+  mediaSupportOf,
   mergeMediaSupport,
+  projectorIsUsable,
 } from '../utils/ggufCapabilities';
 import {isDraftOnlyFilename, isDraftOnlyModel} from '../utils/mtp';
 import {getOriginalModelName} from '../utils/formatters';
@@ -339,6 +342,10 @@ class ModelStore {
   // Why the last media turn had no projector, refreshed by every resolution;
   // runtime only, and {kind:'none'} once one is attached.
   projectionGap: ProjectionGap = {kind: 'none'};
+  // Why the last local-folder scan could not list projectors. Runtime only, so
+  // the media-support sheet can say "pick the file" instead of "none found".
+  projectionScanIssue: 'saf' | 'unreadable' | undefined = undefined;
+  projectionScanError: string | undefined = undefined;
 
   constructor() {
     makeAutoObservable<
@@ -893,6 +900,14 @@ class ModelStore {
     // imports predate the folder scan — pair them before any UI can offer a
     // camera or a mic to a model that has the encoder on disk.
     await this.healLocalProjectionLinks();
+
+    // Projectors downloaded by an older build carry no header capabilities;
+    // probe them before chat asks what the model can see or hear.
+    try {
+      await this.hydrateMediaSupport();
+    } catch (error) {
+      console.warn('[ModelStore] media-support hydration failed:', error);
+    }
 
     // Upgrade past the bundled floor to the online rules override in the
     // background; reconcile (id-keyed, dedup) folds in any newer set.
@@ -1998,6 +2013,9 @@ class ModelStore {
       (merged, projector) => mergeMediaSupport(merged, projector.mediaSupport),
       {...EMPTY_MEDIA_SUPPORT},
     );
+    const scanned = projectors.some(
+      projector => projector.mediaSupport !== undefined,
+    );
     const unsupported = projectors.find(
       projector => projector.unsupportedMediaArchitecture,
     )?.unsupportedMediaArchitecture;
@@ -2009,11 +2027,14 @@ class ModelStore {
     )?.mediaProjectorTypes;
 
     runInAction(() => {
-      model.mediaSupport = support;
+      if (scanned) {
+        model.mediaSupport = support;
+      }
       model.mediaProjectorTypes = types;
       model.unsupportedMediaArchitecture = unsupported;
-      model.mediaSupportError = hasMedia(support) ? undefined : failure;
-      if (hasMedia(support)) {
+      model.mediaSupportError =
+        scanned && hasMedia(support) ? undefined : failure;
+      if (scanned && hasMedia(support)) {
         model.supportsMultimodal = true;
         if (support.vision) {
           model.modelType = ModelType.VISION;
@@ -2239,10 +2260,27 @@ class ModelStore {
     }
 
     const dir = model.fullPath.slice(0, model.fullPath.lastIndexOf('/'));
+    runInAction(() => {
+      this.projectionScanIssue = undefined;
+      this.projectionScanError = undefined;
+    });
+    if (model.fullPath.startsWith('content://')) {
+      runInAction(() => {
+        this.projectionScanIssue = 'saf';
+        this.projectionScanError =
+          'a content:// document cannot be listed for a sibling projector';
+      });
+      return [];
+    }
     let folderFiles: string[];
     try {
       folderFiles = (await RNFS.readDir(dir)).map(entry => entry.name);
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      runInAction(() => {
+        this.projectionScanIssue = 'unreadable';
+        this.projectionScanError = message;
+      });
       console.warn('[ModelStore] Could not read the model folder:', dir, error);
       return [];
     }
@@ -2277,10 +2315,17 @@ class ModelStore {
       return [];
     }
 
+    const usableFilenames = filenames.filter(filename => {
+      const id = idsByFilename.get(filename);
+      const projector = id
+        ? this.models.find(candidate => candidate.id === id)
+        : undefined;
+      return !projector || projectorIsUsable(projector);
+    });
     const recommended =
-      getRecommendedProjectionModel(model.filename, [
-        ...idsByFilename.keys(),
-      ]) ?? filenames[0];
+      preferredProjectorModel(
+        usableFilenames.length > 0 ? usableFilenames : filenames,
+      ) ?? filenames[0];
 
     const storeModel = this.models.find(m => m.id === model.id);
     if (!storeModel) {
@@ -2288,17 +2333,22 @@ class ModelStore {
     }
     runInAction(() => {
       storeModel.supportsMultimodal = true;
-      storeModel.modelType = ModelType.VISION;
-      storeModel.capabilities = Array.from(
-        new Set<SkillKey>([...(storeModel.capabilities ?? []), 'vision']),
-      );
       storeModel.compatibleProjectionModels = [...idsByFilename.values()];
       storeModel.defaultProjectionModel = idsByFilename.get(recommended);
-      if (storeModel.visionEnabled === undefined) {
-        storeModel.visionEnabled = true;
-      }
     });
     this.refreshPairedMediaSupport(storeModel);
+    runInAction(() => {
+      const support = mediaSupportOf(storeModel);
+      if (support.vision) {
+        storeModel.modelType = ModelType.VISION;
+        storeModel.capabilities = Array.from(
+          new Set<SkillKey>([...(storeModel.capabilities ?? []), 'vision']),
+        );
+        if (storeModel.visionEnabled === undefined) {
+          storeModel.visionEnabled = true;
+        }
+      }
+    });
 
     const ids = [...idsByFilename.values()];
     console.log(
@@ -2335,6 +2385,70 @@ class ModelStore {
         );
       }
     }
+  };
+
+  /**
+   * Upgrade models persisted before projector headers were read. Projectors
+   * downloaded by an older build have no `mediaSupport`, and their paired LLM
+   * therefore still gates media by the legacy vision flag. Probe once, then
+   * recompute the pair without redownloading anything.
+   */
+  hydrateMediaSupport = async () => {
+    const projectors = this.models.filter(
+      m =>
+        (m.modelType === ModelType.PROJECTION ||
+          isProjectionModel(m.filename)) &&
+        m.isDownloaded &&
+        m.mediaSupport === undefined &&
+        m.mediaSupportError === undefined &&
+        m.unsupportedMediaArchitecture === undefined,
+    );
+    for (const projector of projectors) {
+      try {
+        const path = await this.getModelFullPath(projector);
+        await this.scanProjectorMediaSupport(projector, path);
+      } catch (error) {
+        console.warn(
+          '[ModelStore] Could not probe projector capabilities:',
+          projector.name,
+          error,
+        );
+      }
+    }
+
+    for (const model of this.models) {
+      if (
+        !model.supportsMultimodal &&
+        !model.compatibleProjectionModels?.length
+      ) {
+        continue;
+      }
+      this.repairDefaultProjectionModel(model);
+      this.refreshPairedMediaSupport(model);
+    }
+  };
+
+  /** Restore a default that is missing or no longer in the compatible list. */
+  private repairDefaultProjectionModel = (model: Model) => {
+    const ids = model.compatibleProjectionModels ?? [];
+    if (ids.length === 0) {
+      return;
+    }
+    if (
+      model.defaultProjectionModel &&
+      ids.includes(model.defaultProjectionModel)
+    ) {
+      return;
+    }
+    const byFilename = new Map<string, string>(
+      ids.map(id => [id.split('/').pop() ?? id, id] as const),
+    );
+    const preferred = preferredProjectorModel([...byFilename.keys()]);
+    runInAction(() => {
+      model.defaultProjectionModel = preferred
+        ? byFilename.get(preferred)
+        : ids[0];
+    });
   };
 
   /**
@@ -2502,17 +2616,19 @@ class ModelStore {
   ): Promise<MultimodalResolution> => {
     // A model that arrived as a file has no repository listing to read the
     // projector off, so pair it from its folder before asking any preference.
+    const explicitPath = model.mmprojPath ?? mmProjPath;
     let folderHasNoProjector = false;
-    if (!mmProjPath && !model.supportsMultimodal) {
+    if (!explicitPath && !model.supportsMultimodal) {
       const paired = await this.linkLocalProjectionModels(model);
       folderHasNoProjector = paired.length === 0 && !!model.fullPath;
     }
 
     const visionEnabled = this.getModelVisionPreference(model);
 
-    // Priority 1: Explicit path provided by caller
-    if (mmProjPath && visionEnabled) {
-      return {isMultimodalInit: true, resolvedMmProjPath: mmProjPath};
+    // Priority 1: an explicit path — the model's manual override first, then a
+    // caller-supplied path. A file the user picked always wins.
+    if (explicitPath && visionEnabled) {
+      return {isMultimodalInit: true, resolvedMmProjPath: explicitPath};
     }
 
     // Priority 2: Auto-resolve from model's default projection model
@@ -2524,7 +2640,7 @@ class ModelStore {
       const projectionModel = this.models.find(
         m => m.id === model.defaultProjectionModel,
       );
-      if (projectionModel?.isDownloaded) {
+      if (projectionModel?.isDownloaded && projectorIsUsable(projectionModel)) {
         const resolvedPath = await this.getModelFullPath(projectionModel);
         return {
           isMultimodalInit: true,
@@ -2542,6 +2658,7 @@ class ModelStore {
         m =>
           m.modelType === ModelType.PROJECTION &&
           m.isDownloaded &&
+          projectorIsUsable(m) &&
           model.compatibleProjectionModels?.includes(m.id),
       );
       if (alternative) {

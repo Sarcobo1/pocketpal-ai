@@ -3,7 +3,9 @@ import {
   hasMedia,
   isMediaGGUFKey,
   mediaCapabilitiesFromGGUFValues,
+  mediaSupportOf,
   mergeMediaSupport,
+  projectorIsUsable,
 } from '../ggufCapabilities';
 import {localFileSource, scanGGUFHeader} from '../ggufHeader';
 import {FixtureType, GGUFFixture} from './ggufFixture';
@@ -116,5 +118,43 @@ describe('GGUF media capabilities', () => {
       ),
     ).toEqual({vision: true, audioInput: true, audioOutput: true});
     expect(hasMedia(EMPTY_MEDIA_SUPPORT)).toBe(false);
+  });
+
+  describe('legacy defaults', () => {
+    it('reads a model persisted before mediaSupport as vision-only', () => {
+      expect(
+        mediaSupportOf({supportsMultimodal: true, mediaSupport: undefined}),
+      ).toEqual({vision: true, audioInput: false, audioOutput: false});
+      expect(mediaSupportOf({supportsMultimodal: false})).toEqual(
+        EMPTY_MEDIA_SUPPORT,
+      );
+    });
+
+    it('trusts a scanned value over the legacy vision flag', () => {
+      expect(
+        mediaSupportOf({
+          supportsMultimodal: true,
+          mediaSupport: {vision: false, audioInput: true, audioOutput: false},
+        }),
+      ).toEqual({vision: false, audioInput: true, audioOutput: false});
+    });
+
+    it('treats an unscanned projector as usable and a broken one as not', () => {
+      expect(projectorIsUsable({})).toBe(true);
+      expect(
+        projectorIsUsable({
+          mediaSupport: {vision: true, audioInput: false, audioOutput: false},
+        }),
+      ).toBe(true);
+      expect(
+        projectorIsUsable({
+          mediaSupport: EMPTY_MEDIA_SUPPORT,
+        }),
+      ).toBe(false);
+      expect(projectorIsUsable({unsupportedMediaArchitecture: 'lfm2a'})).toBe(
+        false,
+      );
+      expect(projectorIsUsable({mediaSupportError: 'read failed'})).toBe(false);
+    });
   });
 });

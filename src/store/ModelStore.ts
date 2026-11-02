@@ -2487,7 +2487,7 @@ class ModelStore {
   ): Promise<{dir: string; filename: string} | undefined> => {
     const modelsRoot = `${RNFS.DocumentDirectoryPath}/models`;
     for (const root of [`${modelsRoot}/local`, `${modelsRoot}/hf`]) {
-      let entries: RNFS.ReadDirItem[];
+      let entries: Awaited<ReturnType<typeof RNFS.readDir>>;
       try {
         entries = await RNFS.readDir(root);
       } catch {

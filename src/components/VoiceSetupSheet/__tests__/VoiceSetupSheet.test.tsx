@@ -93,7 +93,8 @@ describe('VoiceSetupSheet', () => {
 
   it('leaves whisper out of setup when the model hears the mic itself', async () => {
     const {queryByText, getByTestId} = renderSheet(false);
-    const downloadsBefore = (asrStore.downloadModel as jest.Mock).calls.length;
+    const downloadsBefore = (asrStore.downloadModel as jest.Mock).mock.calls
+      .length;
     const doneBefore = onDone.mock.calls.length;
 
     expect(queryByText(strings.sttRowTitle)).toBeNull();

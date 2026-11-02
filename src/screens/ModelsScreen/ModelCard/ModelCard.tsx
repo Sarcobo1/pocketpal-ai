@@ -930,7 +930,9 @@ export const ModelCard: React.FC<ModelCardProps> = observer(
                     onPress={handleAddProjector}
                     disabled={isAddingProjector}>
                     <Icon
-                      name={isAddingProjector ? 'loading' : 'file-plus-outline'}
+                      source={
+                        isAddingProjector ? 'loading' : 'file-plus-outline'
+                      }
                       size={16}
                       color={theme.colors.primary}
                     />

@@ -9,11 +9,69 @@ export const VOICE_FIRST_CHUNK_HOLD_MS = 1500;
 export const VOICE_ENDPOINT_HANG_MS = 600;
 
 /**
- * Wait after stopping the mic before starting it again (ms): three 50 ms
- * chunks. On Android the recorder's read thread releases the shared
- * recorder when it ends, so a restart sooner can lose the new recorder.
+ * Wait after stopping the mic before starting it again (ms). The mic stays shut
+ * for the whole turn — capture only restarts once the reply has finished
+ * playing — so this is the tail of the half-duplex window: the model must not
+ * hear the end of its own voice.
  */
-export const VOICE_CAPTURE_SETTLE_MS = 150;
+export const VOICE_CAPTURE_SETTLE_MS = 400;
+
+/**
+ * Contiguous speech an utterance needs before it is sent. Shorter than this is
+ * a cough, a key, or the tail of the model's own voice.
+ */
+export const VOICE_VAD_MIN_SPEECH_MS = 400;
+
+/**
+ * Speech has to stand this many times above the room tone to open an
+ * utterance, and this many to hold one open. Two thresholds instead of one:
+ * a single level makes a consonant at the end of a word look like the pause
+ * that closes it.
+ */
+export const VOICE_VAD_ONSET_FACTOR = 3;
+export const VOICE_VAD_HOLD_FACTOR = 1.8;
+
+/**
+ * Voice activity sensitivity: 1 is the tuned default, a higher number accepts
+ * quieter speech by lowering both floors, a lower one demands louder.
+ */
+export const VOICE_VAD_SENSITIVITY = 1;
+
+/** The quietest onset the floor will ever trust (~-36 dBFS). */
+export const VOICE_VAD_FLOOR_MIN_RMS = 0.015;
+
+/** ...the loudest (~-24 dBFS), so loud room tone cannot make the mic deaf. */
+export const VOICE_VAD_FLOOR_MAX_RMS = 0.06;
+
+/** Room tone below this is read as the digital floor, not as a quiet room. */
+export const VOICE_VAD_TRACK_MIN_RMS = 0.002;
+
+/** The room tone estimate falls this fast toward a quieter room (0..1). */
+export const VOICE_VAD_NOISE_LEAK = 0.2;
+
+/**
+ * ...and rises this slow toward a louder one (0..1). Slow on purpose: speech
+ * that briefly dips below the onset must not push the floor up under itself.
+ */
+export const VOICE_VAD_NOISE_RISE = 0.02;
+
+/**
+ * Audio at the start of every capture measures the room instead of the user:
+ * the mic reopens for each turn, so the estimate is rebuilt from the quietest
+ * chunk of this window (ms). It stays under `VOICE_VAD_MIN_SPEECH_MS` so a run
+ * can never reach the length that opens an utterance before the room is known.
+ */
+export const VOICE_VAD_CALIBRATE_MS = 300;
+
+/** Silence kept at the end of an utterance (ms); the rest is trimmed. */
+export const VOICE_VAD_TAIL_MS = 120;
+
+/**
+ * A whole clip below this RMS (~-48 dBFS) is dead air, not a quiet voice, and
+ * never costs a model turn. Deliberately far under the speech floors: the
+ * endpointer owns the adaptive call, this one only refuses obvious nothing.
+ */
+export const VOICE_CLIP_MIN_RMS = 0.004;
 
 /**
  * A started mic that delivers no audio within this long (ms) is restarted

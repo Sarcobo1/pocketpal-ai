@@ -13,3 +13,30 @@ index a5365d5..d6a67fe 100644
  
      _recordState.mIsRunning = true;
  
+diff --git a/node_modules/@fugood/react-native-audio-pcm-stream/android/src/main/java/com/imxiqi/rnliveaudiostream/RNLiveAudioStreamModule.java b/node_modules/@fugood/react-native-audio-pcm-stream/android/src/main/java/com/imxiqi/rnliveaudiostream/RNLiveAudioStreamModule.java
+index 6d7d17d..e242041 100644
+--- a/node_modules/@fugood/react-native-audio-pcm-stream/android/src/main/java/com/imxiqi/rnliveaudiostream/RNLiveAudioStreamModule.java
++++ b/node_modules/@fugood/react-native-audio-pcm-stream/android/src/main/java/com/imxiqi/rnliveaudiostream/RNLiveAudioStreamModule.java
+@@ -95,6 +95,7 @@
+             public void run() {
+                 try {
+                     int bytesRead;
++                    int frameBytes;
+                     int count = 0;
+                     String base64Data;
+                     byte[] buffer = new byte[bufferSize];
+@@ -103,8 +104,12 @@
+                         bytesRead = recorder.read(buffer, 0, buffer.length);
+ 
+                         // skip first 2 buffers to eliminate "click sound"
+-                        if (bytesRead > 0 && ++count > 2) {
+-                            base64Data = Base64.encodeToString(buffer, Base64.NO_WRAP);
++                        // A short read leaves the previous buffer's tail in place,
++                        // and encodeToString(buffer) would send those stale bytes as
++                        // fresh audio; rounding down keeps 16-bit samples aligned.
++                        frameBytes = bytesRead - (bytesRead % 2);
++                        if (frameBytes > 0 && ++count > 2) {
++                            base64Data = Base64.encodeToString(buffer, 0, frameBytes, Base64.NO_WRAP);
+                             eventEmitter.emit("data", base64Data);
+                         }
+                     }

@@ -170,9 +170,8 @@ describe('memoryEstimator', () => {
         model,
         undefined,
         contextSettings,
-        {
-          fileBackedWeights: true,
-        },
+        undefined,
+        {fileBackedWeights: true},
       );
 
       // mmap'd weights are reclaimable, so three quarters of them no longer
@@ -227,9 +226,8 @@ describe('memoryEstimator', () => {
         model,
         undefined,
         contextSettings,
-        {
-          fileBackedWeights: true,
-        },
+        undefined,
+        {fileBackedWeights: true},
       );
 
       // With no KV/buffer split to recover, the whole file still has to count.

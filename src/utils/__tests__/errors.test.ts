@@ -217,7 +217,7 @@ describe('errors.ts', () => {
 
       expect(errorState.code).toBe('memory');
       expect(errorState.message).toBe('The phone ran out of memory');
-      expect(errorState.metadata.nativeMessage).toBe(
+      expect(errorState.metadata?.nativeMessage).toBe(
         'Native error: out of memory',
       );
     });
@@ -228,7 +228,7 @@ describe('errors.ts', () => {
       const errorState = createErrorState(error, 'modelInit');
 
       expect(errorState.code).toBe('memory');
-      expect(errorState.metadata.nativeMessage).toBe(
+      expect(errorState.metadata?.nativeMessage).toBe(
         'ggml_buffer_alloc failed',
       );
     });

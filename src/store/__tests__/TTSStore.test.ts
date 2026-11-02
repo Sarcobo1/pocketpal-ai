@@ -1126,13 +1126,36 @@ describe('TTSStore', () => {
     });
 
     it('says a reply whose start it never saw', async () => {
-      const sink = makeSink();
+      const {sink, finish} = makePendingSink();
       const store = await makeModelStore(sink);
 
       store.onAssistantMessageComplete('msg-1', 'Paris is the capital.');
       await flush();
 
       expect(sink.speak.mock.calls[0]![0]).toBe('Paris is the capital.');
+      expect(store.playbackState).toEqual({
+        mode: 'playing',
+        messageId: 'msg-1',
+      });
+
+      finish();
+      await flush();
+      expect(store.playbackState.mode).toBe('idle');
+    });
+
+    it('cuts a model utterance that has no handle left to cancel', async () => {
+      const {sink, finish} = makePendingSink();
+      const store = await makeModelStore(sink);
+      store.onAssistantMessageComplete('msg-1', 'Paris is the capital.');
+      await flush();
+
+      await store.stop('barge_in');
+      expect(sink.stop).toHaveBeenCalledTimes(1);
+
+      finish();
+      await flush();
+      expect(store.playbackState.mode).toBe('idle');
+      expect(mockSystemPlay).not.toHaveBeenCalled();
     });
 
     it('stays quiet for a reply with nothing in it', async () => {

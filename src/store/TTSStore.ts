@@ -643,6 +643,13 @@ export class TTSStore {
     this.streamStripper = null;
     this.streamPlaceholderEmitted = false;
     this.clearVoiceHold();
+    // A model's utterance is not an engine's playback, so the engine stop
+    // below cannot reach it, and a reply said outside a stream has no handle
+    // to cancel. Harmless when nothing is speaking: the flag is cleared when
+    // the next utterance starts.
+    if (state.mode !== 'streaming') {
+      this.modelVoice?.stop();
+    }
     if (state.mode === 'streaming') {
       try {
         await state.handle.cancel();
@@ -1093,12 +1100,27 @@ export class TTSStore {
     if (sink) {
       const handle = this.modelVoiceHandle(sink, messageId);
       handle.appendText(this.spokenReplyText(text, opts?.hadReasoning));
-      handle.finalize().catch(err => {
-        console.warn('[TTSStore] model reply failed:', err);
-        runInAction(() => {
-          this.voiceStreamFailed = messageId;
-        });
+      // Recorded as playback, not as a stream: the reply is one utterance the
+      // session waits out before it listens again.
+      const playing = runInAction(() => {
+        this.playbackState = {mode: 'playing', messageId};
+        return this.playbackState;
       });
+      handle
+        .finalize()
+        .catch(err => {
+          console.warn('[TTSStore] model reply failed:', err);
+          runInAction(() => {
+            this.voiceStreamFailed = messageId;
+          });
+        })
+        .finally(() => {
+          runInAction(() => {
+            if (this.playbackState === playing) {
+              this.playbackState = {mode: 'idle'};
+            }
+          });
+        });
       return;
     }
     this.play(messageId, text, {hadReasoning: opts?.hadReasoning}).catch(() => {

@@ -2772,6 +2772,30 @@ class ModelStore {
   };
 
   /**
+   * What the engine reports for the projector it just loaded. `audio` in
+   * llama.rn means audio *input*; this build exposes no speech synthesis, so
+   * audio output keeps whatever the projector header declared.
+   */
+  private readRuntimeMediaSupport = async (
+    ctx: LlamaContext,
+  ): Promise<MediaSupport | undefined> => {
+    try {
+      const support = await ctx.getMultimodalSupport();
+      return {
+        vision: !!support.vision,
+        audioInput: !!support.audio,
+        audioOutput: false,
+      };
+    } catch (error) {
+      console.warn(
+        '[ModelStore] Could not read the attached projector support:',
+        error,
+      );
+      return undefined;
+    }
+  };
+
+  /**
    * Load a projector into a context and record what the engine reports.
    *
    * The clamp on image_max_tokens is llama.rn's: a projector configured above
@@ -2799,16 +2823,38 @@ class ModelStore {
       return false;
     }
     try {
-      const success = await ctx.initMultimodal({
+      const params = {
         path: mmProjPath,
-        use_gpu: !this.contextInitParams.no_gpu_devices,
         image_max_tokens: Math.min(
           this.contextInitParams.image_max_tokens ?? 512,
           this.contextInitParams.n_ctx,
         ),
-      });
+      };
+      const useGPU = !this.contextInitParams.no_gpu_devices;
+      let success = false;
+      let failure: unknown;
+      try {
+        success = await ctx.initMultimodal({...params, use_gpu: useGPU});
+      } catch (error) {
+        failure = error;
+      }
+      // A projector that will not build on this GPU is still a projector: the
+      // CPU encoder is slower per frame but works, and text-only is the wrong
+      // answer to a device-specific kernel failure.
+      if (!success && useGPU) {
+        console.warn(
+          '[ModelStore] Projector would not initialize on the GPU, retrying on CPU:',
+          failure instanceof Error ? failure.message : failure,
+        );
+        failure = undefined;
+        try {
+          success = await ctx.initMultimodal({...params, use_gpu: false});
+        } catch (error) {
+          failure = error;
+        }
+      }
       if (!success) {
-        console.error('Failed to initialize multimodal support');
+        console.error('Failed to initialize multimodal support', failure);
         runInAction(() => {
           this.isMultimodalActive = false;
           this.activeProjectionModelId = undefined;
@@ -2818,6 +2864,15 @@ class ModelStore {
       }
       const isEnabled = await ctx.isMultimodalEnabled();
       console.log('Multimodal enabled status:', isEnabled);
+      const runtime = isEnabled
+        ? await this.readRuntimeMediaSupport(ctx)
+        : undefined;
+      const owner = this.activeModel;
+      if (runtime && owner) {
+        runInAction(() => {
+          owner.mediaSupport = mergeMediaSupport(owner.mediaSupport, runtime);
+        });
+      }
       runInAction(() => {
         this.isMultimodalActive = isEnabled;
         this.activeProjectionModelId = isEnabled
@@ -3905,6 +3960,19 @@ class ModelStore {
   /** Capabilities of the live session — chat's entry point. */
   get activeModelCaps(): ModelCapabilityView {
     return this.capsFor(this.activeModel);
+  }
+
+  /**
+   * What the live session can accept as media. Only an attached projector
+   * answers this: a flag on the model record says what the repository claimed,
+   * the projector says what is in memory right now.
+   */
+  get activeMediaSupport(): MediaSupport {
+    if (!this.isMultimodalActive) {
+      return EMPTY_MEDIA_SUPPORT;
+    }
+    const model = this.activeModel;
+    return model ? mediaSupportOf(model) : EMPTY_MEDIA_SUPPORT;
   }
 
   get activeSamplerDefaults(): Samplers | undefined {

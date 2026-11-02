@@ -250,7 +250,7 @@ index eb52272..9ff97ad 100644
      void invokeAsyncTracked(
          std::shared_ptr<react::CallInvoker> callInvoker,
 diff --git a/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.cpp b/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.cpp
-index ffd7942..a2c5190 100644
+index ffd7942..57f942c 100644
 --- a/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.cpp
 +++ b/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.cpp
 @@ -13,11 +13,13 @@
@@ -267,7 +267,7 @@ index ffd7942..a2c5190 100644
  #include <utility>
  #include <vector>
  
-@@ -57,6 +59,10 @@ static void log(LogLevel level, const char* format, ...) {
+@@ -57,6 +59,10 @@
  
  static std::once_flag backend_init_once;
  
@@ -278,7 +278,7 @@ index ffd7942..a2c5190 100644
  #if defined(__ANDROID__)
  static bool shouldExcludeHexagonDevice(ggml_backend_dev_t dev) {
  #if defined(GGML_USE_HEXAGON)
-@@ -188,6 +194,7 @@ namespace rnllama_jsi {
+@@ -188,6 +194,7 @@
      // beginCompletion(), see #403).
      class ContextClaim {
      public:
@@ -286,7 +286,7 @@ index ffd7942..a2c5190 100644
          explicit ContextClaim(rnllama::llama_rn_context* ctx) : ctx_(ctx) {
              bool expected = false;
              if (!ctx_->is_claimed.compare_exchange_strong(expected, true)) {
-@@ -224,6 +231,27 @@ namespace rnllama_jsi {
+@@ -224,6 +231,27 @@
          rnllama::llama_rn_context* ctx_;
      };
  
@@ -314,7 +314,7 @@ index ffd7942..a2c5190 100644
      static void ensureBackendInitialized() {
          std::call_once(backend_init_once, []() {
              llama_backend_init();
-@@ -526,20 +554,40 @@ namespace rnllama_jsi {
+@@ -526,20 +554,40 @@
          }
      }
  
@@ -364,7 +364,7 @@ index ffd7942..a2c5190 100644
      }
  
      void installJSIBindings(
-@@ -732,7 +780,8 @@ namespace rnllama_jsi {
+@@ -732,7 +780,8 @@
                               }
                           }
  
@@ -374,7 +374,7 @@ index ffd7942..a2c5190 100644
  
                           std::string androidLibName = "";
                           #if defined(__ANDROID__)
-@@ -743,7 +792,7 @@ namespace rnllama_jsi {
+@@ -743,7 +792,7 @@
                               {"reasonNoGPU", reasonNoGPU},
                               {"systemInfo", common_params_get_system_info(ctx->params)},
                               // Model metadata and chat template capabilities
@@ -383,7 +383,7 @@ index ffd7942..a2c5190 100644
                               {"devices", usedDevices},
                               {"androidLib", androidLibName},
                           });
-@@ -811,7 +860,7 @@ namespace rnllama_jsi {
+@@ -811,7 +860,7 @@
                  return createPromiseTask(runtime, callInvoker, [contextId, path]() -> PromiseResultGenerator {
                      auto ctx = getContextOrThrow(contextId);
                      ContextClaim claim(ctx);
@@ -392,7 +392,7 @@ index ffd7942..a2c5190 100644
                      return [result](jsi::Runtime& rt) {
                          return fromJson(rt, result);
                      };
-@@ -831,7 +880,7 @@ namespace rnllama_jsi {
+@@ -831,7 +880,7 @@
                  return createPromiseTask(runtime, callInvoker, [contextId, path, size]() -> PromiseResultGenerator {
                      auto ctx = getContextOrThrow(contextId);
                      ContextClaim claim(ctx);
@@ -401,7 +401,7 @@ index ffd7942..a2c5190 100644
                      return [tokens_saved](jsi::Runtime& rt) {
                          return jsi::Value(tokens_saved);
                      };
-@@ -1122,7 +1171,7 @@ namespace rnllama_jsi {
+@@ -1122,7 +1171,7 @@
                  ContextClaim claim(ctx);
                  ctx->completion->rewind();
  
@@ -410,7 +410,7 @@ index ffd7942..a2c5190 100644
  
                  std::vector<std::string> mediaPaths;
                  // media_paths: string | string[]
-@@ -1147,7 +1196,7 @@ namespace rnllama_jsi {
+@@ -1147,7 +1196,7 @@
  
                  jsi::Value promise = createPromiseTask(runtime, callInvoker, [runtimePtr = std::shared_ptr<jsi::Runtime>(&runtime, [](jsi::Runtime*){}), contextId, onToken, emitPartial, mediaPaths, chat_format, reasoning_format, generation_prompt, chat_parser, prefill_text, callInvoker]() -> PromiseResultGenerator {
                      auto ctx = getContextOrThrow(contextId);
@@ -419,7 +419,7 @@ index ffd7942..a2c5190 100644
  
                      if (ctx->completion == nullptr) {
                          throw std::runtime_error("Completion not initialized");
-@@ -1187,6 +1236,7 @@ namespace rnllama_jsi {
+@@ -1187,6 +1236,7 @@
  
                      size_t sent_count = 0;
  
@@ -427,7 +427,7 @@ index ffd7942..a2c5190 100644
                      while (ctx->completion->has_next_token && !ctx->completion->is_interrupted) {
                          const rnllama::completion_token_output token_with_probs = ctx->completion->doCompletion();
                          if (token_with_probs.tok == -1 || ctx->completion->incomplete) {
-@@ -1228,7 +1278,7 @@ namespace rnllama_jsi {
+@@ -1228,7 +1278,7 @@
  
                                  auto runtime = runtimePtr;
                                  if (runtime) {
@@ -436,7 +436,7 @@ index ffd7942..a2c5190 100644
                                      if (has_partial_output) {
                                          addChatOutputFields(tokenResult, partial_output);
                                      }
-@@ -1246,10 +1296,10 @@ namespace rnllama_jsi {
+@@ -1246,10 +1296,10 @@
                      }
  
                      common_perf_print(ctx->ctx, ctx->completion->ctx_sampling);
@@ -449,7 +449,7 @@ index ffd7942..a2c5190 100644
  
                      return [contextId, result](jsi::Runtime& rt) -> jsi::Value {
                          if (!g_llamaContexts.get(contextId)) {
-@@ -1363,7 +1413,7 @@ namespace rnllama_jsi {
+@@ -1363,7 +1413,7 @@
                      throw jsi::JSError(runtime, "This model only answers decisions, see decide()");
                  }
                  auto originalParams = ctxPtr->params;
@@ -458,7 +458,7 @@ index ffd7942..a2c5190 100644
                  common_params cparams = ctxPtr->params;
                  ctxPtr->params = originalParams;
  
-@@ -1402,7 +1452,14 @@ namespace rnllama_jsi {
+@@ -1402,7 +1452,14 @@
                      auto tokenizeResult = ctx->tokenize(cparams.prompt, mediaPaths);
                      std::vector<llama_token> tokens = tokenizeResult.tokens;
  
@@ -474,7 +474,7 @@ index ffd7942..a2c5190 100644
                          int requestId = token.request_id;
                          rnllama::completion_chat_output parsed_output;
                          bool has_parsed_output = false;
-@@ -1420,7 +1477,7 @@ namespace rnllama_jsi {
+@@ -1420,7 +1477,7 @@
  
                          auto callbacks = RequestManager::getInstance().getRequest(contextId, requestId);
                          if (callbacks.onToken) {
@@ -483,7 +483,7 @@ index ffd7942..a2c5190 100644
                              if (has_parsed_output) {
                                  addChatOutputFields(tokenResult, parsed_output);
                              }
-@@ -1496,7 +1553,7 @@ namespace rnllama_jsi {
+@@ -1496,7 +1553,7 @@
                      if (result == rnllama::llama_rn_cancel_result::QUEUED) {
                          auto callbacks = RequestManager::getInstance().takeRequest(contextId, requestId);
                          if (callbacks.onComplete) {
@@ -492,7 +492,7 @@ index ffd7942..a2c5190 100644
                              callbacks.onComplete->call(runtime, fromJson(runtime, response));
                          }
                      }
-@@ -1756,12 +1813,9 @@ namespace rnllama_jsi {
+@@ -1756,12 +1813,9 @@
                  int contextId = (int)arguments[0].asNumber();
                  int subscriberId = (int)arguments[1].asNumber();
  
@@ -508,7 +508,7 @@ index ffd7942..a2c5190 100644
                  }
  
                  return jsi::Value::undefined();
-@@ -1776,33 +1830,17 @@ namespace rnllama_jsi {
+@@ -1776,33 +1830,17 @@
                   int contextId = (int)arguments[0].asNumber();
                   return createPromiseTask(runtime, callInvoker, [contextId]() -> PromiseResultGenerator {
                       RequestManager::getInstance().clearContext(contextId);
@@ -547,7 +547,7 @@ index ffd7942..a2c5190 100644
                       }
                       return [](jsi::Runtime& rt) { return jsi::Value::undefined(); };
                   }, contextId, false);  // trackTask=false - release should not count itself
-@@ -1817,33 +1855,18 @@ namespace rnllama_jsi {
+@@ -1817,33 +1855,18 @@
                   return createPromiseTask(runtime, callInvoker, []() -> PromiseResultGenerator {
                       RequestManager::getInstance().clearAll();
  
@@ -587,7 +587,15 @@ index ffd7942..a2c5190 100644
                       return [](jsi::Runtime& rt) { return jsi::Value::undefined(); };
                   }, -1, false);  // contextId=-1 (not tracked), trackTask=false
              }
-@@ -2040,7 +2063,7 @@ namespace rnllama_jsi {
+@@ -1958,6 +1981,7 @@
+                     json support = json::object({
+                         {"vision", ctx->isMultimodalSupportVision()},
+                         {"audio", ctx->isMultimodalSupportAudio()},
++                        {"audioGen", ctx->isMultimodalSupportAudioGen()},
+                     });
+                     return [support](jsi::Runtime& rt) {
+                         return fromJson(rt, support);
+@@ -2040,7 +2064,7 @@
                      if (!ctx->isVocoderEnabled()) throw std::runtime_error("Vocoder is not enabled");
  
                      try {
@@ -596,7 +604,7 @@ index ffd7942..a2c5190 100644
                          json res = json::object({{"prompt", audio_result.prompt}});
                          if (!audio_result.grammar.empty()) {
                              res["grammar"] = audio_result.grammar;
-@@ -2066,7 +2089,7 @@ namespace rnllama_jsi {
+@@ -2066,7 +2090,7 @@
                  return createPromiseTask(runtime, callInvoker, [contextId]() -> PromiseResultGenerator {
                      auto ctx = getContextOrThrow(contextId);
                      if (!ctx->isVocoderEnabled()) throw std::runtime_error("Vocoder is not enabled");
@@ -605,7 +613,7 @@ index ffd7942..a2c5190 100644
                      json res = json::object({
                          {"type", cap.type},
                          {"promptKind", cap.prompt_kind},
-@@ -2095,7 +2118,7 @@ namespace rnllama_jsi {
+@@ -2095,7 +2119,7 @@
                      if (!ctx->isVocoderEnabled()) throw std::runtime_error("Vocoder is not enabled");
  
                      try {
@@ -614,7 +622,7 @@ index ffd7942..a2c5190 100644
                          return [audio_data](jsi::Runtime& rt) {
                              return makeFloat32Array(rt, audio_data);
                          };
-@@ -2158,7 +2181,7 @@ namespace rnllama_jsi {
+@@ -2158,7 +2182,7 @@
                      }
  
                      try {
@@ -623,7 +631,7 @@ index ffd7942..a2c5190 100644
                          json res = json::object({
                              {"codes", r.codes},
                              {"nCodebook", r.n_codebook},
-@@ -2195,14 +2218,14 @@ namespace rnllama_jsi {
+@@ -2195,14 +2219,14 @@
                      auto ctx = getContextOrThrow(contextId);
                      if (!ctx->isVocoderEnabled()) throw std::runtime_error("Vocoder is not enabled");
  
@@ -640,7 +648,7 @@ index ffd7942..a2c5190 100644
                          has_emotion ? opts.emotion : 0.5f, has_emotion, opts.bake);
  
                      const rnllama::rn_speaker * spk = ctx->tts_wrapper->getSpeaker(speakerId);
-@@ -2234,7 +2257,7 @@ namespace rnllama_jsi {
+@@ -2234,7 +2258,7 @@
                      auto ctx = getContextOrThrow(contextId);
                      if (!ctx->isVocoderEnabled()) throw std::runtime_error("Vocoder is not enabled");
  
@@ -649,7 +657,7 @@ index ffd7942..a2c5190 100644
  
                      const rnllama::rn_speaker * spk = ctx->tts_wrapper->getSpeaker(speakerId);
                      if (!spk) throw std::runtime_error("bakeSpeaker: speaker id not found");
-@@ -2283,7 +2306,7 @@ namespace rnllama_jsi {
+@@ -2283,7 +2307,7 @@
                      if (!ctx->isVocoderEnabled()) throw std::runtime_error("Vocoder is not enabled");
  
                      try {
@@ -658,7 +666,7 @@ index ffd7942..a2c5190 100644
                          return [audio_data](jsi::Runtime& rt) {
                              return makeFloat32Array(rt, audio_data);
                          };
-@@ -2358,19 +2381,9 @@ namespace rnllama_jsi {
+@@ -2358,19 +2382,9 @@
          llama_log_set(llama_log_callback_default, nullptr);
  
          RequestManager::getInstance().clearAll();
@@ -681,7 +689,7 @@ index ffd7942..a2c5190 100644
          }
  
          if (contexts.empty()) {
-@@ -2379,12 +2392,9 @@ namespace rnllama_jsi {
+@@ -2379,12 +2393,9 @@
          }
          ThreadPool::getInstance().shutdown();
  
@@ -871,10 +879,10 @@ index d152478..13c490f 100644
      void startGenerationTiming();
      void updateGenerationTiming();
 diff --git a/node_modules/llama.rn/cpp/rn-llama.cpp b/node_modules/llama.rn/cpp/rn-llama.cpp
-index 87e7ec8..d3634c2 100644
+index 87e7ec8..7aa2b66 100644
 --- a/node_modules/llama.rn/cpp/rn-llama.cpp
 +++ b/node_modules/llama.rn/cpp/rn-llama.cpp
-@@ -128,6 +128,28 @@ void install_ggml_abort_handler() {
+@@ -128,6 +128,28 @@
      ggml_set_abort_callback(ggml_abort_log_callback);
  }
  
@@ -903,7 +911,7 @@ index 87e7ec8..d3634c2 100644
  static const std::vector<ggml_type> kv_cache_types = {
      GGML_TYPE_F32,
      GGML_TYPE_F16,
-@@ -519,6 +541,13 @@ bool llama_rn_context::attachThreadpoolsIfAvailable() {
+@@ -519,6 +541,13 @@
  }
  
  llama_rn_context::~llama_rn_context() {
@@ -917,7 +925,7 @@ index 87e7ec8..d3634c2 100644
      // Disable parallel mode first (cleans up slot_manager)
      disableParallelMode();
  
-@@ -570,6 +599,7 @@ bool llama_rn_context::loadModel(common_params &params_)
+@@ -570,6 +599,7 @@
          }
          return false;
      }
@@ -925,7 +933,7 @@ index 87e7ec8..d3634c2 100644
  
      // Load the draft model for embedded MTP drafts and for classic standalone draft models
      // (draft-simple) alike. Gating this on MTP alone silently disabled speculation for
-@@ -724,7 +754,13 @@ llama_context * llama_rn_context::createMTPDraftContext(const common_params &par
+@@ -724,7 +754,13 @@
      cparams.type_k = params_for_context.speculative.draft.cache_type_k;
      cparams.type_v = params_for_context.speculative.draft.cache_type_v;
  
@@ -940,11 +948,37 @@ index 87e7ec8..d3634c2 100644
  }
  
  
+@@ -900,6 +936,15 @@
+     return isMultimodalEnabled() && mtmd_wrapper->supportAudio();
+ }
+ 
++bool llama_rn_context::isMultimodalSupportAudioGen() const {
++    // isMultimodalEnabled() is what guarantees the non-null mtmd_ctx that the
++    // capability lookup dereferences.
++    if (!isMultimodalEnabled() || model == nullptr) {
++        return false;
++    }
++    return mtmd_helper_get_capabilities(model, mtmd_wrapper->mtmd_ctx).audio_gen;
++}
++
+ void llama_rn_context::releaseMultimodal() {
+     if (mtmd_wrapper != nullptr) {
+         delete mtmd_wrapper;
 diff --git a/node_modules/llama.rn/cpp/rn-llama.h b/node_modules/llama.rn/cpp/rn-llama.h
-index 8236f13..0bbb907 100644
+index 8236f13..1a3f01d 100644
 --- a/node_modules/llama.rn/cpp/rn-llama.h
 +++ b/node_modules/llama.rn/cpp/rn-llama.h
-@@ -222,6 +222,13 @@ struct llama_rn_context {
+@@ -196,6 +196,9 @@
+     bool isMultimodalEnabled() const;
+     bool isMultimodalSupportVision() const;
+     bool isMultimodalSupportAudio() const;
++    // Whether the attached projector carries an audio generator, i.e. the
++    // mtmd audio_gen capability: the model can speak as well as hear.
++    bool isMultimodalSupportAudioGen() const;
+     void releaseMultimodal();
+     // Media identity hashes tracked by the multimodal wrapper (empty when
+     // multimodal is disabled); persisted alongside session/state files
+@@ -222,6 +225,13 @@
  
      // Cache management
      void clearCache(bool clear_data = false);
@@ -1002,10 +1036,10 @@ index 1362325..1542d02 100644
        "#{llama_cpp}/common/**/*.{h,cpp}",
        "#{llama_cpp}/tools/mtmd/**/*.{h,cpp}",
 diff --git a/node_modules/llama.rn/src/index.ts b/node_modules/llama.rn/src/index.ts
-index 039933f..1fdd5d4 100644
+index 039933f..6852791 100644
 --- a/node_modules/llama.rn/src/index.ts
 +++ b/node_modules/llama.rn/src/index.ts
-@@ -432,6 +432,10 @@ export class LlamaSpeaker {
+@@ -432,6 +432,10 @@
  export class LlamaContext {
    id: number
  
@@ -1016,7 +1050,7 @@ index 039933f..1fdd5d4 100644
    gpu: boolean = false
  
    reasonNoGPU: string = ''
-@@ -911,6 +915,7 @@ export class LlamaContext {
+@@ -911,6 +915,7 @@
      params: CompletionParams & { speaker?: LlamaSpeaker },
      callback?: (data: TokenData) => void,
    ): Promise<NativeCompletionResult> {
@@ -1024,7 +1058,7 @@ index 039933f..1fdd5d4 100644
      const nativeParams: NativeCompletionRequestParams & {
        speakerId?: number
      } = {
-@@ -998,11 +1003,16 @@ export class LlamaContext {
+@@ -998,11 +1003,16 @@
      if (!nativeParams.prompt && !params.embedding && !nativeParams.media_paths)
        throw new Error('Prompt is required')
  
@@ -1043,6 +1077,14 @@ index 039933f..1fdd5d4 100644
      const { llamaStopCompletion } = getJsi()
      return llamaStopCompletion(this.id)
    }
+@@ -1157,6 +1167,7 @@
+   async getMultimodalSupport(): Promise<{
+     vision: boolean
+     audio: boolean
++    audioGen: boolean
+   }> {
+     const { llamaGetMultimodalSupport } = getJsi()
+     return await llamaGetMultimodalSupport(this.id)
 diff --git a/node_modules/llama.rn/vendor/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.m b/node_modules/llama.rn/vendor/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.m
 index 451f652..54fb9ff 100644
 --- a/node_modules/llama.rn/vendor/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.m
@@ -1069,3 +1111,40 @@ index 451f652..54fb9ff 100644
  
      NSString * path_resource = [[NSProcessInfo processInfo].environment objectForKey:@"GGML_METAL_PATH_RESOURCES"];
      if (path_resource) {
+diff --git a/node_modules/llama.rn/src/jsi.ts b/node_modules/llama.rn/src/jsi.ts
+index 5a83ed7..9c6b871 100644
+--- a/node_modules/llama.rn/src/jsi.ts
++++ b/node_modules/llama.rn/src/jsi.ts
+@@ -114,7 +114,7 @@
+   var llamaIsMultimodalEnabled: (contextId: number) => Promise<boolean>
+   var llamaGetMultimodalSupport: (
+     contextId: number,
+-  ) => Promise<{ vision: boolean; audio: boolean }>
++  ) => Promise<{ vision: boolean; audio: boolean; audioGen: boolean }>
+   var llamaReleaseMultimodal: (contextId: number) => Promise<void>
+   var llamaInitVocoder: (
+     contextId: number,
+diff --git a/node_modules/llama.rn/lib/typescript/index.d.ts b/node_modules/llama.rn/lib/typescript/index.d.ts
+index aa0e7c3..6ee92b0 100644
+--- a/node_modules/llama.rn/lib/typescript/index.d.ts
++++ b/node_modules/llama.rn/lib/typescript/index.d.ts
+@@ -280,6 +280,7 @@
+     getMultimodalSupport(): Promise<{
+         vision: boolean;
+         audio: boolean;
++        audioGen: boolean;
+     }>;
+     releaseMultimodal(): Promise<void>;
+     /**
+diff --git a/node_modules/llama.rn/lib/typescript/jsi.d.ts b/node_modules/llama.rn/lib/typescript/jsi.d.ts
+index 1173e79..bcf475a 100644
+--- a/node_modules/llama.rn/lib/typescript/jsi.d.ts
++++ b/node_modules/llama.rn/lib/typescript/jsi.d.ts
+@@ -51,6 +51,7 @@
+     var llamaGetMultimodalSupport: (contextId: number) => Promise<{
+         vision: boolean;
+         audio: boolean;
++        audioGen: boolean;
+     }>;
+     var llamaReleaseMultimodal: (contextId: number) => Promise<void>;
+     var llamaInitVocoder: (contextId: number, params: {

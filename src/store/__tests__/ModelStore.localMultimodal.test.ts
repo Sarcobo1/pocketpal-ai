@@ -41,6 +41,9 @@ const push = (model: Model): Model => {
 };
 
 describe('ModelStore local projector pairing', () => {
+  const resolve = (target: Model) =>
+    (modelStore as any).resolveMultimodalConfig(target);
+
   let model: Model;
   let addLocalModel: jest.Mock;
 
@@ -196,9 +199,6 @@ describe('ModelStore local projector pairing', () => {
   });
 
   describe('resolveMultimodalConfig', () => {
-    const resolve = (target: Model) =>
-      (modelStore as any).resolveMultimodalConfig(target);
-
     it('pairs on the fly when the load path asks', async () => {
       (modelStore as any).addLocalModel = jest.fn(async (fullPath: string) => {
         push({

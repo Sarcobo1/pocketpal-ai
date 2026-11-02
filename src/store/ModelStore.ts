@@ -44,6 +44,7 @@ import {
   formatBytes,
   inferRepoFromModelId,
   parseSizeLabel,
+  type SkillKey,
 } from '../utils';
 import {
   getRecommendedProjectionModel,
@@ -2159,9 +2160,9 @@ class ModelStore {
       }
       storeModel.supportsMultimodal = true;
       storeModel.modelType = ModelType.VISION;
-      storeModel.capabilities = [
-        ...new Set([...(storeModel.capabilities ?? []), 'vision']),
-      ];
+      storeModel.capabilities = Array.from(
+        new Set<SkillKey>([...(storeModel.capabilities ?? []), 'vision']),
+      );
       storeModel.compatibleProjectionModels = [...idsByFilename.values()];
       storeModel.defaultProjectionModel = idsByFilename.get(recommended);
       if (storeModel.visionEnabled === undefined) {

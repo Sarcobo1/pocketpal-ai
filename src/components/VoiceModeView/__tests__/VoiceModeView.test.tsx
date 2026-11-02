@@ -38,6 +38,7 @@ jest.mock('react-native-vision-camera', () => {
     useCameraDevices: jest.fn(() => [{id: 'mock-device', position: 'back'}]),
     getCameraDevice: (devices: any[], position: string) =>
       devices.find(d => d.position === position),
+    useCameraFormat: jest.fn(() => undefined),
     useCameraPermission: jest.fn(() => mockCameraPermission),
   };
 });

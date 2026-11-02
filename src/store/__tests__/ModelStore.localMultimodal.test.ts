@@ -1,5 +1,16 @@
 jest.unmock('../../store');
 
+// The store kicks a device-signal read off at construction; unmocked it reads
+// Platform after the environment is gone and jest fails the file for a log.
+jest.mock('../../services/deviceRules/rules', () => ({
+  fetchRules: jest.fn().mockResolvedValue(null),
+}));
+jest.mock('../../services/deviceRules/signals', () => ({
+  readDeviceSignals: jest
+    .fn()
+    .mockResolvedValue({ramBytes: 8 * 1e9, socModel: 'SM8850'}),
+}));
+
 import * as RNFS from '@dr.pogodin/react-native-fs';
 import {runInAction} from 'mobx';
 
@@ -47,7 +58,8 @@ describe('ModelStore local projector pairing', () => {
   let addLocalModel: jest.Mock;
 
   // A context that already runs the model, so the only thing left to ask for
-  // is the projector on top of it.
+  // is the projector on top of it. The engine goes with it: a completion needs
+  // a lease, and a lease is only granted to an engine the load path made.
   const contextWithProjector = () => {
     const ctx = {
       initMultimodal: jest.fn().mockResolvedValue(true),
@@ -60,6 +72,10 @@ describe('ModelStore local projector pairing', () => {
     };
     runInAction(() => {
       modelStore.context = ctx as any;
+      modelStore.engine = {
+        completion: ctx.completion,
+        stopCompletion: ctx.stopCompletion,
+      } as any;
       modelStore.activeModelId = model.id;
     });
     return ctx;
@@ -72,6 +88,7 @@ describe('ModelStore local projector pairing', () => {
     runInAction(() => {
       modelStore.models = [];
       modelStore.context = undefined;
+      modelStore.engine = undefined;
       modelStore.isMultimodalActive = false;
       modelStore.activeModelId = undefined;
       modelStore.activeProjectionModelId = undefined;
@@ -161,11 +178,13 @@ describe('ModelStore local projector pairing', () => {
     });
 
     it('skips drafts and projection files, which own nothing', async () => {
+      // ggml-org publishes drafts as `mtp-<target>`; that naming convention is
+      // what the guard reads, not a free-form "-draft" suffix.
       const draft = push({
         ...unpairedLocalModel(),
         id: 'local-draft',
-        filename: 'LFM3-Omni-2B-Q8_0-draft.gguf',
-        fullPath: `${DIR}/LFM3-Omni-2B-Q8_0-draft.gguf`,
+        filename: 'mtp-LFM3-Omni-2B-Q8_0.gguf',
+        fullPath: `${DIR}/mtp-LFM3-Omni-2B-Q8_0.gguf`,
       });
       const projector = push({
         ...unpairedLocalModel(),

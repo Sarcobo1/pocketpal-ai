@@ -83,7 +83,6 @@ const prepareCompletion = async ({
   contextId,
   assistant,
   conversationIdRef,
-  isMultimodalEnabled,
   l10n,
   currentMessages,
   spoken,
@@ -95,7 +94,6 @@ const prepareCompletion = async ({
   contextId: string;
   assistant: User;
   conversationIdRef: string;
-  isMultimodalEnabled: boolean;
   l10n: any;
   currentMessages: MessageType.Any[];
   spoken: boolean;
@@ -112,26 +110,35 @@ const prepareCompletion = async ({
   // carries media asks for one before being downgraded to plain text. Without
   // this a model imported from storage — whose pairing lands only when
   // ModelStore next reads its folder — sends a camera frame as a caption.
-  const multimodalReady =
-    isMultimodalEnabled ||
-    ((hasImages || hasAudio) && (await modelStore.ensureMultimodalActive()));
+  let media = modelStore.activeMediaSupport;
+  if ((hasImages || hasAudio) && !media.vision && !media.audioInput) {
+    await modelStore.ensureMultimodalActive();
+    media = modelStore.activeMediaSupport;
+  }
+  // Each modality is decided on its own: an omni projector that hears need not
+  // see, and offering the camera to it produces a caption about nothing.
+  const canImages = !!hasImages && media.vision;
+  const canAudio = hasAudio && media.audioInput;
+  const multimodalReady = canImages || canAudio;
 
   // Create user message content - use array format only for multimodal,
   // string for text-only.
   let userMessageContent: any;
 
-  if ((hasImages || hasAudio) && multimodalReady) {
+  if (multimodalReady) {
     userMessageContent = [
       {
         type: 'text',
         text: message.text,
       },
-      ...imageUris.map(path => ({
-        type: 'image_url',
-        image_url: {url: path},
-      })),
+      ...(canImages
+        ? imageUris.map(path => ({
+            type: 'image_url',
+            image_url: {url: toLocalMediaPath(path)},
+          }))
+        : []),
     ];
-    if (hasAudio) {
+    if (canAudio) {
       // `url`, not `data`: llama.rn strips file:// from the former and pushes
       // the latter verbatim, so a content URI in `data` never opens.
       userMessageContent.push({
@@ -142,7 +149,7 @@ const prepareCompletion = async ({
   } else {
     userMessageContent = message.text;
 
-    if ((hasImages || hasAudio) && !multimodalReady) {
+    if (hasImages || hasAudio) {
       // The generic copy is the wrong answer when the app knows exactly which
       // file is missing, which is the usual reason a camera turn lands here.
       uiStore.setChatWarning(
@@ -152,6 +159,17 @@ const prepareCompletion = async ({
         ),
       );
     }
+  }
+
+  // Half a turn is worse than none: an attached audio-only projector takes the
+  // mic and drops the camera frame that came with it.
+  if (
+    multimodalReady &&
+    ((hasImages && !canImages) || (hasAudio && !canAudio))
+  ) {
+    uiStore.setChatWarning(
+      createMultimodalWarning(l10n.chat.multimodalNotEnabled),
+    );
   }
 
   // Convert chat session messages to llama.rn format. Filtering
@@ -210,6 +228,25 @@ const prepareCompletion = async ({
   const cleanCompletionParams = toApiCompletionParams(
     completionParamsWithAppProps as CompletionParams,
   );
+
+  // Settles the question every media turn raises: did the frame reach the
+  // prompt, or was it dropped because no projector could take it?
+  if (hasImages || hasAudio) {
+    console.log(
+      '[chat] media turn',
+      JSON.stringify({
+        projector: {vision: media.vision, audioInput: media.audioInput},
+        parts: Array.isArray(userMessageContent)
+          ? userMessageContent.map(part => part.type)
+          : ['text'],
+        dropped: [
+          ...(hasImages && !canImages ? ['image'] : []),
+          ...(hasAudio && !canAudio ? ['audio'] : []),
+        ],
+        messageCount: cleanCompletionParams.messages?.length ?? 0,
+      }),
+    );
+  }
 
   // reasoning_format is always 'auto' for the local (llama.rn) path: a no-op for
   // non-reasoning models and the value that extracts reasoning into
@@ -805,8 +842,6 @@ export const useChatSession = (
     const audioUri = message.audioUri;
     const hasAudio = !!audioUri;
 
-    const isMultimodalEnabled = modelStore.activeModelCaps.visionActive;
-
     const currentMessages = toJS(chatSessionStore.currentSessionMessages);
 
     const textMessage: MessageType.Text = {
@@ -857,7 +892,6 @@ export const useChatSession = (
       contextId,
       assistant,
       conversationIdRef: conversationIdRef.current,
-      isMultimodalEnabled,
       l10n,
       currentMessages,
       spoken: !!opts.spoken,
@@ -998,7 +1032,10 @@ export const useChatSession = (
           completionStartTime,
           timeToFirstTokenMs,
           hasImages,
-          isMultimodalEnabled,
+          // Read as the turn runs: the projector that answers this is attached
+          // inside prepareCompletion, so a value captured before it would be
+          // the one from a session that could not see.
+          isMultimodalEnabled: modelStore.activeMediaSupport.vision,
           tts,
           stopped: lease.signal.aborted,
         });

@@ -53,6 +53,13 @@ import {
   VoiceModeButton,
 } from '..';
 
+/**
+ * Longest edge of a frame handed to the model. A projector re-samples to its
+ * own token budget anyway, and decoding a 12-megapixel photo into the same
+ * memory as the weights is how the phone kills the app instead of answering.
+ */
+const MAX_IMAGE_INPUT_PX = 1024;
+
 export interface ChatInputTopLevelProps {
   /** Whether the AI is currently streaming tokens */
   isStreaming?: boolean;
@@ -312,6 +319,8 @@ export const ChatInput = observer(
         const result = await launchCamera({
           mediaType: 'photo',
           quality: 0.8,
+          maxWidth: MAX_IMAGE_INPUT_PX,
+          maxHeight: MAX_IMAGE_INPUT_PX,
         });
 
         if (result.errorCode === 'camera_unavailable') {
@@ -353,6 +362,8 @@ export const ChatInput = observer(
           mediaType: 'photo',
           selectionLimit: 5, // Allow multiple images
           quality: 0.8,
+          maxWidth: MAX_IMAGE_INPUT_PX,
+          maxHeight: MAX_IMAGE_INPUT_PX,
         });
 
         if (result.assets && result.assets.length > 0) {

@@ -1,3 +1,4 @@
+import {mediaSupportOf} from './ggufCapabilities';
 import {resolveRemoteCaps} from './remoteCaps';
 import {ModelOrigin} from './types';
 import type {ListDerivedCaps} from './types';
@@ -93,7 +94,10 @@ export function resolveModelCaps(
 
   return {
     vision: triState(model.supportsMultimodal),
-    visionActive: isActiveModel && env.isMultimodalActive,
+    // The projector decides, not the flag: an audio-only encoder makes a model
+    // multimodal without ever being able to look at a camera frame.
+    visionActive:
+      isActiveModel && env.isMultimodalActive && mediaSupportOf(model).vision,
     contextLength:
       positive(model.hfModel?.specs?.gguf?.context_length) ??
       positive(model.ggufMetadata?.context_length),

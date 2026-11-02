@@ -1,19 +1,11 @@
 import type {GGUFValue} from './ggufHeader';
-import type {MediaSupport} from './types';
+import type {MediaSupport, ProjectorTypes} from './types';
 
 export const EMPTY_MEDIA_SUPPORT: MediaSupport = {
   vision: false,
   audioInput: false,
   audioOutput: false,
 };
-
-export interface ProjectorTypes {
-  vision?: string;
-  audio?: string;
-  genAudio?: string;
-  /** Legacy `clip.projector_type`, used by single-encoder projectors. */
-  single?: string;
-}
 
 export interface GGUFMediaCapabilities {
   mediaSupport: MediaSupport;

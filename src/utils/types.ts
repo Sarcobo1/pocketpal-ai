@@ -567,6 +567,15 @@ export interface MediaSupport {
   audioOutput: boolean;
 }
 
+/** Projector architectures named by a projector's own GGUF header. */
+export interface ProjectorTypes {
+  vision?: string;
+  audio?: string;
+  genAudio?: string;
+  /** Legacy `clip.projector_type`, used by single-encoder projectors. */
+  single?: string;
+}
+
 /**
  * GGUF metadata (currently this is used for memory estimation)
  * Parsed from model file using llama.rn's loadLlamaModelInfo()
@@ -611,6 +620,20 @@ export interface Model {
 
   // Multimodal support fields
   supportsMultimodal?: boolean; // Whether this model supports multimodal input
+  /**
+   * Modalities the paired projector actually carries. Unlike
+   * `supportsMultimodal`, this is video/audio-specific: a projector with only
+   * an audio encoder must not light up the camera.
+   */
+  mediaSupport?: MediaSupport;
+  /** Projector architectures from the header, kept for diagnostics. */
+  mediaProjectorTypes?: ProjectorTypes;
+  /** A known-incompatible encoder this build cannot drive (e.g. `lfm2a`). */
+  unsupportedMediaArchitecture?: string;
+  /** Why the projector header could not be read or mapped to capabilities. */
+  mediaSupportError?: string;
+  /** Manual projector override; always wins over the auto-paired file. */
+  mmprojPath?: string;
   compatibleProjectionModels?: string[]; // Array of mmproj model IDs that work with this model
   defaultProjectionModel?: string; // Default mmproj model ID to use with this model
   visionEnabled?: boolean; // User preference for enabling vision capabilities (defaults to true for backward compatibility)

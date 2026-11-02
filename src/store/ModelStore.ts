@@ -52,6 +52,14 @@ import {
   projectorsForLocalModel,
   type ProjectionGap,
 } from '../utils/multimodalHelpers';
+import {localFileSource, scanGGUFHeader} from '../utils/ggufHeader';
+import {
+  EMPTY_MEDIA_SUPPORT,
+  hasMedia,
+  isMediaGGUFKey,
+  mediaCapabilitiesFromGGUFValues,
+  mergeMediaSupport,
+} from '../utils/ggufCapabilities';
 import {isDraftOnlyFilename, isDraftOnlyModel} from '../utils/mtp';
 import {getOriginalModelName} from '../utils/formatters';
 import {stopQuietly} from '../utils/stopQuietly';
@@ -92,6 +100,7 @@ import {
   ModelFile,
   ModelOrigin,
   ModelType,
+  MediaSupport,
   RemoteModelCaps,
   RemoteSessionBinding,
 } from '../utils/types';
@@ -1930,6 +1939,119 @@ class ModelStore {
   };
 
   /**
+   * Read the encoder flags out of a projector's own GGUF header.
+   *
+   * Filenames say "mmproj" and nothing else: a vision projector, an audio-only
+   * projector, and an omni projector all look alike. The header is the only
+   * place that says which of them the file actually is, and a known-unsupported
+   * encoder must be reported as such instead of being loaded and failing later.
+   */
+  private scanProjectorMediaSupport = async (
+    model: Model,
+    filePath: string,
+  ) => {
+    let scan: Awaited<ReturnType<typeof scanGGUFHeader>>;
+    try {
+      scan = await scanGGUFHeader(localFileSource(filePath), {
+        keyFilter: isMediaGGUFKey,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      runInAction(() => {
+        model.mediaSupport = undefined;
+        model.mediaProjectorTypes = undefined;
+        model.unsupportedMediaArchitecture = undefined;
+        model.mediaSupportError = message;
+      });
+      return;
+    }
+
+    const capabilities = mediaCapabilitiesFromGGUFValues(scan.values);
+    runInAction(() => {
+      model.mediaSupport = capabilities.mediaSupport;
+      model.mediaProjectorTypes = capabilities.projectorTypes;
+      model.unsupportedMediaArchitecture = capabilities.unsupportedArchitecture;
+      model.mediaSupportError = undefined;
+    });
+    this.propagateProjectorMediaSupport(model);
+  };
+
+  /**
+   * A model's media support is the union of the projectors paired with it.
+   * Recompute it whenever either side of that pairing learns something new.
+   */
+  private refreshPairedMediaSupport = (model: Model) => {
+    const ids = new Set(
+      [
+        model.defaultProjectionModel,
+        ...(model.compatibleProjectionModels ?? []),
+      ].filter((id): id is string => !!id),
+    );
+    const projectors = [...ids]
+      .map(id => this.models.find(m => m.id === id))
+      .filter((m): m is Model => !!m);
+    if (projectors.length === 0) {
+      return;
+    }
+
+    const support = projectors.reduce<MediaSupport>(
+      (merged, projector) => mergeMediaSupport(merged, projector.mediaSupport),
+      {...EMPTY_MEDIA_SUPPORT},
+    );
+    const unsupported = projectors.find(
+      projector => projector.unsupportedMediaArchitecture,
+    )?.unsupportedMediaArchitecture;
+    const failure = projectors.find(
+      projector => projector.mediaSupportError,
+    )?.mediaSupportError;
+    const types = projectors.find(
+      projector => projector.mediaProjectorTypes,
+    )?.mediaProjectorTypes;
+
+    runInAction(() => {
+      model.mediaSupport = support;
+      model.mediaProjectorTypes = types;
+      model.unsupportedMediaArchitecture = unsupported;
+      model.mediaSupportError = hasMedia(support) ? undefined : failure;
+      if (hasMedia(support)) {
+        model.supportsMultimodal = true;
+        if (support.vision) {
+          model.modelType = ModelType.VISION;
+        }
+        const capabilities = new Set<SkillKey>(model.capabilities ?? []);
+        if (support.vision) {
+          capabilities.add('vision');
+        } else {
+          capabilities.delete('vision');
+        }
+        model.capabilities =
+          capabilities.size > 0 ? [...capabilities] : undefined;
+        if (support.vision && model.visionEnabled === undefined) {
+          model.visionEnabled = true;
+        }
+      }
+    });
+  };
+
+  /** Push a freshly scanned projector's capabilities to every model using it. */
+  private propagateProjectorMediaSupport = (projector: Model) => {
+    for (const model of this.models) {
+      if (
+        model.id === projector.id ||
+        model.modelType === ModelType.PROJECTION
+      ) {
+        continue;
+      }
+      if (
+        model.defaultProjectionModel === projector.id ||
+        model.compatibleProjectionModels?.includes(projector.id)
+      ) {
+        this.refreshPairedMediaSupport(model);
+      }
+    }
+  };
+
+  /**
    * Fetch and persist GGUF metadata for a downloaded model
    * Called after download completes to enable accurate memory estimation
    */
@@ -1941,6 +2063,13 @@ class ModelStore {
           '[ModelStore] Cannot fetch GGUF metadata: model path is undefined',
         );
         return;
+      }
+
+      if (
+        model.modelType === ModelType.PROJECTION ||
+        isProjectionModel(model.filename)
+      ) {
+        await this.scanProjectorMediaSupport(model, filePath);
       }
 
       const modelInfo = await loadLlamaModelInfo(filePath);
@@ -2153,11 +2282,11 @@ class ModelStore {
         ...idsByFilename.keys(),
       ]) ?? filenames[0];
 
+    const storeModel = this.models.find(m => m.id === model.id);
+    if (!storeModel) {
+      return [];
+    }
     runInAction(() => {
-      const storeModel = this.models.find(m => m.id === model.id);
-      if (!storeModel) {
-        return;
-      }
       storeModel.supportsMultimodal = true;
       storeModel.modelType = ModelType.VISION;
       storeModel.capabilities = Array.from(
@@ -2169,6 +2298,7 @@ class ModelStore {
         storeModel.visionEnabled = true;
       }
     });
+    this.refreshPairedMediaSupport(storeModel);
 
     const ids = [...idsByFilename.values()];
     console.log(
@@ -3658,6 +3788,7 @@ class ModelStore {
             }
           }
         });
+        this.refreshPairedMediaSupport(storeModel);
       }
     }
 
@@ -3688,6 +3819,7 @@ class ModelStore {
               visionModel.defaultProjectionModel = newModel.id;
             }
           });
+          this.refreshPairedMediaSupport(visionModel);
         }
       }
     }

@@ -284,14 +284,14 @@ const prepareCompletion = async ({
 
   // Every media part in the finished prompt, not just this turn's: a projector
   // re-encodes what it is handed on each completion.
-  const promptMedia =
-    hasImages || hasAudio
-      ? countMediaParts(cleanCompletionParams.messages)
-      : undefined;
+  const allMedia = countMediaParts(cleanCompletionParams.messages);
+  const promptMedia = hasImages || hasAudio ? allMedia : undefined;
 
   // Settles the question every media turn raises: did the frame reach the
-  // prompt, or was it dropped because no projector could take it?
-  if (hasImages || hasAudio) {
+  // prompt, or was it dropped because no projector could take it? A typed
+  // follow-up is where a replayed clip shows up — no media this turn, yet the
+  // prompt carries one — so it is worth the pass over the finished prompt.
+  if (hasImages || hasAudio || allMedia.images > 0 || allMedia.audio > 0) {
     console.log(
       '[chat] media turn',
       JSON.stringify({
@@ -303,7 +303,8 @@ const prepareCompletion = async ({
           ...(hasImages && !canImages ? ['image'] : []),
           ...(hasAudio && !canAudio ? ['audio'] : []),
         ],
-        inPrompt: promptMedia,
+        inPrompt: allMedia,
+        clip: audioUri,
         messageCount: cleanCompletionParams.messages?.length ?? 0,
       }),
     );

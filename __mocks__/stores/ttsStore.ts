@@ -50,6 +50,7 @@ class MockTTSStore {
   // behavior has to say so instead of inheriting it by accident.
   streamSpeech = true;
   voiceShortAnswers = true;
+  slowSpeech: 'wait' | 'system' = 'wait';
 
   supertonicDownloadState: DownloadState = 'not_installed';
   supertonicDownloadProgress = 0;
@@ -87,6 +88,7 @@ class MockTTSStore {
   setSpeechLanguage: jest.Mock;
   setStreamSpeech: jest.Mock;
   setVoiceShortAnswers: jest.Mock;
+  setSlowSpeech: jest.Mock;
   openSetupSheet: jest.Mock;
   closeSetupSheet: jest.Mock;
   onAssistantMessageStart: jest.Mock;
@@ -186,6 +188,11 @@ class MockTTSStore {
     this.setVoiceShortAnswers = jest.fn((on: boolean) => {
       runInAction(() => {
         this.voiceShortAnswers = on;
+      });
+    });
+    this.setSlowSpeech = jest.fn((policy: 'wait' | 'system') => {
+      runInAction(() => {
+        this.slowSpeech = policy;
       });
     });
     this.openSetupSheet = jest.fn();

@@ -1335,6 +1335,27 @@ export const SettingsScreen: React.FC = observer(() => {
                   />
                 </View>
 
+                {/* The model's voice can fall behind its own audio on a slow
+                    device. Which cost to accept is the listener's call, not
+                    the app's, so both halves are named on the row. */}
+                <View style={styles.switchContainer}>
+                  <View style={styles.textContainer}>
+                    <Text variant="titleMedium" style={styles.textLabel}>
+                      {l10n.settings.slowSpeech}
+                    </Text>
+                    <Text variant="labelSmall" style={styles.textDescription}>
+                      {l10n.settings.slowSpeechDescription}
+                    </Text>
+                  </View>
+                  <Switch
+                    testID="slow-speech-switch"
+                    value={ttsStore.slowSpeech === 'system'}
+                    onValueChange={value =>
+                      ttsStore.setSlowSpeech(value ? 'system' : 'wait')
+                    }
+                  />
+                </View>
+
                 <View style={styles.switchContainer}>
                   <View style={styles.textContainer}>
                     <Text variant="titleMedium" style={styles.textLabel}>

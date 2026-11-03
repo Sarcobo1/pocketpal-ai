@@ -199,6 +199,12 @@ export class TTSStore {
    * prompt as the app wrote it.
    */
   voiceShortAnswers: boolean = true;
+  /**
+   * What to do when the model's voice is clearly generating slower than it can
+   * speak. `wait` holds a bigger buffer and accepts a slow start; `system` lets
+   * the device voice finish a reply the model's voice is falling behind on.
+   */
+  slowSpeech: 'wait' | 'system' = 'wait';
 
   // UI state
   isSetupSheetOpen: boolean = false;
@@ -276,6 +282,7 @@ export class TTSStore {
         'speechLanguage',
         'streamSpeech',
         'voiceShortAnswers',
+        'slowSpeech',
       ],
       storage: AsyncStorage,
     });
@@ -562,6 +569,14 @@ export class TTSStore {
   /** Ask voice mode for a reply of one or two sentences. */
   setVoiceShortAnswers(on: boolean) {
     this.voiceShortAnswers = on;
+  }
+
+  /**
+   * The policy for a reply the model's voice cannot say in time. Takes effect
+   * on the next reply: a handoff is decided while one is being spoken.
+   */
+  setSlowSpeech(policy: 'wait' | 'system') {
+    this.slowSpeech = policy;
   }
 
   openSetupSheet() {
@@ -960,6 +975,13 @@ export class TTSStore {
           runInAction(() => {
             this.modelVoice = null;
           });
+        }
+        if (report.resumeText) {
+          // The model's voice got partway through and fell behind. Its audio
+          // has played; the device voice picks the sentence up where the ear
+          // was left. Nothing here is a failure, so nothing is reported as one.
+          await this.sayWithFallbackVoice(messageId, report.resumeText);
+          return;
         }
         if (!report.spoken) {
           runInAction(() => {

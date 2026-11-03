@@ -155,6 +155,12 @@ export interface ModelSpeechReport {
   /** False when this model should not be asked again this session. */
   keepModelVoice: boolean;
   stopReason: string;
+  /**
+   * The part of the reply the model's voice gave up on, so the TTS voice can
+   * finish the sentence rather than restart it or leave it hanging. Empty for
+   * every reply that was not handed over.
+   */
+  resumeText: string;
   /** Which step of the native pipeline answered; empty once audio was said. */
   stage: string;
   /** What the engine itself blamed, when it said anything. */
@@ -173,6 +179,7 @@ const report = (
 ): ModelSpeechReport => ({
   spoken: false,
   keepModelVoice: true,
+  resumeText: '',
   seconds: 0,
   frames: 0,
   msPerFrame: 0,
@@ -223,12 +230,19 @@ export const speakWithModel = async (
     });
   }
   let thrown = '';
-  // One feed per reply. It owns the piece boundary and the player queue, so
-  // the engine has only to hand samples over — and when the setting is off no
-  // feed exists, which is the whole difference from the old behavior.
-  const feed = ttsStore.streamSpeech ? openSpeechFeed() : null;
+  // One feed per reply. It owns the piece boundary and the pace of the output,
+  // so the engine has only to hand samples over — and when the setting is off
+  // no feed exists, which is the whole difference from the old behavior.
+  // The reply's words go in as well: a cut is placed where the text says a
+  // pause belongs, which is the only map from audio to sentence the engine gives.
+  const handoff = ttsStore.slowSpeech === 'system';
+  const feed = ttsStore.streamSpeech
+    ? openSpeechFeed({text, allowHandoff: handoff})
+    : null;
   activeFeed = feed;
   let announced = false;
+  /** The words the model's voice gave up on, once it handed the reply over. */
+  let resumeText = '';
   const out = await ctx
     .generateSpeech(
       {
@@ -247,6 +261,18 @@ export const speakWithModel = async (
               onPlaying?.();
             }
             feed.push(samples, sampleRate);
+            // The feed has decided this reply cannot be made smooth. Stop the
+            // engine rather than finish audio nobody will hear in time; the
+            // samples already made still play out, and the TTS voice takes the
+            // rest of the sentence where the ear was left.
+            if (handoff && feed.handoffOffered()) {
+              resumeText = feed.remainingText().trim();
+              logPerf('speech.handoff', {
+                said: text.length - resumeText.length,
+                left: resumeText.length,
+              });
+              ctx.stopSpeech();
+            }
           }
         : undefined,
     )
@@ -337,6 +363,8 @@ export const speakWithModel = async (
     stage: out.stage,
     error: out.error,
     keepModelVoice,
+    /** Empty unless this reply was handed over partway through saying itself. */
+    resumeText,
     seconds: out.seconds,
     frames: out.frames,
     msPerFrame,

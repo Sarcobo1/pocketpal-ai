@@ -86,6 +86,11 @@ export interface ModelVoiceSink {
     spoken: boolean;
     /** False when this model should not be asked again this session. */
     keepModelVoice: boolean;
+    /**
+     * Words the model's voice stopped saying partway through, for the TTS
+     * voice to finish. Empty unless the reply was handed over mid-sentence.
+     */
+    resumeText: string;
     /** Why the audio is not coming, in the engine's own vocabulary. */
     stopReason: string;
     stage: string;

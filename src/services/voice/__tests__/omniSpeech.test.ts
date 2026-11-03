@@ -224,6 +224,9 @@ describe('speakWithModel', () => {
     runInAction(() => {
       tts.speechLanguage = '';
       tts.forceTTSFallback = false;
+      // This suite is the whole-buffer path: one clip, one play call. What the
+      // engine hands over piece by piece is the suite below.
+      tts.streamSpeech = false;
     });
   });
 
@@ -376,17 +379,21 @@ describe('speakWithModel', () => {
     await speakWithModel('Salom');
     expect(generateSpeech).toHaveBeenCalledWith(
       expect.not.objectContaining({language: expect.anything()}),
+      undefined,
     );
 
     runInAction(() => {
       tts.speechLanguage = 'uzbek';
     });
     await speakWithModel('Salom');
-    expect(generateSpeech).toHaveBeenLastCalledWith({
-      text: 'Salom',
-      language: 'uzbek',
-      maxSeconds: 30,
-    });
+    expect(generateSpeech).toHaveBeenLastCalledWith(
+      {
+        text: 'Salom',
+        language: 'uzbek',
+        maxSeconds: 30,
+      },
+      undefined,
+    );
   });
 
   it('names the template default when no language was set', async () => {
@@ -404,5 +411,211 @@ describe('speakWithModel', () => {
 
     expect(stopSpeech).toHaveBeenCalledTimes(1);
     expect(neuralAudioPlayer.stop).toHaveBeenCalledTimes(1);
+  });
+});
+
+/** One second of the model's own voice, and the pause between two of them. */
+const RATE = 24000;
+const talk = (ms: number) =>
+  new Float32Array(Math.round((RATE * ms) / 1000)).fill(0.3);
+const gap = (ms: number) => new Float32Array(Math.round((RATE * ms) / 1000));
+
+/**
+ * A streamed result carries no buffer — the samples went to the player instead
+ * — so the pieces are what say there was audio at all.
+ */
+const streamedResult = (over: Record<string, unknown> = {}) =>
+  speechResult({
+    pcm: new Float32Array(0),
+    chunks: 6,
+    firstAudioMs: 900,
+    ...over,
+  });
+
+describe('speakWithModel, piece by piece', () => {
+  let generateSpeech: jest.Mock;
+  let clearCache: jest.Mock;
+  let stopSpeech: jest.Mock;
+  const play = neuralAudioPlayer.play as jest.Mock;
+
+  /** A context that speaks in pieces, handing each one to the callback. */
+  const withStream = (
+    result: Record<string, unknown>,
+    pieces: Array<{samples: Float32Array; after?: number}>,
+  ) => {
+    runInAction(() => {
+      store.activeModelId = 'model-1';
+      store.context = {
+        id: nextId++,
+        generateSpeech,
+        clearCache,
+        stopSpeech,
+        getMultimodalSupport: jest
+          .fn()
+          .mockResolvedValue({audioGen: true, audio: true}),
+      };
+    });
+    generateSpeech.mockImplementation(async (_opts, onChunk) => {
+      for (const piece of pieces) {
+        onChunk(piece.samples, RATE);
+        if (piece.after) {
+          await new Promise(resolve => setTimeout(resolve, piece.after));
+        }
+      }
+      return result;
+    });
+  };
+
+  /** Two seconds of speech, cut by the feed into two pieces. */
+  const twoPieces = [
+    {samples: talk(900)},
+    {samples: gap(120)},
+    {samples: talk(900)},
+    {samples: gap(120)},
+  ];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    generateSpeech = jest.fn();
+    clearCache = jest.fn().mockResolvedValue(undefined);
+    stopSpeech = jest.fn();
+    play.mockResolvedValue(undefined);
+    runInAction(() => {
+      tts.streamSpeech = true;
+      tts.speechLanguage = '';
+      tts.forceTTSFallback = false;
+    });
+  });
+
+  it('asks the engine for pieces and plays them all', async () => {
+    withStream(streamedResult(), twoPieces);
+
+    const report = await speakWithModel('Salom');
+
+    expect(generateSpeech).toHaveBeenCalledWith(
+      expect.objectContaining({stream: true}),
+      expect.any(Function),
+    );
+    expect(play).toHaveBeenCalledTimes(2);
+    expect(report).toEqual(
+      expect.objectContaining({spoken: true, keepModelVoice: true}),
+    );
+  });
+
+  it('says the reply is being heard as soon as a sample is on its way', async () => {
+    withStream(streamedResult(), twoPieces);
+    const onPlaying = jest.fn();
+
+    await speakWithModel('Salom', onPlaying);
+
+    expect(onPlaying).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts playing before the engine has finished speaking', async () => {
+    let heard = -1;
+    runInAction(() => {
+      store.activeModelId = 'model-1';
+      store.context = {
+        id: nextId++,
+        clearCache,
+        stopSpeech,
+        getMultimodalSupport: jest
+          .fn()
+          .mockResolvedValue({audioGen: true, audio: true}),
+        generateSpeech,
+      };
+    });
+    generateSpeech.mockImplementation(async (_opts, onChunk) => {
+      onChunk(talk(900), RATE);
+      onChunk(gap(120), RATE);
+      // A slice of wall clock, which is all the JS thread needs to take the
+      // piece; the whole-buffer path could only have reported `0` here.
+      await new Promise(resolve => setTimeout(resolve, 20));
+      heard = play.mock.calls.length;
+      onChunk(talk(900), RATE);
+      onChunk(gap(120), RATE);
+      return streamedResult();
+    });
+
+    const report = await speakWithModel('Salom');
+
+    expect(heard).toBe(1);
+    expect(play).toHaveBeenCalledTimes(2);
+    expect(report.spoken).toBe(true);
+  });
+
+  it('clears the cache the utterance decoded over, pieces or not', async () => {
+    withStream(streamedResult(), twoPieces);
+
+    await speakWithModel('Salom');
+
+    expect(clearCache).toHaveBeenCalledWith(true);
+  });
+
+  it('leaves a reply with no piece to the TTS voice', async () => {
+    withStream(
+      streamedResult({
+        chunks: 0,
+        seconds: 0,
+        genMs: 0,
+        stopReason: 'unsupported',
+        stage: 'no-audio-gen',
+      }),
+      [],
+    );
+
+    const report = await speakWithModel('Salom');
+
+    expect(report).toEqual(
+      expect.objectContaining({spoken: false, keepModelVoice: false}),
+    );
+    expect(play).not.toHaveBeenCalled();
+  });
+
+  it('drops the pieces a barge-in did not live to hear', async () => {
+    let release: () => void = () => {};
+    runInAction(() => {
+      store.activeModelId = 'model-1';
+      store.context = {
+        id: nextId++,
+        clearCache,
+        stopSpeech,
+        getMultimodalSupport: jest
+          .fn()
+          .mockResolvedValue({audioGen: true, audio: true}),
+        generateSpeech,
+      };
+    });
+    generateSpeech.mockImplementation(async (_opts, onChunk) => {
+      onChunk(talk(900), RATE);
+      onChunk(gap(120), RATE);
+      await new Promise(resolve => {
+        release = resolve;
+      });
+      // The engine notices the interrupt between batches and says so here.
+      onChunk(talk(900), RATE);
+      return streamedResult({stopReason: 'aborted', aborted: true});
+    });
+
+    const pending = speakWithModel('Salom');
+    await new Promise(resolve => setTimeout(resolve, 20));
+    stopModelSpeech();
+    release();
+    const report = await pending;
+
+    expect(stopSpeech).toHaveBeenCalledTimes(1);
+    expect(neuralAudioPlayer.stop).toHaveBeenCalled();
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(report.spoken).toBe(false);
+  });
+
+  it('plays the tail however short it is', async () => {
+    withStream(streamedResult(), [{samples: talk(400)}]);
+
+    const report = await speakWithModel('Salom');
+
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(play.mock.calls[0][0].duration).toBeCloseTo(0.4, 3);
+    expect(report.spoken).toBe(true);
   });
 });

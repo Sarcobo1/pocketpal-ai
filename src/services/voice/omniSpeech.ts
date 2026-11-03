@@ -4,6 +4,7 @@ import {modelStore, ttsStore} from '../../store';
 import {ModelOrigin} from '../../utils/types';
 import {logPerf} from '../../utils/mediaPerf';
 import {vtrace} from '../../utils/voiceTrace';
+import {openSpeechFeed, type SpeechFeed} from './speechStream';
 
 /**
  * LFM3-Omni carries its speech decoder in the same projector file it already
@@ -14,6 +15,14 @@ import {vtrace} from '../../utils/voiceTrace';
  */
 
 let probe: {contextId: number; audioGen: boolean} | null = null;
+
+/**
+ * The feed of the reply being spoken, if any. A barge-in arrives through
+ * `stopModelSpeech`, which is not given the reply it is interrupting, so the
+ * one in flight is kept here — dropping its queue is the difference between a
+ * reply that stops and one that keeps playing under the next question.
+ */
+let activeFeed: SpeechFeed | null = null;
 
 /**
  * True when the active model can voice its own reply.
@@ -178,10 +187,12 @@ const report = (
 /**
  * Say `text` with the model's own voice and wait for the audio to finish.
  *
- * The utterance is generated in one piece, behind the same context claim a
- * completion takes, so the reply's text is complete before a sample exists.
  * What comes back is one buffer: it plays through the neural TTS player, which
  * is already what the device's audio focus and ducking are arranged around.
+ * With `streamSpeech` on, that buffer never exists — the player is fed piece by
+ * piece while the engine is still decoding, and this resolves once the last
+ * piece has played. Both cases take the same context claim a completion takes,
+ * so the reply's text is complete before a sample is asked for.
  */
 export const speakWithModel = async (
   text: string,
@@ -212,18 +223,41 @@ export const speakWithModel = async (
     });
   }
   let thrown = '';
+  // One feed per reply. It owns the piece boundary and the player queue, so
+  // the engine has only to hand samples over — and when the setting is off no
+  // feed exists, which is the whole difference from the old behavior.
+  const feed = ttsStore.streamSpeech ? openSpeechFeed() : null;
+  activeFeed = feed;
+  let announced = false;
   const out = await ctx
-    .generateSpeech({
-      text,
-      ...(language ? {language} : {}),
-      maxSeconds: MAX_UTTERANCE_SECONDS,
-    })
+    .generateSpeech(
+      {
+        text,
+        ...(language ? {language} : {}),
+        maxSeconds: MAX_UTTERANCE_SECONDS,
+        ...(feed ? {stream: true} : {}),
+      },
+      feed
+        ? (samples, sampleRate) => {
+            // The first sample on its way, not the first played: a long
+            // synthesis must not look like a session with nothing to say, and
+            // the jitter buffer is the feed's business, not the caller's.
+            if (!announced) {
+              announced = true;
+              onPlaying?.();
+            }
+            feed.push(samples, sampleRate);
+          }
+        : undefined,
+    )
     .catch(err => {
       thrown = err instanceof Error ? err.message : String(err);
       console.warn('[voice] speech generation failed:', err);
       return null;
     });
   if (!out) {
+    feed?.abort('js-bridge');
+    activeFeed = null;
     // A throw is the bridge itself failing, so it never named a stage.
     logPerf('speech.reply', {
       stop: 'failed',
@@ -260,6 +294,11 @@ export const speakWithModel = async (
     rtf: rtf.toFixed(2),
     lang: language || 'template',
     voice: 'template',
+    // The two numbers streaming is judged on: what the engine took to make the
+    // first sample, and how many pieces it had to make it in.
+    stream: feed ? 'on' : 'off',
+    chunks: out.chunks,
+    firstAudioMs: out.firstAudioMs,
   });
   // The template decides its own defaults, so the only faithful record of the
   // language and voice a reply was spoken with is the prompt it rendered.
@@ -287,10 +326,12 @@ export const speakWithModel = async (
 
   const deadEnd = DEAD_ENDS.has(out.stopReason);
   const interrupted = out.stopReason === 'aborted';
+  // A streamed reply carries no buffer on the result — the samples went
+  // somewhere else — so the pieces it made are what say there was audio.
+  const hasAudio = feed ? out.chunks > 0 : out.pcm.length > 0;
   // Past the real-time factor the wait costs more than the voice is worth, so
   // the buffer is dropped and the TTS voice says this reply instead.
-  const keepModelVoice =
-    !deadEnd && rtf <= MAX_REALTIME_FACTOR && out.pcm.length > 0;
+  const keepModelVoice = !deadEnd && rtf <= MAX_REALTIME_FACTOR && hasAudio;
   const done = {
     stopReason: out.stopReason,
     stage: out.stage,
@@ -302,36 +343,51 @@ export const speakWithModel = async (
     rtf,
     language: language || 'template',
   };
+
+  let spoken = false;
+  let playError = '';
+  if (feed) {
+    // Every piece this reply made is already on its way to the ear; closing is
+    // the wait for the last one to play out, which is what the sink asks for.
+    const stats = await feed.close();
+    spoken = stats.played;
+    playError = stats.playError;
+    activeFeed = null;
+  }
   if (deadEnd || interrupted || !keepModelVoice) {
-    return report(done);
+    // A whole-clip reply stops here, before a sample is heard. A streamed one
+    // may already have been heard, and `spoken` says so: the fallback voice
+    // stays behind it rather than talking over it.
+    return report(spoken ? {...done, spoken} : done);
   }
 
-  onPlaying?.();
-  let playError = '';
-  const spoken = await neuralAudioPlayer
-    .play(
-      {
-        samples: out.pcm,
-        sampleRate: out.sampleRate,
-        channels: 1,
-        duration: out.seconds,
-      },
-      {ducking: true},
-    )
-    .then(() => true)
-    .catch(err => {
-      playError = err instanceof Error ? err.message : String(err);
-      console.warn('[voice] speech playback failed:', err);
-      return false;
+  if (!feed) {
+    onPlaying?.();
+    spoken = await neuralAudioPlayer
+      .play(
+        {
+          samples: out.pcm,
+          sampleRate: out.sampleRate,
+          channels: 1,
+          duration: out.seconds,
+        },
+        {ducking: true},
+      )
+      .then(() => true)
+      .catch(err => {
+        playError = err instanceof Error ? err.message : String(err);
+        console.warn('[voice] speech playback failed:', err);
+        return false;
+      });
+    logPerf('speech.playback', {
+      ok: spoken,
+      err: playError.slice(0, 200),
+      samples: out.pcm.length,
+      sampleRate: out.sampleRate,
+      channels: 1,
+      seconds: out.seconds.toFixed(2),
     });
-  logPerf('speech.playback', {
-    ok: spoken,
-    err: playError.slice(0, 200),
-    samples: out.pcm.length,
-    sampleRate: out.sampleRate,
-    channels: 1,
-    seconds: out.seconds.toFixed(2),
-  });
+  }
   // Audio the player refused is still the model's own voice working, so only
   // the stage moves: the next reply should keep asking the model.
   return report(
@@ -342,12 +398,15 @@ export const speakWithModel = async (
 };
 
 /**
- * Cut the utterance in flight short. Both halves are fire-and-forget: the
- * frame loop notices the flag between batches, and the player stops at once so
- * the microphone can open again.
+ * Cut the utterance in flight short. All three halves are fire-and-forget: the
+ * frame loop notices the flag between batches, the feed drops what it had not
+ * played yet, and the player stops at once so the microphone can open again.
  */
 export const stopModelSpeech = (): void => {
+  const feed = activeFeed;
+  activeFeed = null;
   modelStore.context?.stopSpeech();
+  feed?.abort('barge-in');
   neuralAudioPlayer.stop().catch(err => {
     console.warn('[voice] speech stop failed:', err);
   });

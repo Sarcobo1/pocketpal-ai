@@ -1,8 +1,10 @@
 diff --git a/node_modules/llama.rn/cpp/jsi/JSICompletion.h b/node_modules/llama.rn/cpp/jsi/JSICompletion.h
-index d6cf4b6..e0e4218 100644
+index d6cf4b6876639829e77a256d95542bce54c50437..e0e4218df8b329e77907df94b110035bb576e900 100644
 --- a/node_modules/llama.rn/cpp/jsi/JSICompletion.h
 +++ b/node_modules/llama.rn/cpp/jsi/JSICompletion.h
-@@ -161,7 +161,7 @@ namespace rnllama_jsi {
+--- a/node_modules/llama.rn/cpp/jsi/JSICompletion.h
++++ b/node_modules/llama.rn/cpp/jsi/JSICompletion.h
+@@ -161,7 +161,7 @@
          res["draft_tokens_accepted"] = c.num_draft_tokens_accepted;
          res["truncated"] = c.truncated;
          res["context_full"] = c.context_full;
@@ -12,7 +14,9 @@ index d6cf4b6..e0e4218 100644
          res["stopped_word"] = c.stopped_word;
          res["stopped_limit"] = c.stopped_limit;
 diff --git a/node_modules/llama.rn/cpp/jsi/JSIContext.h b/node_modules/llama.rn/cpp/jsi/JSIContext.h
-index a11a0d5..86e119c 100644
+index a11a0d54e1740f9383004444a026efd4df6042d6..86e119cf2eb81baf109b11c5cf0ad081169d8a97 100644
+--- a/node_modules/llama.rn/cpp/jsi/JSIContext.h
++++ b/node_modules/llama.rn/cpp/jsi/JSIContext.h
 --- a/node_modules/llama.rn/cpp/jsi/JSIContext.h
 +++ b/node_modules/llama.rn/cpp/jsi/JSIContext.h
 @@ -1,32 +1,42 @@
@@ -66,7 +70,7 @@ index a11a0d5..86e119c 100644
          }
  
          size_t size() {
-@@ -34,39 +44,19 @@ namespace rnllama_jsi {
+@@ -34,39 +44,19 @@
              return contextMap.size();
          }
  
@@ -114,7 +118,9 @@ index a11a0d5..86e119c 100644
      extern ContextManager<rnllama::llama_rn_context> g_llamaContexts;
  }
 diff --git a/node_modules/llama.rn/cpp/jsi/JSITaskManager.cpp b/node_modules/llama.rn/cpp/jsi/JSITaskManager.cpp
-index a35bbf0..df5bfb4 100644
+index a35bbf0715a6bdfdf144bb25312b477f4c016e43..df5bfb4fa34e97caa044e62696030a6913505893 100644
+--- a/node_modules/llama.rn/cpp/jsi/JSITaskManager.cpp
++++ b/node_modules/llama.rn/cpp/jsi/JSITaskManager.cpp
 --- a/node_modules/llama.rn/cpp/jsi/JSITaskManager.cpp
 +++ b/node_modules/llama.rn/cpp/jsi/JSITaskManager.cpp
 @@ -1,12 +1,7 @@
@@ -130,7 +136,7 @@ index a35bbf0..df5bfb4 100644
  TaskManager& TaskManager::getInstance() {
      static TaskManager instance;
      return instance;
-@@ -32,13 +27,10 @@ void TaskManager::finishTask(int contextId) {
+@@ -32,13 +27,10 @@
      if (totalTasks > 0) {
          totalTasks -= 1;
      }
@@ -144,7 +150,7 @@ index a35bbf0..df5bfb4 100644
  }
  
  void TaskManager::reset() {
-@@ -48,39 +40,12 @@ void TaskManager::reset() {
+@@ -48,39 +40,12 @@
          totalTasks = 0;
      }
      shuttingDown.store(false, std::memory_order_relaxed);
@@ -185,7 +191,9 @@ index a35bbf0..df5bfb4 100644
      : contextId(contextId), tracked(tracked) {}
  
 diff --git a/node_modules/llama.rn/cpp/jsi/JSITaskManager.h b/node_modules/llama.rn/cpp/jsi/JSITaskManager.h
-index 13ffe4b..57b06a4 100644
+index 13ffe4b799e975a1cbcb0b00f422cf1a9ffa6e9f..57b06a45347d3ef2324e491551b44cb343817c8b 100644
+--- a/node_modules/llama.rn/cpp/jsi/JSITaskManager.h
++++ b/node_modules/llama.rn/cpp/jsi/JSITaskManager.h
 --- a/node_modules/llama.rn/cpp/jsi/JSITaskManager.h
 +++ b/node_modules/llama.rn/cpp/jsi/JSITaskManager.h
 @@ -1,7 +1,6 @@
@@ -196,7 +204,7 @@ index 13ffe4b..57b06a4 100644
  #include <mutex>
  #include <unordered_map>
  
-@@ -17,17 +16,10 @@ namespace rnllama_jsi {
+@@ -17,17 +16,10 @@
          void reset();
          bool isShuttingDown() const;
  
@@ -215,10 +223,12 @@ index 13ffe4b..57b06a4 100644
          int totalTasks = 0;
          std::atomic<bool> shuttingDown{false};
 diff --git a/node_modules/llama.rn/cpp/jsi/JSIUtils.cpp b/node_modules/llama.rn/cpp/jsi/JSIUtils.cpp
-index a61f5e9..a0ef6b4 100644
+index a61f5e9c03781b0295a6b5120ae9a0afa6534fb8..a0ef6b4140e3c834d33dd4179b7285a0f0722bcd 100644
 --- a/node_modules/llama.rn/cpp/jsi/JSIUtils.cpp
 +++ b/node_modules/llama.rn/cpp/jsi/JSIUtils.cpp
-@@ -159,8 +159,7 @@ namespace rnllama_jsi {
+--- a/node_modules/llama.rn/cpp/jsi/JSIUtils.cpp
++++ b/node_modules/llama.rn/cpp/jsi/JSIUtils.cpp
+@@ -159,8 +159,7 @@
                              }
                          }
  
@@ -228,7 +238,7 @@ index a61f5e9..a0ef6b4 100644
                          if (!invokeScheduled && shouldTrack) {
                              TaskManager::getInstance().finishTask(contextId);
                          }
-@@ -188,7 +187,7 @@ namespace rnllama_jsi {
+@@ -188,7 +187,7 @@
                  callback(shouldProceed);
              });
          } catch (...) {
@@ -238,10 +248,12 @@ index a61f5e9..a0ef6b4 100644
                  TaskManager::getInstance().finishTask(contextId);
              }
 diff --git a/node_modules/llama.rn/cpp/jsi/JSIUtils.h b/node_modules/llama.rn/cpp/jsi/JSIUtils.h
-index eb52272..9ff97ad 100644
+index eb522720cc4bd1e12ac9f1e28781635ff0abad24..9ff97ada3962f583595167758a97c8ec8eb132ca 100644
 --- a/node_modules/llama.rn/cpp/jsi/JSIUtils.h
 +++ b/node_modules/llama.rn/cpp/jsi/JSIUtils.h
-@@ -33,7 +33,6 @@ namespace rnllama_jsi {
+--- a/node_modules/llama.rn/cpp/jsi/JSIUtils.h
++++ b/node_modules/llama.rn/cpp/jsi/JSIUtils.h
+@@ -33,7 +33,6 @@
      );
  
      // Schedule an async callback on the JS thread with TaskManager tracking.
@@ -250,7 +262,9 @@ index eb52272..9ff97ad 100644
      void invokeAsyncTracked(
          std::shared_ptr<react::CallInvoker> callInvoker,
 diff --git a/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.cpp b/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.cpp
-index ffd7942..e3c2e9f 100644
+index ffd7942d1e897e036f7952a223a809a351000e46..9a55222fc782fed1b02aeb1fffff24915cda6050 100644
+--- a/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.cpp
++++ b/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.cpp
 --- a/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.cpp
 +++ b/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.cpp
 @@ -13,11 +13,13 @@
@@ -666,7 +680,7 @@ index ffd7942..e3c2e9f 100644
                          return [audio_data](jsi::Runtime& rt) {
                              return makeFloat32Array(rt, audio_data);
                          };
-@@ -2331,6 +2355,59 @@
+@@ -2331,6 +2355,61 @@
          );
          runtime.global().setProperty(runtime, "llamaClearCache", clearCache);
  
@@ -701,6 +715,8 @@ index ffd7942..e3c2e9f 100644
 +                        out.setProperty(rt, "genMs", (double) res.gen_us / 1000.0);
 +                        out.setProperty(rt, "aborted", res.aborted);
 +                        out.setProperty(rt, "stopReason", jsi::String::createFromUtf8(rt, res.stop_reason));
++                        out.setProperty(rt, "stage", jsi::String::createFromUtf8(rt, res.stage));
++                        out.setProperty(rt, "error", jsi::String::createFromUtf8(rt, res.error));
 +                        out.setProperty(rt, "prompt", jsi::String::createFromUtf8(rt, res.prompt));
 +                        return out;
 +                    };
@@ -726,7 +742,7 @@ index ffd7942..e3c2e9f 100644
          auto releaseVocoder = jsi::Function::createFromHostFunction(runtime,
              jsi::PropNameID::forAscii(runtime, "llamaReleaseVocoder"),
              1,
-@@ -2358,19 +2435,9 @@
+@@ -2358,19 +2437,9 @@
          llama_log_set(llama_log_callback_default, nullptr);
  
          RequestManager::getInstance().clearAll();
@@ -749,7 +765,7 @@ index ffd7942..e3c2e9f 100644
          }
  
          if (contexts.empty()) {
-@@ -2379,12 +2446,9 @@
+@@ -2379,12 +2448,9 @@
          }
          ThreadPool::getInstance().shutdown();
  
@@ -766,10 +782,12 @@ index ffd7942..e3c2e9f 100644
      }
  }
 diff --git a/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.h b/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.h
-index 7a065cb..5012051 100644
+index 7a065cb45c4019983c1c5a9239773ec9b2406f0d..5012051a2721bc48b689954e50f66dc94fe487b5 100644
 --- a/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.h
 +++ b/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.h
-@@ -9,8 +9,6 @@ using namespace facebook;
+--- a/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.h
++++ b/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.h
+@@ -9,8 +9,6 @@
  
  namespace rnllama_jsi {
      // Context management functions
@@ -779,10 +797,12 @@ index 7a065cb..5012051 100644
  #if defined(__ANDROID__)
      void setAndroidLoadedLibrary(const std::string& name);
 diff --git a/node_modules/llama.rn/cpp/rn-completion.cpp b/node_modules/llama.rn/cpp/rn-completion.cpp
-index 11141fd..b362862 100644
+index 11141fd2ce1a0b68ec496541db652054d08335b4..b362862e5fd68405b499aa922c43b1ecccd0492d 100644
 --- a/node_modules/llama.rn/cpp/rn-completion.cpp
 +++ b/node_modules/llama.rn/cpp/rn-completion.cpp
-@@ -610,7 +610,17 @@ void llama_rn_context_completion::loadPrompt(const std::vector<std::string> &med
+--- a/node_modules/llama.rn/cpp/rn-completion.cpp
++++ b/node_modules/llama.rn/cpp/rn-completion.cpp
+@@ -610,7 +610,17 @@
          );
      } else {
          // Multimodal path - process all media paths
@@ -801,7 +821,7 @@ index 11141fd..b362862 100644
          num_prompt_tokens = embd.size();
          // Placeholder tokens are not vocab ids; no delimiter scan on media prompts.
          boundary_ckpts.clear();
-@@ -677,6 +687,8 @@ void llama_rn_context_completion::beginCompletion(int chat_format, common_reason
+@@ -677,6 +687,8 @@
      llama_perf_context_reset(parent_ctx->ctx);
      resetGenerationTimings();
      is_predicting = true;
@@ -810,7 +830,7 @@ index 11141fd..b362862 100644
  
      current_chat_format = chat_format;
      current_reasoning_format = reasoning_format;
-@@ -687,12 +699,62 @@ void llama_rn_context_completion::beginCompletion(int chat_format, common_reason
+@@ -687,12 +699,62 @@
  void llama_rn_context_completion::endCompletion() {
      generated_text += utf8_gate.finish();
      incomplete = false;
@@ -876,7 +896,7 @@ index 11141fd..b362862 100644
  }
  
  void llama_rn_context_completion::resetGenerationTimings() {
-@@ -1516,12 +1578,14 @@ completion_token_output llama_rn_context_completion::nextToken()
+@@ -1516,12 +1578,14 @@
          } else {
              if (llama_decode(parent_ctx->ctx, llama_batch_get_one(&embd[n_past], n_eval)))
              {
@@ -897,7 +917,7 @@ index 11141fd..b362862 100644
                  // Trim embd to what the memory actually contains so a later prefix
                  // match can't claim never-written cells.
                  embd.resize(n_past);
-@@ -1790,7 +1854,18 @@ size_t llama_rn_context_completion::findStoppingStrings(const std::string &text,
+@@ -1790,7 +1854,18 @@
  
  completion_token_output llama_rn_context_completion::doCompletion()
  {
@@ -918,10 +938,12 @@ index 11141fd..b362862 100644
      const std::string token_text = token_with_probs.tok == -1 ? "" : common_token_to_piece(parent_ctx->ctx, token_with_probs.tok);
      generated_text += utf8_gate.feed(token_text);
 diff --git a/node_modules/llama.rn/cpp/rn-completion.h b/node_modules/llama.rn/cpp/rn-completion.h
-index d152478..13c490f 100644
+index d1524784deeaab297c5769cce75e0af9bf5d3552..13c490faf3d11412331c15edc85acb24fc386382 100644
 --- a/node_modules/llama.rn/cpp/rn-completion.h
 +++ b/node_modules/llama.rn/cpp/rn-completion.h
-@@ -79,7 +79,7 @@ struct llama_rn_context_completion {
+--- a/node_modules/llama.rn/cpp/rn-completion.h
++++ b/node_modules/llama.rn/cpp/rn-completion.h
+@@ -79,7 +79,7 @@
  
      // Completion state fields
      bool is_predicting = false;
@@ -930,7 +952,7 @@ index d152478..13c490f 100644
      bool has_next_token = false;
      std::string prefill_text;
      std::string generated_text;
-@@ -193,6 +193,7 @@ struct llama_rn_context_completion {
+@@ -193,6 +193,7 @@
      void beginCompletion();
      void beginCompletion(int chat_format, common_reasoning_format reasoning_format, const std::string &generation_prompt = "", const std::string &chat_parser = "");
      void endCompletion();
@@ -939,7 +961,9 @@ index d152478..13c490f 100644
      void startGenerationTiming();
      void updateGenerationTiming();
 diff --git a/node_modules/llama.rn/cpp/rn-llama.cpp b/node_modules/llama.rn/cpp/rn-llama.cpp
-index 87e7ec8..8a32d57 100644
+index 87e7ec86f981c08a0f9853b974cb075b2facab8e..00d7cf1a965c6dbc1e0ec92d117cdc53dd0a4dd5 100644
+--- a/node_modules/llama.rn/cpp/rn-llama.cpp
++++ b/node_modules/llama.rn/cpp/rn-llama.cpp
 --- a/node_modules/llama.rn/cpp/rn-llama.cpp
 +++ b/node_modules/llama.rn/cpp/rn-llama.cpp
 @@ -12,6 +12,7 @@
@@ -1035,7 +1059,7 @@ index 87e7ec8..8a32d57 100644
  void llama_rn_context::releaseMultimodal() {
      if (mtmd_wrapper != nullptr) {
          delete mtmd_wrapper;
-@@ -1044,4 +1093,161 @@
+@@ -1044,4 +1093,250 @@
      }
  }
  
@@ -1068,18 +1092,79 @@ index 87e7ec8..8a32d57 100644
 +        std::chrono::steady_clock::now().time_since_epoch()).count();
 +}
 +
++// One speech call at a time holds the log sink (a ContextClaim serializes them),
++// so a bare global is enough to route the engine's words into its result.
++std::string * g_speech_log = nullptr;
++
++void speech_log_capture(enum ggml_log_level level, const char * text, void * /*user_data*/) {
++    if (g_speech_log == nullptr || text == nullptr) {
++        return;
++    }
++    // The engine is chatty at info; only what it blames the failure on is kept.
++    if (level != GGML_LOG_LEVEL_WARN && level != GGML_LOG_LEVEL_ERROR) {
++        return;
++    }
++    // One line: the caller prints this inside a key=value log line.
++    for (const char * p = text; *p != '\0' && g_speech_log->size() < 600; p++) {
++        if (*p == '\n' || *p == '\r') {
++            if (!g_speech_log->empty() && g_speech_log->back() != ' ') {
++                g_speech_log->push_back(' ');
++            }
++            continue;
++        }
++        g_speech_log->push_back(*p);
++    }
++}
++
++// The loggers are global. llama has a getter, so it is saved and put back
++// exactly; the mtmd helper does not, and llama.rn never sets it, so restoring
++// the library's own default returns it to where it started. The helper's own
++// LOG_ERR ("prompt decode failed") goes through mtmd_helper_log_set, not
++// mtmd_log_set, so that is the one to attach.
++struct scoped_speech_log {
++    ggml_log_callback prev_llama = nullptr;
++    void * prev_llama_ud = nullptr;
++    bool attached = false;
++
++    explicit scoped_speech_log(std::string * sink) {
++        if (sink == nullptr || g_speech_log != nullptr) {
++            return;
++        }
++        llama_log_get(&prev_llama, &prev_llama_ud);
++        g_speech_log = sink;
++        llama_log_set(speech_log_capture, nullptr);
++        mtmd_helper_log_set(speech_log_capture, nullptr);
++        attached = true;
++    }
++
++    ~scoped_speech_log() {
++        if (!attached) {
++            return;
++        }
++        llama_log_set(prev_llama, prev_llama_ud);
++        mtmd_helper_log_set(nullptr, nullptr);
++        g_speech_log = nullptr;
++    }
++
++    scoped_speech_log(const scoped_speech_log &) = delete;
++    scoped_speech_log & operator=(const scoped_speech_log &) = delete;
++};
++
 +} // namespace
 +
 +llama_rn_speech_result llama_rn_context::generate_speech(const llama_rn_speech_options & opts) {
 +    llama_rn_speech_result res;
++    scoped_speech_log slog(&res.error);
 +    // mtmd answers whether this projector can speak; isMultimodalEnabled() is
 +    // what guarantees the mtmd_context the calls below dereference.
 +    if (!isMultimodalEnabled() || ctx == nullptr || !isMultimodalSupportAudioGen()) {
 +        res.stop_reason = "unsupported";
++        res.stage = "no-audio-gen";
 +        return res;
 +    }
 +    if (opts.text.empty()) {
 +        res.stop_reason = "failed";
++        res.stage = "empty-text";
 +        return res;
 +    }
 +    // Only the model's own "tts" template ends the prompt with the speech-start
@@ -1087,8 +1172,10 @@ index 87e7ec8..8a32d57 100644
 +    res.prompt = common_chat_get_tts_prompt(templates.get(), opts.text, opts.language, opts.voice);
 +    if (res.prompt.empty()) {
 +        res.stop_reason = "no-tts-template";
++        res.stage = "tts-prompt";
 +        return res;
 +    }
++    res.stage = "pipeline-init";
 +
 +    mtmd_helper_gen_audio * gen = mtmd_helper_gen_audio_init(ctx, mtmd_wrapper->mtmd_ctx);
 +    mtmd_helper_gen_audio_inp inp = mtmd_helper_gen_audio_inp_default();
@@ -1108,6 +1195,7 @@ index 87e7ec8..8a32d57 100644
 +    if (mtmd_helper_gen_audio_set_input(gen, &inp) != 0) {
 +        mtmd_helper_gen_audio_free(gen);
 +        res.stop_reason = "unsupported";
++        res.stage = "set-input";
 +        return res;
 +    }
 +    scoped_speech_session session{this, gen};
@@ -1117,26 +1205,46 @@ index 87e7ec8..8a32d57 100644
 +    // the caller clears the cache once this returns.
 +    scoped_speech_embeddings embeddings(ctx);
 +
-+    const int64_t prompt_start = speech_now_us();
-+    for (;;) {
-+        const int32_t left = mtmd_helper_gen_audio_step_prompt(gen, std::max(1, params.n_batch));
-+        if (left == 0) {
-+            break;
++    auto prefill = [&]() {
++        for (;;) {
++            const int32_t left = mtmd_helper_gen_audio_step_prompt(gen, std::max(1, params.n_batch));
++            if (left == 0) {
++                return true;
++            }
++            if (left < 0 || speech_interrupted.load()) {
++                res.aborted = speech_interrupted.load();
++                res.stop_reason = res.aborted ? "aborted" : "failed";
++                res.stage = res.aborted ? "interrupted" : "prompt-decode";
++                return false;
++            }
 +        }
-+        if (left < 0 || speech_interrupted.load()) {
-+            res.aborted = speech_interrupted.load();
-+            res.stop_reason = res.aborted ? "aborted" : "failed";
++    };
++
++    const int64_t prompt_start = speech_now_us();
++    if (!prefill() && !res.aborted) {
++        // The utterance is a stand-alone sequence, but it decodes over the
++        // positions the chat's own prefix holds: a cache busy with the
++        // conversation can refuse that. Retry once over an empty cache — the
++        // caller clears it after this returns either way.
++        std::string first = res.error.substr(0, 240);
++        res.error.clear();
++        llama_memory_clear(llama_get_memory(ctx), false);
++        if (!(mtmd_helper_gen_audio_set_input(gen, &inp) == 0 && prefill())) {
++            res.error = "prefill: " + first + " | after clear: " + res.error.substr(0, 240);
 +            return res;
 +        }
++        res.error = "prefill retried on a cleared cache: " + first;
 +    }
 +    res.prompt_us = speech_now_us() - prompt_start;
 +
 +    const float * h_state = llama_get_embeddings_ith(ctx, -1);
 +    if (h_state == nullptr) {
 +        res.stop_reason = "failed";
++        res.stage = "embeddings";
 +        return res;
 +    }
 +    res.stop_reason = "eos";
++    res.stage = "eos";
 +    bool stop = false;
 +    while (!stop) {
 +        const int64_t frame_start = speech_now_us();
@@ -1144,6 +1252,7 @@ index 87e7ec8..8a32d57 100644
 +        if (mtmd_helper_gen_audio_step_gen(gen, LLAMA_TOKEN_NULL, h_state, &next_state, &stop) != 0) {
 +            res.aborted = speech_interrupted.load();
 +            res.stop_reason = res.aborted ? "aborted" : "failed";
++            res.stage = "gen-frame";
 +            break;
 +        }
 +        if (next_state != nullptr) {
@@ -1156,6 +1265,7 @@ index 87e7ec8..8a32d57 100644
 +        int64_t n_samples = 0;
 +        if (mtmd_helper_gen_audio_get_output(gen, &sample_rate, &data, &data_len, &n_samples) != 0) {
 +            res.stop_reason = "failed";
++            res.stage = "gen-output";
 +            break;
 +        }
 +        res.sample_rate = sample_rate;
@@ -1168,16 +1278,19 @@ index 87e7ec8..8a32d57 100644
 +        if (speech_interrupted.load()) {
 +            res.aborted = true;
 +            res.stop_reason = "aborted";
++            res.stage = "interrupted";
 +            break;
 +        }
 +        // A model that switches to text is the interleaved path, not this one.
 +        if (mtmd_helper_gen_audio_next_is_text(gen)) {
 +            res.stop_reason = "failed";
++            res.stage = "next-is-text";
 +            break;
 +        }
 +        const int64_t cap = (int64_t) ((double) opts.max_seconds * (double) sample_rate);
 +        if (cap > 0 && (int64_t) res.pcm.size() >= cap) {
 +            res.stop_reason = "max";
++            res.stage = "max-seconds";
 +            break;
 +        }
 +    }
@@ -1198,10 +1311,12 @@ index 87e7ec8..8a32d57 100644
 +
  }
 diff --git a/node_modules/llama.rn/cpp/rn-llama.h b/node_modules/llama.rn/cpp/rn-llama.h
-index 8236f13..6b6bf6b 100644
+index 8236f1319fcf30beea88e1c2f6ac7a50d3845706..33348f7f9a5edf8cc7f40f0e676c0b33d7c5268d 100644
 --- a/node_modules/llama.rn/cpp/rn-llama.h
 +++ b/node_modules/llama.rn/cpp/rn-llama.h
-@@ -101,6 +101,27 @@
+--- a/node_modules/llama.rn/cpp/rn-llama.h
++++ b/node_modules/llama.rn/cpp/rn-llama.h
+@@ -101,6 +101,33 @@
  
  struct llama_rn_slot_manager;
  
@@ -1223,13 +1338,19 @@ index 8236f13..6b6bf6b 100644
 +    bool aborted = false;
 +    // eos | max | aborted | no-tts-template | unsupported | failed
 +    std::string stop_reason = "failed";
++    // Which call inside the pipeline refused: empty-text | tts-prompt |
++    // pipeline-init | prompt-decode | embeddings | gen-frame | gen-output |
++    // next-is-text | eos. stop_reason alone cannot tell a refused prompt
++    // apart from a decode that died halfway.
++    std::string stage = "pipeline-init";
++    std::string error;                 // the engine's own words, if any
 +    std::string prompt;                // what the "tts" template rendered
 +};
 +
  struct llama_rn_tokenize_result {
    std::vector<llama_token> tokens;
    bool has_media = false;
-@@ -196,6 +217,9 @@
+@@ -196,6 +223,9 @@
      bool isMultimodalEnabled() const;
      bool isMultimodalSupportVision() const;
      bool isMultimodalSupportAudio() const;
@@ -1239,7 +1360,7 @@ index 8236f13..6b6bf6b 100644
      void releaseMultimodal();
      // Media identity hashes tracked by the multimodal wrapper (empty when
      // multimodal is disabled); persisted alongside session/state files
-@@ -222,6 +246,20 @@
+@@ -222,6 +252,20 @@
  
      // Cache management
      void clearCache(bool clear_data = false);
@@ -1261,10 +1382,12 @@ index 8236f13..6b6bf6b 100644
  
  // Utility functions
 diff --git a/node_modules/llama.rn/cpp/rn-mtmd.hpp b/node_modules/llama.rn/cpp/rn-mtmd.hpp
-index 0065b43..122681f 100644
+index 0065b433c568656b7e85aadea077cb4be62ebc35..122681fe220cd1346101af236834cf629c5f20f7 100644
 --- a/node_modules/llama.rn/cpp/rn-mtmd.hpp
 +++ b/node_modules/llama.rn/cpp/rn-mtmd.hpp
-@@ -658,6 +658,10 @@ inline void llama_rn_context_mtmd::processMedia(
+--- a/node_modules/llama.rn/cpp/rn-mtmd.hpp
++++ b/node_modules/llama.rn/cpp/rn-mtmd.hpp
+@@ -658,6 +658,10 @@
              );
              if (res != 0) {
                  mtmd_input_chunks_free(chunks);
@@ -1276,10 +1399,12 @@ index 0065b43..122681f 100644
              }
              n_past = new_n_past;
 diff --git a/node_modules/llama.rn/llama-rn.podspec b/node_modules/llama.rn/llama-rn.podspec
-index 1362325..1542d02 100644
+index 136232525cf9a0773c70b4235871a6711a043c81..1542d02ccb9b7bc08c0ac4ae2b18b496e8e70d23 100644
 --- a/node_modules/llama.rn/llama-rn.podspec
 +++ b/node_modules/llama.rn/llama-rn.podspec
-@@ -7,12 +7,12 @@ base_compiler_flags = "-fno-objc-arc -fvisibility-inlines-hidden -DGGML_USE_CPU
+--- a/node_modules/llama.rn/llama-rn.podspec
++++ b/node_modules/llama.rn/llama-rn.podspec
+@@ -7,12 +7,12 @@
  if ENV["RNLLAMA_DISABLE_METAL"] != "1" then
    # GGMLMetalClass only exists when GGML_METAL_EMBED_LIBRARY is off; keep the
    # (process-global) Objective-C class name unique per library regardless.
@@ -1294,7 +1419,7 @@ index 1362325..1542d02 100644
  
  if ENV["RNLLAMA_NATIVE_CPU"] == "1" then
    apple_cpu_flags = ENV["RNLLAMA_NATIVE_CPU_FLAGS"] || "-Xarch_arm64 -mcpu=apple-m2"
-@@ -44,7 +44,7 @@ Pod::Spec.new do |s|
+@@ -44,7 +44,7 @@
        "#{llama_cpp}/ggml/include/*.h",
        "#{llama_cpp}/ggml/src/*.{h,c,cpp}",
        "#{llama_cpp}/ggml/src/ggml-cpu/**/*.{h,c,cpp}",
@@ -1304,7 +1429,9 @@ index 1362325..1542d02 100644
        "#{llama_cpp}/common/**/*.{h,cpp}",
        "#{llama_cpp}/tools/mtmd/**/*.{h,cpp}",
 diff --git a/node_modules/llama.rn/src/index.ts b/node_modules/llama.rn/src/index.ts
-index 039933f..3c2afa8 100644
+index 039933f442016a0c5d549c9fa1203266b2801313..53a51c38907ec4a2dd790d1db541744af3f94bbc 100644
+--- a/node_modules/llama.rn/src/index.ts
++++ b/node_modules/llama.rn/src/index.ts
 --- a/node_modules/llama.rn/src/index.ts
 +++ b/node_modules/llama.rn/src/index.ts
 @@ -161,6 +161,8 @@
@@ -1362,7 +1489,7 @@ index 039933f..3c2afa8 100644
    }> {
      const { llamaGetMultimodalSupport } = getJsi()
      return await llamaGetMultimodalSupport(this.id)
-@@ -1407,6 +1420,45 @@
+@@ -1407,6 +1420,47 @@
    }
  
    /**
@@ -1392,6 +1519,8 @@ index 039933f..3c2afa8 100644
 +    genMs: number
 +    aborted: boolean
 +    stopReason: 'eos' | 'max' | 'aborted' | 'no-tts-template' | 'unsupported' | 'failed'
++    stage: string
++    error: string
 +    prompt: string
 +  }> {
 +    const { llamaGenerateSpeech } = getJsi()
@@ -1409,10 +1538,12 @@ index 039933f..3c2afa8 100644
     * @param clearData If true, clears both metadata and tensor data buffers (slower). If false, only clears metadata (faster).
     * @returns Promise that resolves when cache is cleared
 diff --git a/node_modules/llama.rn/vendor/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.m b/node_modules/llama.rn/vendor/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.m
-index 451f652..54fb9ff 100644
+index 451f6529919ef611472f3a2abd85beea4686f011..54fb9ffb30ba9f3349a94de7c962e119d4d55fec 100644
 --- a/node_modules/llama.rn/vendor/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.m
 +++ b/node_modules/llama.rn/vendor/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.m
-@@ -508,10 +508,10 @@ ggml_metal_library_t ggml_metal_library_init(ggml_metal_device_t dev) {
+--- a/node_modules/llama.rn/vendor/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.m
++++ b/node_modules/llama.rn/vendor/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.m
+@@ -508,10 +508,10 @@
      const int64_t t_start = ggml_time_us();
  
      NSError * error = nil;
@@ -1425,7 +1556,7 @@ index 451f652..54fb9ff 100644
          NSURL * libURL = [NSURL fileURLWithPath:path_lib];
          GGML_LOG_INFO("%s: loading '%s'\n", __func__, [path_lib UTF8String]);
  
-@@ -552,7 +552,7 @@ ggml_metal_library_t ggml_metal_library_init(ggml_metal_device_t dev) {
+@@ -552,7 +552,7 @@
      }
  
      // no pre-compiled metallib: fall back to compiling each kernel source separately
@@ -1435,7 +1566,9 @@ index 451f652..54fb9ff 100644
      NSString * path_resource = [[NSProcessInfo processInfo].environment objectForKey:@"GGML_METAL_PATH_RESOURCES"];
      if (path_resource) {
 diff --git a/node_modules/llama.rn/src/jsi.ts b/node_modules/llama.rn/src/jsi.ts
-index 5a83ed7..d7fb73d 100644
+index 5a83ed78dd2fabc97468c853f89fea9313b0358b..13c40f0f0642bdd41cfe6cf76bbe54659a9c1c07 100644
+--- a/node_modules/llama.rn/src/jsi.ts
++++ b/node_modules/llama.rn/src/jsi.ts
 --- a/node_modules/llama.rn/src/jsi.ts
 +++ b/node_modules/llama.rn/src/jsi.ts
 @@ -114,7 +114,7 @@
@@ -1447,7 +1580,7 @@ index 5a83ed7..d7fb73d 100644
    var llamaReleaseMultimodal: (contextId: number) => Promise<void>
    var llamaInitVocoder: (
      contextId: number,
-@@ -218,6 +218,33 @@
+@@ -218,6 +218,35 @@
    var llamaGetAudioSampleRate: (contextId: number) => Promise<number>
    var llamaReleaseVocoder: (contextId: number) => Promise<void>
    var llamaClearCache: (contextId: number, clearData: boolean) => Promise<void>
@@ -1475,6 +1608,8 @@ index 5a83ed7..d7fb73d 100644
 +      | 'no-tts-template'
 +      | 'unsupported'
 +      | 'failed'
++    stage: string
++    error: string
 +    prompt: string
 +  }>
 +  var llamaStopSpeech: (contextId: number) => void
@@ -1482,7 +1617,9 @@ index 5a83ed7..d7fb73d 100644
    // Parallel decoding
    var llamaEnableParallelMode: (
 diff --git a/node_modules/llama.rn/lib/typescript/index.d.ts b/node_modules/llama.rn/lib/typescript/index.d.ts
-index aa0e7c3..8e72546 100644
+index aa0e7c336853a4c8c5a5c4c2ad7dc37c13a59482..1d95e23030a30af3381c431dfbe590f8b04d3af2 100644
+--- a/node_modules/llama.rn/lib/typescript/index.d.ts
++++ b/node_modules/llama.rn/lib/typescript/index.d.ts
 --- a/node_modules/llama.rn/lib/typescript/index.d.ts
 +++ b/node_modules/llama.rn/lib/typescript/index.d.ts
 @@ -280,6 +280,7 @@
@@ -1493,7 +1630,7 @@ index aa0e7c3..8e72546 100644
      }>;
      releaseMultimodal(): Promise<void>;
      /**
-@@ -370,6 +371,37 @@
+@@ -370,6 +371,39 @@
      getAudioSampleRate(): Promise<number>;
      releaseVocoder(): Promise<void>;
      /**
@@ -1523,6 +1660,8 @@ index aa0e7c3..8e72546 100644
 +        genMs: number;
 +        aborted: boolean;
 +        stopReason: 'eos' | 'max' | 'aborted' | 'no-tts-template' | 'unsupported' | 'failed';
++        stage: string;
++        error: string;
 +        prompt: string;
 +    }>;
 +    /** Stop a running `generateSpeech()`; keeps the audio said so far. */
@@ -1532,7 +1671,9 @@ index aa0e7c3..8e72546 100644
       * @param clearData If true, clears both metadata and tensor data buffers (slower). If false, only clears metadata (faster).
       * @returns Promise that resolves when cache is cleared
 diff --git a/node_modules/llama.rn/lib/typescript/jsi.d.ts b/node_modules/llama.rn/lib/typescript/jsi.d.ts
-index 1173e79..2105ca7 100644
+index 1173e7998ddf63c15b54adfa23c320e747d7a90b..ce1c5703cfef12ad87531c2ec45d61a7ce9ac6f5 100644
+--- a/node_modules/llama.rn/lib/typescript/jsi.d.ts
++++ b/node_modules/llama.rn/lib/typescript/jsi.d.ts
 --- a/node_modules/llama.rn/lib/typescript/jsi.d.ts
 +++ b/node_modules/llama.rn/lib/typescript/jsi.d.ts
 @@ -51,6 +51,7 @@
@@ -1543,7 +1684,7 @@ index 1173e79..2105ca7 100644
      }>;
      var llamaReleaseMultimodal: (contextId: number) => Promise<void>;
      var llamaInitVocoder: (contextId: number, params: {
-@@ -107,6 +108,24 @@
+@@ -107,6 +108,26 @@
      var llamaGetAudioSampleRate: (contextId: number) => Promise<number>;
      var llamaReleaseVocoder: (contextId: number) => Promise<void>;
      var llamaClearCache: (contextId: number, clearData: boolean) => Promise<void>;
@@ -1562,6 +1703,8 @@ index 1173e79..2105ca7 100644
 +        genMs: number;
 +        aborted: boolean;
 +        stopReason: 'eos' | 'max' | 'aborted' | 'no-tts-template' | 'unsupported' | 'failed';
++        stage: string;
++        error: string;
 +        prompt: string;
 +    }>;
 +    var llamaStopSpeech: (contextId: number) => void;
@@ -1569,7 +1712,9 @@ index 1173e79..2105ca7 100644
          enabled: boolean;
          n_parallel?: number;
 diff --git a/node_modules/llama.rn/cpp/jsi/JSIParams.h b/node_modules/llama.rn/cpp/jsi/JSIParams.h
-index 35a9399..6f9f2ba 100644
+index 35a9399668eb69031115a97fa4ff3430b9a26000..6f9f2bab208437d962f7e5488f21b02bca4d6a7c 100644
+--- a/node_modules/llama.rn/cpp/jsi/JSIParams.h
++++ b/node_modules/llama.rn/cpp/jsi/JSIParams.h
 --- a/node_modules/llama.rn/cpp/jsi/JSIParams.h
 +++ b/node_modules/llama.rn/cpp/jsi/JSIParams.h
 @@ -102,4 +102,15 @@

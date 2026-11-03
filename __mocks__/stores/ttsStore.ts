@@ -46,6 +46,10 @@ class MockTTSStore {
   lastSpokenMessageId: string | null = null;
   forceTTSFallback = false;
   speechLanguage = '';
+  // Mirrors the real default, so a test that wants the old whole-buffer
+  // behavior has to say so instead of inheriting it by accident.
+  streamSpeech = true;
+  voiceShortAnswers = true;
 
   supertonicDownloadState: DownloadState = 'not_installed';
   supertonicDownloadProgress = 0;
@@ -168,6 +172,16 @@ class MockTTSStore {
     this.setSpeechLanguage = jest.fn((value: string) => {
       runInAction(() => {
         this.speechLanguage = value;
+      });
+    });
+    this.setStreamSpeech = jest.fn((on: boolean) => {
+      runInAction(() => {
+        this.streamSpeech = on;
+      });
+    });
+    this.setVoiceShortAnswers = jest.fn((on: boolean) => {
+      runInAction(() => {
+        this.voiceShortAnswers = on;
       });
     });
     this.openSetupSheet = jest.fn();

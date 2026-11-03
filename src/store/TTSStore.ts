@@ -186,6 +186,19 @@ export class TTSStore {
    * template use its own default, which is what a model is shipped to do.
    */
   speechLanguage: string = '';
+  /**
+   * Play a model-voice reply in pieces as it is synthesized, instead of
+   * waiting for the whole clip. Off is the old behavior, and the number the
+   * first-audio times are read against; a piece that cannot be cut at a pause
+   * is the cost of it.
+   */
+  streamSpeech: boolean = true;
+  /**
+   * Voice mode asks for a reply of one or two sentences, which is what keeps
+   * the first piece of audio short enough to hear quickly. Off leaves the
+   * prompt as the app wrote it.
+   */
+  voiceShortAnswers: boolean = true;
 
   // UI state
   isSetupSheetOpen: boolean = false;
@@ -261,6 +274,8 @@ export class TTSStore {
         'userTTSOverride',
         'forceTTSFallback',
         'speechLanguage',
+        'streamSpeech',
+        'voiceShortAnswers',
       ],
       storage: AsyncStorage,
     });
@@ -534,6 +549,19 @@ export class TTSStore {
   /** The `lang` for the model's own voice; empty leaves it to the template. */
   setSpeechLanguage(language: string) {
     this.speechLanguage = language;
+  }
+
+  /**
+   * Hear a model-voice reply as it is synthesized. Takes effect on the next
+   * reply: a piece already handed to the player plays out either way.
+   */
+  setStreamSpeech(on: boolean) {
+    this.streamSpeech = on;
+  }
+
+  /** Ask voice mode for a reply of one or two sentences. */
+  setVoiceShortAnswers(on: boolean) {
+    this.voiceShortAnswers = on;
   }
 
   openSetupSheet() {

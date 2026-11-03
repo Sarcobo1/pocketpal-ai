@@ -85,6 +85,8 @@ class MockTTSStore {
   setSupertonicLanguage: jest.Mock;
   setForceTTSFallback: jest.Mock;
   setSpeechLanguage: jest.Mock;
+  setStreamSpeech: jest.Mock;
+  setVoiceShortAnswers: jest.Mock;
   openSetupSheet: jest.Mock;
   closeSetupSheet: jest.Mock;
   onAssistantMessageStart: jest.Mock;
@@ -125,6 +127,8 @@ class MockTTSStore {
       setSupertonicLanguage: false,
       setForceTTSFallback: false,
       setSpeechLanguage: false,
+      setStreamSpeech: false,
+      setVoiceShortAnswers: false,
       openSetupSheet: false,
       closeSetupSheet: false,
       onAssistantMessageStart: false,

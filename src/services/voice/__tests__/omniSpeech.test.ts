@@ -590,7 +590,7 @@ describe('speakWithModel, piece by piece', () => {
       onChunk(talk(900), RATE);
       onChunk(gap(120), RATE);
       await new Promise(resolve => {
-        release = resolve;
+        release = () => resolve(undefined);
       });
       // The engine notices the interrupt between batches and says so here.
       onChunk(talk(900), RATE);

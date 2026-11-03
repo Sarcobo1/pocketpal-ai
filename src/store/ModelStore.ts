@@ -68,6 +68,7 @@ import {isDraftOnlyFilename, isDraftOnlyModel} from '../utils/mtp';
 import {getOriginalModelName} from '../utils/formatters';
 import {stopQuietly} from '../utils/stopQuietly';
 import {logPerf} from '../utils/mediaPerf';
+import {omniModeGuardFor, TEXT_MODE_INSTRUCTION} from '../utils/omniMode';
 import type {OnboardingPalModelEntry} from './onboarding/onboardingPals';
 
 import {downloadManager, DownloadCancelledError} from '../services/downloads';
@@ -5286,13 +5287,26 @@ class ModelStore {
           : path,
       );
 
+      // A camera frame is an input modality too, so an omni model answers one
+      // in a speech mode a plain text completion has no pipeline for. Same
+      // guard the chat turn applies, same reason; a text-only model resolves
+      // none of the tokens and keeps the parameters it always had.
+      const omniGuard = await omniModeGuardFor(context);
+
       // Create a system message if provided
-      const systemMessage = params.systemMessage?.trim()
-        ? {
-            role: 'system',
-            content: params.systemMessage,
-          }
-        : undefined;
+      const systemParts = params.systemMessage?.trim()
+        ? [params.systemMessage]
+        : [];
+      const systemMessage =
+        !!omniGuard || systemParts.length > 0
+          ? {
+              role: 'system',
+              content: [
+                ...systemParts,
+                ...(omniGuard ? [TEXT_MODE_INSTRUCTION] : []),
+              ].join('\n\n'),
+            }
+          : undefined;
 
       // Create a user message with text and all images
       const userMessage = {
@@ -5329,7 +5343,12 @@ class ModelStore {
       const completionParamsWithAppProps = {
         ...completionParams,
         messages: messages,
-        stop: stopWords,
+        // Stops as well as banned logits: a mode token that arrives from a stale
+        // cache ends the turn there instead of running it to the context limit.
+        stop: omniGuard
+          ? [...(stopWords ?? []), ...omniGuard.stopWords]
+          : stopWords,
+        ...(omniGuard ? {logit_bias: omniGuard.logitBias} : {}),
       } as CompletionParams;
 
       // Strip app-specific properties before passing to llama.rn

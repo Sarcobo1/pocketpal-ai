@@ -48,6 +48,12 @@ import {
 import {acquireKeepAwake} from '../utils/keepAwake';
 import {vtrace} from '../utils/voiceTrace';
 import {logPerf} from '../utils/mediaPerf';
+import {
+  controlTokenLoop,
+  omniModeGuardFor,
+  stripControlTokens,
+  TEXT_MODE_INSTRUCTION,
+} from '../utils/omniMode';
 import {toLocalMediaPath} from '../utils/multimodalPatterns';
 import {LLAMARN_ERROR_PATTERNS} from '../utils/llamaRnErrors';
 import {projectionGapCopy} from '../utils/multimodalHelpers';
@@ -104,6 +110,16 @@ const prepareCompletion = async ({
   const sessionCompletionSettings =
     await chatSessionStore.getCurrentCompletionSettings();
   const stopWords = toJS(modelStore.activeModel?.stopWords);
+
+  // A model that carries a speech decoder answers an audio turn *in speech*
+  // unless something says otherwise: LFM3-Omni picks its output modality to
+  // match its input, and inside a plain text completion there is no audio
+  // pipeline to feed the mode it chose, so the turn leaks its mode tokens and
+  // then repeats the one that closes a text block. Banning the tokens this
+  // vocab actually has is the sampler-level half of the fix; `Respond with
+  // text.` is the prompt-level half. A text-only model resolves none of them,
+  // gets a null guard here, and keeps every parameter it always had.
+  const omniGuard = await omniModeGuardFor(modelStore.context);
 
   // Check if we have media and if multimodal is enabled
   const hasImages = imageUris && imageUris.length > 0;
@@ -261,10 +277,33 @@ const prepareCompletion = async ({
     maxToolTurns: DEFAULT_MAX_TURNS,
   });
 
-  const messages = assembleMessages(systemMessages, systemPromptFragments, [
-    ...chatMessages,
-    {role: 'user', content: userMessageContent},
-  ]);
+  const messages = assembleMessages(
+    systemMessages,
+    // The card appends the mode instruction to whatever system prompt already
+    // stands, so it joins the end of the same fragment list instead of
+    // replacing the Pal's or the template's text.
+    omniGuard
+      ? [...systemPromptFragments, TEXT_MODE_INSTRUCTION]
+      : systemPromptFragments,
+    [...chatMessages, {role: 'user', content: userMessageContent}],
+  );
+
+  // The two shapes that decide the mode: the tail of the system message, where
+  // the instruction lands, and the last turn. A voice turn and a typed turn
+  // differ exactly here, and the leak is only diagnosable against this — the
+  // message list on its own looks identical whether or not the guard fired.
+  const systemMessage = messages.find(msg => msg.role === 'system');
+  const lastTurn = messages[messages.length - 1];
+  logPerf('chat.prompt', {
+    spoken,
+    turns: messages.length,
+    mode: omniGuard ? 'text-guarded' : 'default',
+    systemTail: systemMessage
+      ? String(systemMessage.content).slice(-48).replace(/\n/g, '\\n')
+      : '-',
+    lastRole: lastTurn?.role,
+    lastMedia: Array.isArray(lastTurn?.content),
+  });
 
   // Reseed the read_url exfiltration allowlist for this run; the trust policy
   // (which sources count) lives in the talents module.
@@ -275,7 +314,13 @@ const prepareCompletion = async ({
     // A spoken reply must start talking at once, not after a reasoning pass.
     ...(spoken ? {enable_thinking: false, reasoning: {enabled: false}} : {}),
     messages,
-    stop: stopWords,
+    // The mode tokens stop the turn as well as being banned at sampling: a
+    // token that arrives anyway, from a cache an earlier turn left behind, ends
+    // the reply there instead of running to the context limit.
+    stop: omniGuard
+      ? [...(stopWords ?? []), ...omniGuard.stopWords]
+      : stopWords,
+    ...(omniGuard ? {logit_bias: omniGuard.logitBias} : {}),
   };
 
   const cleanCompletionParams = toApiCompletionParams(
@@ -565,9 +610,30 @@ async function applyEventToStore(
       });
       return;
     case 'token': {
-      const hasFirstTokenSignal = !!(
+      // A control token can still arrive — from a cache an earlier turn left,
+      // or from a model that answers around the bias. It is never part of an
+      // answer, so it comes out at the one place both the voice and the stored
+      // text are read: what the user sees, what a voice speaks and what the next
+      // prompt is built from all get the same string. `delta.content` is the
+      // step's snapshot rather than a diff, so this runs over the whole reply on
+      // every token and stays idempotent.
+      const delta: TokenDelta =
         event.delta.content || event.delta.reasoningContent
-      );
+          ? {
+              ...event.delta,
+              ...(event.delta.content
+                ? {content: stripControlTokens(event.delta.content)}
+                : {}),
+              ...(event.delta.reasoningContent
+                ? {
+                    reasoningContent: stripControlTokens(
+                      event.delta.reasoningContent,
+                    ),
+                  }
+                : {}),
+            }
+          : event.delta;
+      const hasFirstTokenSignal = !!(delta.content || delta.reasoningContent);
       if (ctx.timeToFirstTokenMs.value === null && hasFirstTokenSignal) {
         ctx.timeToFirstTokenMs.value = Date.now() - ctx.completionStartTime;
       }
@@ -578,10 +644,7 @@ async function applyEventToStore(
       // resolver does not already know it reasons, persist the learned flag so
       // the pill becomes reachable on the next render. The store writer is
       // idempotent and never downgrades a user/learned 'yes'.
-      if (
-        event.delta.reasoningContent &&
-        event.delta.reasoningContent.length > 0
-      ) {
+      if (delta.reasoningContent && delta.reasoningContent.length > 0) {
         const activeModel = modelStore.activeModel;
         if (
           activeModel &&
@@ -594,7 +657,7 @@ async function applyEventToStore(
       // Wrapped so a TTS failure cannot kill the completion stream.
       if (ctx.tts.enabled) {
         try {
-          forwardTokenToTts(ctx.messageId, event.delta, ctx.tts);
+          forwardTokenToTts(ctx.messageId, delta, ctx.tts);
         } catch (ttsErr) {
           console.warn('[useChatSession] TTS stream hook failed:', ttsErr);
         }
@@ -607,11 +670,11 @@ async function applyEventToStore(
       // canonical step.toolCalls write happens after step_finished via
       // appendToolCall so ids match outcomes by construction.
       const partial: Partial<MessageType.AssistantTurn['steps'][number]> = {};
-      if (event.delta.content) {
-        partial.content = event.delta.content.replace(/^\s+/, '');
+      if (delta.content) {
+        partial.content = delta.content.replace(/^\s+/, '');
       }
-      if (event.delta.reasoningContent) {
-        partial.reasoningContent = event.delta.reasoningContent;
+      if (delta.reasoningContent) {
+        partial.reasoningContent = delta.reasoningContent;
       }
       if (Object.keys(partial).length > 0) {
         chatSessionStore.updateActiveStepStreaming(
@@ -745,7 +808,11 @@ async function applyEventToStore(
       try {
         ttsStore.onAssistantMessageComplete(
           ctx.messageId,
-          finalResult.text ?? '',
+          // The engine's own final text, not the store's: an aborted or
+          // truncated turn can end on text the streaming path never wrote, and
+          // a voice reading it out loud is the one place a control token would
+          // be heard rather than seen.
+          stripControlTokens(finalResult.text ?? ''),
           {hadReasoning: !!finalResult.reasoning_content?.trim()},
         );
       } catch (ttsErr) {
@@ -1095,6 +1162,22 @@ export const useChatSession = (
             }
             break;
           case 'token':
+            // The bias is a probability, not a wall, and a reply can also run on
+            // without any token at all. Checked on the raw text, because the
+            // strip below is what hides the evidence: a third repeat of one
+            // control token is a model that has found an exit it cannot leave,
+            // so the turn ends rather than streaming to the context limit.
+            {
+              const leaked = controlTokenLoop(event.delta.content ?? '');
+              if (leaked && !lease.signal.aborted) {
+                logPerf('omni.loop', {
+                  stoppedOn: leaked,
+                  chars: event.delta.content?.length ?? 0,
+                });
+                vtrace('omni.loop', {token: leaked});
+                lease.abort();
+              }
+            }
             if (event.delta.toolCalls && event.delta.toolCalls.length > 0) {
               toolCallTokensRaw += 1;
               if (

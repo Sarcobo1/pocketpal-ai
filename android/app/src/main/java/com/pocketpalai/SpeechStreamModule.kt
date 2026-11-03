@@ -15,6 +15,8 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.module.annotations.ReactModule
 import com.pocketpal.specs.NativeSpeechStreamSpec
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
 
 /**
  * One uninterrupted output stream for one spoken reply.
@@ -124,7 +126,13 @@ class SpeechStreamModule(reactContext: ReactApplicationContext) :
     private val ducking: Boolean,
   ) {
     private val lock = Any()
-    private val queue = ArrayDeque<ByteArray>()
+
+    /**
+     * Chunks waiting for the writer. A blocking queue rather than a monitor of
+     * our own: Kotlin hides `wait`/`notify` behind `Any`, and a writer that
+     * simply times out its poll cannot miss a wake-up in the first place.
+     */
+    private val queue = LinkedBlockingQueue<ByteArray>()
 
     private var track: AudioTrack? = null
 
@@ -239,22 +247,17 @@ class SpeechStreamModule(reactContext: ReactApplicationContext) :
       return true
     }
 
-    fun enqueue(bytes: ByteArray): Boolean {
-      synchronized(lock) {
-        if (aborted || closing || settled) {
-          return false
+    fun enqueue(bytes: ByteArray): Boolean = synchronized(lock) {
+      when {
+        aborted || closing || settled -> false
+        bytes.isEmpty() -> true
+        // Half a frame would shift every sample that follows it and turn the
+        // rest of the reply into noise, so a torn chunk is dropped whole.
+        bytes.size % frameBytes != 0 -> false
+        else -> {
+          queue.add(bytes)
+          true
         }
-        if (bytes.isEmpty()) {
-          return true
-        }
-        if (bytes.size % frameBytes != 0) {
-          // Half a frame would shift every sample that follows it and turn the
-          // rest of the reply into noise, so a torn chunk is dropped whole.
-          return false
-        }
-        queue.addLast(bytes)
-        lock.notifyAll()
-        return true
       }
     }
 
@@ -266,7 +269,6 @@ class SpeechStreamModule(reactContext: ReactApplicationContext) :
         } else {
           endPromise = promise
           closing = true
-          lock.notifyAll()
         }
       }
       // Either the writer has gone or another caller is already owed the real
@@ -279,16 +281,12 @@ class SpeechStreamModule(reactContext: ReactApplicationContext) :
 
     /** @return true when a live stream was stopped, so silence is expected. */
     fun abort(): Boolean {
-      val current: AudioTrack?
-      val live: Boolean
-      synchronized(lock) {
-        live = !settled
+      val (live, current) = synchronized(lock) {
         aborted = true
         closing = true
-        queue.clear()
-        current = track
-        lock.notifyAll()
+        Pair(!settled, track)
       }
+      queue.clear()
       // Done from the interrupting thread so a barge-in is silent at once
       // instead of as soon as the writer finishes its slice. `stop` is what
       // frees a thread blocked inside `write`; `pause` alone would leave it
@@ -340,51 +338,63 @@ class SpeechStreamModule(reactContext: ReactApplicationContext) :
       var checkedAtMs = SystemClock.elapsedRealtime()
 
       while (true) {
-        val stopped: Boolean
-        val chunk: ByteArray?
-        synchronized(lock) {
-          while (queue.isEmpty() && !aborted && !closing) {
-            lock.wait(POLL_MS)
-            val now = SystemClock.elapsedRealtime()
-            if (playing && headFrames(track) >= framesWritten) {
-              dryMs += (now - checkedAtMs).toDouble()
-            }
-            checkedAtMs = now
-          }
-          stopped = aborted
-          chunk = if (aborted) null else queue.pollFirst()
+        val chunk: ByteArray? = try {
+          queue.poll(POLL_MS, TimeUnit.MILLISECONDS)
+        } catch (_: InterruptedException) {
+          null
         }
-        if (stopped) {
-          break
+        val now = SystemClock.elapsedRealtime()
+        // Wall time the device had already played everything it was handed is
+        // the hole a listener hears, and it is the one number here that cannot
+        // be blamed on the output path rebuilding itself.
+        if (playing && headFrames(track) >= framesWritten) {
+          dryMs += (now - checkedAtMs).toDouble()
         }
-        if (chunk != null) {
-          if (!playing) {
-            playing = true
-            playedAtMs = SystemClock.elapsedRealtime()
-            try {
-              track.play()
-            } catch (_: Exception) {
-              break
-            }
+        checkedAtMs = now
+
+        if (chunk == null) {
+          if (synchronized(lock) { aborted }) {
+            break
           }
-          if (!writeAll(track, chunk)) {
+          if (synchronized(lock) { closing } && queue.isEmpty()) {
+            drainTail(track)
             break
           }
           continue
         }
-        // Queue empty and the reply is over.
-        val remaining = framesWritten - headFrames(track)
-        if (remaining > 0) {
-          val deadline = SystemClock.elapsedRealtime() +
-            (remaining * 1000L) / sampleRate + TAIL_GRACE_MS
-          while (headFrames(track) < framesWritten &&
-            SystemClock.elapsedRealtime() < deadline &&
-            !synchronized(lock) { aborted }
-          ) {
-            Thread.sleep(POLL_MS)
+        if (synchronized(lock) { aborted || settled }) {
+          break
+        }
+        if (!playing) {
+          playing = true
+          playedAtMs = now
+          try {
+            track.play()
+          } catch (_: Exception) {
+            break
           }
         }
-        break
+        if (!writeAll(track, chunk)) {
+          break
+        }
+      }
+    }
+
+    /** The audio JS had already handed over when the reply ended: play it out, but not forever. */
+    private fun drainTail(track: AudioTrack) {
+      val remaining = framesWritten - headFrames(track)
+      if (remaining <= 0) {
+        return
+      }
+      val deadline = SystemClock.elapsedRealtime() +
+        (remaining * 1000L) / sampleRate + TAIL_GRACE_MS
+      while (headFrames(track) < framesWritten &&
+        SystemClock.elapsedRealtime() < deadline
+      ) {
+        if (synchronized(lock) { aborted }) {
+          break
+        }
+        Thread.sleep(POLL_MS)
       }
     }
 

@@ -27,7 +27,7 @@ let probe: {contextId: number; audioGen: boolean} | null = null;
  * that has one" need different fixes.
  */
 export const modelCanVoiceReplies = async (): Promise<boolean> => {
-  const declared = modelStore.activeMediaSupport.audioOutput === true;
+  const declared = modelStore.activeModelCanSpeak === true;
   const refuse = (reason: string, runtime?: boolean) => {
     logPerf('speech.gate', {reason, declared, runtime});
     return false;

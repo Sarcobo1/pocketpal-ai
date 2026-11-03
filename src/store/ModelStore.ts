@@ -4038,6 +4038,21 @@ class ModelStore {
     return model ? mediaSupportOf(model) : EMPTY_MEDIA_SUPPORT;
   }
 
+  /**
+   * Whether the live model can voice its own reply. Unlike
+   * `activeMediaSupport`, this does not wait for a projector to be attached:
+   * `generateSpeech` attaches what it needs itself, and a session that has sent
+   * no media yet has nothing attached — which is exactly the state voice mode
+   * starts in. Only a scanned record counts as the claim; a legacy model with no
+   * `mediaSupport` has never been read and is not assumed to speak.
+   */
+  get activeModelCanSpeak(): boolean {
+    return (
+      this.activeModel?.mediaSupport?.audioOutput === true ||
+      this.activeMediaSupport.audioOutput
+    );
+  }
+
   get activeSamplerDefaults(): Samplers | undefined {
     return samplerDefaultsFor(
       this.activeModel,

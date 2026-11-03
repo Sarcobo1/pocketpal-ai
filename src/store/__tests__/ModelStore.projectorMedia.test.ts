@@ -137,6 +137,41 @@ describe('ModelStore projector media capabilities', () => {
     expect(llm.capabilities).toContain('vision');
   });
 
+  it('trusts the pair for speech before anything is attached', async () => {
+    serve(
+      new GGUFFixture()
+        .kv('general.architecture', {
+          type: FixtureType.STRING,
+          value: 'clip',
+        })
+        .kv('clip.has_audio_encoder', {type: FixtureType.BOOL, value: true})
+        .kv('clip.has_gen_audio_encoder', {
+          type: FixtureType.BOOL,
+          value: true,
+        })
+        .kv('clip.gen.audio.projector_type', {
+          type: FixtureType.STRING,
+          value: 'lfm3a_gen',
+        }),
+    );
+    const {projector, llm} = pushPair();
+    await modelStore.fetchAndPersistGGUFMetadata(projector);
+    runInAction(() => {
+      modelStore.activeModelId = llm.id;
+      modelStore.isMultimodalActive = false;
+    });
+
+    // Voice mode starts before any media has been sent, so nothing is attached
+    // yet — the decoder claim has to survive that.
+    expect(modelStore.activeMediaSupport.audioOutput).toBe(false);
+    expect(modelStore.activeModelCanSpeak).toBe(true);
+
+    runInAction(() => {
+      llm.mediaSupport = {vision: true, audioInput: true, audioOutput: false};
+    });
+    expect(modelStore.activeModelCanSpeak).toBe(false);
+  });
+
   it('marks an lfm2a projector unsupported and does not advertise audio', async () => {
     serve(
       new GGUFFixture()

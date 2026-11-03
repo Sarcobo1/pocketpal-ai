@@ -398,6 +398,15 @@ class MockModelStore {
     return model ? mediaSupportOf(model) : EMPTY_MEDIA_SUPPORT;
   }
 
+  // Mirrors the real getter: the decoder a model's own files claim, whether or
+  // not anything is attached right now.
+  get activeModelCanSpeak(): boolean {
+    return (
+      this.activeModel?.mediaSupport?.audioOutput === true ||
+      this.activeMediaSupport.audioOutput
+    );
+  }
+
   get activeSamplerDefaults(): Samplers | undefined {
     return samplerDefaultsFor(
       this.activeModel,

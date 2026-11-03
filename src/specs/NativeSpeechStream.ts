@@ -46,7 +46,8 @@ export interface Spec extends TurboModule {
 
 // `get`, not `getEnforcing`: iOS and any build without the module must keep
 // speaking through the per-piece player instead of throwing at import time.
+// `get` answers undefined when the name is absent, which is the same refusal.
 const NativeSpeechStream: Spec | null =
-  TurboModuleRegistry.get<Spec>('SpeechStreamModule');
+  TurboModuleRegistry.get<Spec>('SpeechStreamModule') ?? null;
 
 export default NativeSpeechStream;

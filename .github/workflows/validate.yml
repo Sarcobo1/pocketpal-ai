@@ -57,6 +57,7 @@ jobs:
           set -eo pipefail
           yarn test --ci --coverage=false --runTestsByPath \
             src/utils/__tests__/chat.test.ts \
+            src/utils/__tests__/omniMode.test.ts \
             src/utils/__tests__/modelSkills.test.ts \
             src/utils/__tests__/multimodalHelpers.test.ts \
             src/services/plus/__tests__/gate.test.ts \

@@ -63,6 +63,61 @@ export const modelCanVoiceReplies = async (): Promise<boolean> => {
   return refuse('none');
 };
 
+/**
+ * The language codes the model's own `tts` template resolves to a name. A value
+ * outside this list is not rejected — the template writes it as it stands, so
+ * `Russian` works and `ru` becomes `Perform TTS in ru`, which is a phrase the
+ * model was never given a meaning for. That is why an unknown code is only
+ * logged, and why the settings copy has to say what it actually does.
+ */
+const TTS_TEMPLATE_LANGUAGES = new Set([
+  'ar',
+  'da',
+  'de',
+  'el',
+  'en',
+  'en-us',
+  'en-gb',
+  'fi',
+  'fr',
+  'he',
+  'it',
+  'ja',
+  'ko',
+  'nl',
+  'pl',
+  'pt',
+  'es',
+  'sv',
+  'tr',
+  'zh',
+]);
+
+/**
+ * Values that mean "no preference". The template reads an absent language as
+ * English rather than deciding for itself, so this is only about not writing a
+ * word the template cannot resolve.
+ */
+const UNSPECIFIED_LANGUAGES = new Set(['', 'auto', 'default', 'und']);
+
+/**
+ * What to hand the `tts` template for the configured speech language: the
+ * lowercased code, or nothing at all when the setting is empty.
+ *
+ * The template's own default is American English, not "whatever the speaker
+ * used" — so the log records the value that was left out as well, because the
+ * two look the same in the prompt that finally renders.
+ */
+export const resolveSpeechLanguage = (
+  configured: string,
+): {language: string; known: boolean} => {
+  const code = configured.trim().toLowerCase();
+  if (UNSPECIFIED_LANGUAGES.has(code)) {
+    return {language: '', known: true};
+  }
+  return {language: code, known: TTS_TEMPLATE_LANGUAGES.has(code)};
+};
+
 /** A reply longer than this is not one sentence anyone wants to hear spoken. */
 const MAX_UTTERANCE_SECONDS = 30;
 
@@ -133,7 +188,12 @@ export const speakWithModel = async (
   onPlaying?: () => void,
 ): Promise<ModelSpeechReport> => {
   const ctx = modelStore.context;
-  const language = ttsStore.speechLanguage.trim();
+  const {language, known} = resolveSpeechLanguage(ttsStore.speechLanguage);
+  if (!known) {
+    // Not a refusal: the words still go into the prompt as written, but this is
+    // the line that explains a reply in a language nobody picked.
+    logPerf('speech.lang', {code: language, resolved: false});
+  }
   if (!ctx) {
     return report({
       stopReason: 'unsupported',

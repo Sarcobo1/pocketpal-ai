@@ -3,6 +3,7 @@ import {JinjaFormattedChatResult, LlamaContext} from 'llama.rn';
 import {CompletionParams} from './completionTypes';
 import {defaultCompletionParams} from './completionSettingsVersions';
 import {toLocalMediaPath} from './multimodalPatterns';
+import {stripControlTokens} from './omniMode';
 
 import {
   AgentStep,
@@ -65,7 +66,10 @@ export function derivedText(message: MessageType.Any): string {
       .filter(c => c.length > 0)
       .join('\n\n');
   }
-  return 'text' in message && message.text ? message.text : '';
+  const raw = 'text' in message && message.text ? message.text : '';
+  // A plain-text assistant row stored before the leak was closed still shows
+  // what it stored. A user's own words are never rewritten.
+  return message.author.id === assistant.id ? stripControlTokens(raw) : raw;
 }
 
 const FENCED_BLOCK = /^```[^\n`]*\n([\s\S]*)```$/;
@@ -126,9 +130,13 @@ function callArguments(call: AgentToolCall): unknown {
  * A step's text as shown to the user. Small models may write a call as
  * bare JSON before emitting it in tags; that echo is hidden here only,
  * because replay must send the stored content unchanged.
+ *
+ * A leaked control token is hidden at the same place and for the same reason:
+ * `<|text_end|>` is not an answer, and rows written before the sampler was
+ * guarded still hold the ones they were given.
  */
 export function visibleStepContent(step: AgentStep): string {
-  const content = step.content ?? '';
+  const content = stripControlTokens(step.content ?? '');
   if (!step.toolCalls || step.toolCalls.length === 0) {
     return content;
   }
@@ -186,7 +194,10 @@ function toWireToolCall(
 function stepToApiMessages(step: AgentStep): ChatMessage[] {
   const assistantMsg: ChatMessage = {
     role: 'assistant',
-    content: step.content ?? '',
+    // Replay of a turn that leaked its mode tokens teaches the model that
+    // leaking them is the expected shape of an answer, so the old rows are
+    // cleaned on the way in rather than only on the way out.
+    content: stripControlTokens(step.content ?? ''),
   };
   if (step.toolCalls && step.toolCalls.length > 0) {
     assistantMsg.tool_calls = step.toolCalls.map(toWireToolCall);
@@ -251,7 +262,13 @@ export function convertToChatMessages(
       const textMessage = message as MessageType.Text;
       const role: 'assistant' | 'user' =
         message.author.id === assistant.id ? 'assistant' : 'user';
-      const messageText = textMessage.text || '';
+      // Same reason as the step replay above: an assistant row written before
+      // the sampler was guarded carries the tokens it leaked, and the next
+      // prompt would read them back as this model's own style.
+      const messageText =
+        role === 'assistant'
+          ? stripControlTokens(textMessage.text || '')
+          : textMessage.text || '';
 
       // Multimodal user messages keep their existing shape.
       if (

@@ -36,7 +36,9 @@ import {
   pickThinkingPlaceholder,
 } from '../services/tts/thinkingStripper';
 import {VOICE_FIRST_CHUNK_HOLD_MS} from '../services/voice/constants';
+import {speechReasonOf} from '../services/voice/types';
 import type {ModelVoiceSink} from '../services/voice/types';
+import {logPerf} from '../utils/mediaPerf';
 import {vtrace} from '../utils/voiceTrace';
 import {chatSessionStore} from './ChatSessionStore';
 
@@ -88,6 +90,10 @@ type VoiceStream = {
   holdTimer: ReturnType<typeof setTimeout> | null;
   chars: number;
 };
+
+/** A thrown error, in the one line a status subtitle can carry. */
+const shortReason = (err: unknown): string =>
+  (err instanceof Error ? err.message : String(err)).slice(0, 80);
 
 /**
  * Store that coordinates text-to-speech playback.
@@ -147,7 +153,11 @@ export class TTSStore {
   voiceSpeechStarted: string | null = null;
   /** Message id of the last voice reply whose speech failed. */
   voiceStreamFailed: string | null = null;
+  /** Why that reply was not spoken, in one line, for the session UI. */
+  speechReason: string | null = null;
   private voiceStream: VoiceStream | null = null;
+  /** The OS voice, looked up once: it is the last one that can still speak. */
+  private systemVoice: Voice | null | undefined = undefined;
 
   // Persisted user preferences
   autoSpeakEnabled: boolean = false;
@@ -866,6 +876,7 @@ export class TTSStore {
     }
     this.voiceSpeechStarted = null;
     this.voiceStreamFailed = null;
+    this.speechReason = null;
     const stream: VoiceStream = {
       messageId,
       held: this.holdFirstChunk ? [] : null,
@@ -923,6 +934,9 @@ export class TTSStore {
           });
         }
         if (!report.spoken) {
+          runInAction(() => {
+            this.speechReason = speechReasonOf(report);
+          });
           await this.sayWithFallbackVoice(messageId, said);
         }
       },
@@ -933,10 +947,39 @@ export class TTSStore {
     };
   }
 
-  /** A reply the model's voice would not say: the installed voice, or nobody. */
+  /** The default voice of the system engine, or null when it has none. */
+  private async resolveSystemVoice(): Promise<Voice | null> {
+    if (this.systemVoice !== undefined) {
+      return this.systemVoice;
+    }
+    const voices = await getEngine('system')
+      .getVoices()
+      .catch(err => {
+        console.warn('[TTSStore] system voice lookup failed:', err);
+        return [] as Voice[];
+      });
+    const voice = voices[0] ?? null;
+    runInAction(() => {
+      this.systemVoice = voice;
+    });
+    return voice;
+  }
+
+  /**
+   * A reply the model's voice would not say: the installed voice, else the OS
+   * one, else nobody — and only then is the failure shown. Voice mode is
+   * allowed to open with no TTS voice chosen, so "nothing configured" is a
+   * state to speak through, not a reason for silence.
+   */
   private async sayWithFallbackVoice(messageId: string, text: string) {
-    if (this.currentVoice && this.isTTSAvailable) {
-      await this.play(messageId, text);
+    const voice = this.currentVoice ?? (await this.resolveSystemVoice());
+    logPerf('speech.fallback', {
+      engine: voice?.engine ?? 'none',
+      id: voice?.id ?? '-',
+      reason: this.speechReason || '-',
+    });
+    if (voice && this.isTTSAvailable) {
+      await this.play(messageId, text, {voiceOverride: voice});
       return;
     }
     runInAction(() => {
@@ -1067,6 +1110,7 @@ export class TTSStore {
           if (isVoiceReply) {
             runInAction(() => {
               this.voiceStreamFailed = messageId;
+              this.speechReason = shortReason(err);
             });
           }
         })
@@ -1112,6 +1156,7 @@ export class TTSStore {
           console.warn('[TTSStore] model reply failed:', err);
           runInAction(() => {
             this.voiceStreamFailed = messageId;
+            this.speechReason = shortReason(err);
           });
         })
         .finally(() => {

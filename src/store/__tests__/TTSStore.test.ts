@@ -23,6 +23,7 @@ jest
 // real SystemEngine (which imports @pocketpalai/react-native-speech).
 const mockSystemPlay = jest.fn().mockResolvedValue(undefined);
 const mockSystemStop = jest.fn().mockResolvedValue(undefined);
+const mockSystemGetVoices = jest.fn().mockResolvedValue([] as Voice[]);
 const mockSupertonicPlay = jest
   .fn()
   .mockRejectedValue(new Error('Supertonic model is not installed'));
@@ -107,7 +108,7 @@ jest.mock('../../services/tts', () => {
       return {
         id: 'system',
         isInstalled: jest.fn().mockResolvedValue(true),
-        getVoices: jest.fn().mockResolvedValue([]),
+        getVoices: mockSystemGetVoices,
         play: mockSystemPlay,
         playStreaming: mockSystemPlayStreaming,
         stop: mockSystemStop,
@@ -936,12 +937,25 @@ describe('TTSStore', () => {
       onPlaying: (() => void) | null;
     };
 
-    const makeSink = (
-      report: {spoken: boolean; keepModelVoice: boolean} = {
-        spoken: true,
-        keepModelVoice: true,
-      },
-    ): Sink => {
+    /** What the speech pipeline answers a reply with. */
+    type SinkReport = {
+      spoken: boolean;
+      keepModelVoice: boolean;
+      stopReason: string;
+      stage: string;
+      error: string;
+    };
+
+    const sinkReport = (over: Partial<SinkReport>): SinkReport => ({
+      spoken: true,
+      keepModelVoice: true,
+      stopReason: 'eos',
+      stage: 'eos',
+      error: '',
+      ...over,
+    });
+
+    const makeSink = (report: Partial<SinkReport> = {}): Sink => {
       const sink: Sink = {
         speak: jest.fn(),
         stop: jest.fn(),
@@ -950,25 +964,25 @@ describe('TTSStore', () => {
       sink.speak.mockImplementation(
         async (_text: string, onPlaying: () => void) => {
           sink.onPlaying = onPlaying;
-          return report;
+          return sinkReport(report);
         },
       );
       return sink;
     };
 
     /** A sink whose answer arrives when the test says so. */
-    const makePendingSink = (
-      report: {spoken: boolean; keepModelVoice: boolean} = {
-        spoken: true,
-        keepModelVoice: true,
-      },
-    ) => {
-      const sink = makeSink(report);
+    const makePendingSink = (report: Partial<SinkReport> = {}) => {
+      const full = sinkReport(report);
+      const sink: Sink = {
+        speak: jest.fn(),
+        stop: jest.fn(),
+        onPlaying: null,
+      };
       let settle: () => void = () => {};
       sink.speak.mockImplementation((_text: string, onPlaying: () => void) => {
         sink.onPlaying = onPlaying;
         return new Promise(resolve => {
-          settle = () => resolve(report);
+          settle = () => resolve(full);
         });
       });
       return {sink, finish: () => settle()};
@@ -1080,6 +1094,37 @@ describe('TTSStore', () => {
       await speakReply(store);
 
       expect(store.voiceStreamFailed).toBe('msg-1');
+    });
+
+    it('gives the reply to the OS voice when none was ever chosen', async () => {
+      mockSystemGetVoices.mockResolvedValueOnce([SYSTEM_VOICE]);
+      const sink = makeSink({spoken: false, keepModelVoice: true});
+      const store = await makeModelStore(sink);
+
+      await speakReply(store);
+
+      expect(mockSystemPlay).toHaveBeenCalledWith(
+        'Paris is the capital.',
+        SYSTEM_VOICE,
+      );
+      expect(store.voiceStreamFailed).toBeNull();
+    });
+
+    it('names the stage the speech pipeline refused at', async () => {
+      mockSystemGetVoices.mockResolvedValueOnce([SYSTEM_VOICE]);
+      const sink = makeSink({
+        spoken: false,
+        keepModelVoice: false,
+        stopReason: 'failed',
+        stage: 'prompt-decode',
+        error: 'llama_decode: no memory slot for batch of size 61',
+      });
+      const store = await makeModelStore(sink);
+
+      await speakReply(store);
+
+      expect(store.speechReason).toBe('failed at prompt-decode');
+      expect(store.voiceStreamFailed).toBeNull();
     });
 
     it('cuts the utterance and stays quiet when the session stops', async () => {

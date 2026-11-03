@@ -24,6 +24,7 @@ class MockTTSStore {
   voiceOutputActive = false;
   voiceSpeechStarted: string | null = null;
   voiceStreamFailed: string | null = null;
+  speechReason: string | null = null;
   get streamsReplies(): boolean {
     return (
       this.voiceOutputActive || (this.isTTSAvailable && this.autoSpeakEnabled)

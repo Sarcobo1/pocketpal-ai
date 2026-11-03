@@ -29,12 +29,35 @@ const withContext = (support: {
   return getMultimodalSupport;
 };
 
+/** A model whose projector file carries a speech decoder. */
+const withDeclaredVoice = (runtime: {
+  vision: boolean;
+  audio: boolean;
+  audioGen: boolean;
+}) => {
+  const getMultimodalSupport = jest.fn().mockResolvedValue(runtime);
+  runInAction(() => {
+    store.models = [
+      {
+        id: 'model-1',
+        origin: ModelOrigin.LOCAL,
+        mediaSupport: {vision: true, audioInput: true, audioOutput: true},
+      },
+    ];
+    store.activeModelId = 'model-1';
+    store.isMultimodalActive = true;
+    store.context = {id: nextId++, getMultimodalSupport};
+  });
+  return getMultimodalSupport;
+};
+
 describe('modelCanVoiceReplies', () => {
   beforeEach(() => {
     runInAction(() => {
       store.models = [];
       store.activeModelId = undefined;
       store.context = undefined;
+      store.isMultimodalActive = false;
       tts.forceTTSFallback = false;
     });
   });
@@ -95,6 +118,26 @@ describe('modelCanVoiceReplies', () => {
     runInAction(() => {
       store.activeModelId = 'model-1';
     });
+    await expect(modelCanVoiceReplies()).resolves.toBe(false);
+  });
+
+  it('is true from the projector header when the runtime reports no voice', async () => {
+    const probe = withDeclaredVoice({
+      vision: true,
+      audio: true,
+      audioGen: false,
+    });
+
+    await expect(modelCanVoiceReplies()).resolves.toBe(true);
+    expect(probe).toHaveBeenCalledTimes(1);
+  });
+
+  it('is false when neither the header nor the runtime reports a voice', async () => {
+    withContext({vision: true, audio: true, audioGen: false});
+    runInAction(() => {
+      store.isMultimodalActive = true;
+    });
+
     await expect(modelCanVoiceReplies()).resolves.toBe(false);
   });
 

@@ -16,33 +16,51 @@ import {vtrace} from '../../utils/voiceTrace';
 let probe: {contextId: number; audioGen: boolean} | null = null;
 
 /**
- * True when the active context can generate speech. Only a `yes` is cached:
- * attaching a projector to a context that is already running can turn a `no`
- * into a `yes`, and a model that can speak never stops being able to.
+ * True when the active model can voice its own reply.
+ *
+ * Two files answer that question, and they do not always agree: the projector's
+ * GGUF header says what the download carries, the live context says what
+ * llama.rn actually loaded into memory. Either is enough to *ask* — a context
+ * that cannot answer says so with `stopReason:'unsupported'` and the reply goes
+ * to the TTS voice — so the gate takes the union and the log says which one
+ * spoke, because "the model has no voice" and "this build cannot hear the model
+ * that has one" need different fixes.
  */
 export const modelCanVoiceReplies = async (): Promise<boolean> => {
-  if (ttsStore.forceTTSFallback) {
+  const declared = modelStore.activeMediaSupport.audioOutput === true;
+  const refuse = (reason: string, runtime?: boolean) => {
+    logPerf('speech.gate', {reason, declared, runtime});
     return false;
+  };
+  if (ttsStore.forceTTSFallback) {
+    return refuse('forced-fallback');
   }
   if (modelStore.activeModel?.origin === ModelOrigin.REMOTE) {
-    return false;
+    return refuse('remote');
   }
   const ctx = modelStore.context;
   if (!ctx) {
-    return false;
+    return refuse('no-context');
   }
   if (probe?.contextId === ctx.id && probe.audioGen) {
     return true;
   }
-  let audioGen: boolean;
+  let runtime = false;
   try {
-    audioGen = (await ctx.getMultimodalSupport()).audioGen === true;
+    runtime = (await ctx.getMultimodalSupport()).audioGen === true;
   } catch (err) {
     console.warn('[voice] speech support probe failed:', err);
-    return false;
   }
-  probe = {contextId: ctx.id, audioGen};
-  return audioGen;
+  probe = {contextId: ctx.id, audioGen: runtime};
+  if (runtime || declared) {
+    logPerf('speech.gate', {
+      reason: runtime ? 'runtime' : 'header',
+      declared,
+      runtime,
+    });
+    return true;
+  }
+  return refuse('none');
 };
 
 /** A reply longer than this is not one sentence anyone wants to hear spoken. */
@@ -111,6 +129,12 @@ export const speakWithModel = async (
   const ctx = modelStore.context;
   const language = ttsStore.speechLanguage.trim();
   if (!ctx) {
+    return report({stopReason: 'unsupported', keepModelVoice: false});
+  }
+  // The bridge is a build-time thing: a bundle without the patched llama.rn has
+  // no method to call, and saying so is cheaper than a TypeError per reply.
+  if (typeof ctx.generateSpeech !== 'function') {
+    logPerf('speech.method', {present: false});
     return report({stopReason: 'unsupported', keepModelVoice: false});
   }
   const out = await ctx

@@ -2033,6 +2033,12 @@ class ModelStore {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      // A header that could not be read has to look different on the phone from
+      // a header that says the file carries nothing.
+      logPerf('media.header', {
+        file: filePath.split('/').pop() ?? filePath,
+        error: message,
+      });
       runInAction(() => {
         model.mediaSupport = undefined;
         model.mediaProjectorTypes = undefined;
@@ -2043,6 +2049,17 @@ class ModelStore {
     }
 
     const capabilities = mediaCapabilitiesFromGGUFValues(scan.values);
+    // A file that carries a speech decoder is worth naming in a release build:
+    // it is the one record of what the download actually contains, and the
+    // runtime answer below is only what this process managed to load.
+    logPerf('media.header', {
+      file: filePath.split('/').pop() ?? filePath,
+      vision: capabilities.mediaSupport.vision,
+      audioInput: capabilities.mediaSupport.audioInput,
+      audioOutput: capabilities.mediaSupport.audioOutput,
+      genType: capabilities.projectorTypes.genAudio ?? 'absent',
+      unsupported: capabilities.unsupportedArchitecture ?? 'no',
+    });
     runInAction(() => {
       model.mediaSupport = capabilities.mediaSupport;
       model.mediaProjectorTypes = capabilities.projectorTypes;
@@ -2796,6 +2813,14 @@ class ModelStore {
   ): Promise<MediaSupport | undefined> => {
     try {
       const support = await ctx.getMultimodalSupport();
+      // Whether the key is there at all separates a projector that cannot speak
+      // from a build whose native library never reported it.
+      logPerf('media.runtime', {
+        vision: support.vision,
+        audio: support.audio,
+        audioGen: support.audioGen,
+        reported: 'audioGen' in support,
+      });
       return {
         vision: !!support.vision,
         audioInput: !!support.audio,

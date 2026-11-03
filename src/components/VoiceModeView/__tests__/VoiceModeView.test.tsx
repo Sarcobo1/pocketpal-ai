@@ -12,7 +12,7 @@ import {
 import {act, fireEvent, render} from '../../../../jest/test-utils';
 import {themeFixtures} from '../../../../jest/fixtures/theme';
 import {l10n} from '../../../locales';
-import {voiceModeStore} from '../../../store';
+import {ttsStore, voiceModeStore} from '../../../store';
 
 import {VoiceModeControlsContext} from '../controls';
 import {VoiceModeView} from '../VoiceModeView';
@@ -120,6 +120,20 @@ describe('VoiceModeView', () => {
     setSession('listening', false, error);
     const {getByTestId} = renderView();
     expect(getByTestId('voice-status-hint')).toHaveTextContent(text);
+  });
+
+  it('says which step of the speech pipeline refused', () => {
+    runInAction(() => {
+      ttsStore.speechReason = 'failed at prompt-decode';
+    });
+    setSession('listening', false, 'speech_failed');
+    const {getByTestId} = renderView();
+    expect(getByTestId('voice-status-hint')).toHaveTextContent(
+      `${strings.errorSpeech} (failed at prompt-decode)`,
+    );
+    runInAction(() => {
+      ttsStore.speechReason = null;
+    });
   });
 
   it('announces each new status, and an error with it', () => {

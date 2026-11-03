@@ -36,7 +36,7 @@ import {
 } from 'react-native-vision-camera';
 
 import {useTheme} from '../../hooks';
-import {modelStore, voiceModeStore} from '../../store';
+import {modelStore, ttsStore, voiceModeStore} from '../../store';
 import {L10nContext} from '../../utils';
 import {
   CameraIcon,
@@ -75,7 +75,13 @@ export const VoiceModeView: React.FC = observer(() => {
   const {tapCloud, toggleMute, end} = useVoiceModeControls();
   const {phase, micMuted, lastError, cameraOn} = voiceModeStore;
   const visual = voiceVisual(phase, micMuted);
-  const status = voiceStatus(phase, micMuted, lastError, l10n.voiceMode);
+  const status = voiceStatus(
+    phase,
+    micMuted,
+    lastError,
+    l10n.voiceMode,
+    ttsStore.speechReason,
+  );
   const {title, hint} = status;
   useAnnounceVoiceStatus(status, true);
 

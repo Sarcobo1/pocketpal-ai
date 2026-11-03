@@ -12,7 +12,7 @@ import Animated, {
 import {scheduleOnRN} from 'react-native-worklets';
 
 import {useTheme} from '../../hooks';
-import {voiceModeStore} from '../../store';
+import {ttsStore, voiceModeStore} from '../../store';
 import {L10nContext} from '../../utils';
 import {CloseIcon, MicrophoneIcon, MicrophoneOffIcon} from '../../assets/icons';
 import {VoiceCloud, voiceVisual} from '../VoiceCloud';
@@ -40,7 +40,13 @@ export const VoiceBar: React.FC = observer(() => {
   const {toggleMute, end} = useVoiceModeControls();
   const {phase, micMuted, lastError, presentation} = voiceModeStore;
   const visual = voiceVisual(phase, micMuted);
-  const status = voiceStatus(phase, micMuted, lastError, l10n.voiceMode);
+  const status = voiceStatus(
+    phase,
+    micMuted,
+    lastError,
+    l10n.voiceMode,
+    ttsStore.speechReason,
+  );
   useAnnounceVoiceStatus(status, presentation === 'bar');
 
   const expand = useCallback(() => voiceModeStore.setPresentation('full'), []);

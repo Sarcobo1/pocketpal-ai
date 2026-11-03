@@ -26,6 +26,8 @@ export const voiceStatus = (
   micMuted: boolean,
   error: VoiceError | null,
   strings: VoiceModeStrings,
+  /** Why the speech failed, in the pipeline's own words, if it answered. */
+  speechReason?: string | null,
 ): {title: string; hint: string; isError: boolean} => {
   const key = phase === 'starting' ? 'starting' : voiceVisual(phase, micMuted);
   const title = strings[`${key}Title`];
@@ -36,7 +38,13 @@ export const voiceStatus = (
     return {title, hint: strings.errorReply, isError: true};
   }
   if (error === 'speech_failed') {
-    return {title, hint: strings.errorSpeech, isError: true};
+    return {
+      title,
+      hint: speechReason
+        ? `${strings.errorSpeech} (${speechReason})`
+        : strings.errorSpeech,
+      isError: true,
+    };
   }
   return {title, hint: strings[`${key}Hint`], isError: false};
 };

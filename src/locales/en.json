@@ -113,6 +113,11 @@
     "speculativeDraftCacheTypeInactiveDescription": "Applies once speculative decoding runs.",
     "ttsAvailability": "Text-to-speech",
     "ttsAvailabilityDescription": "Read assistant replies aloud.",
+    "forceTTSFallback": "Always use the TTS voice",
+    "forceTTSFallbackDescription": "Say replies with the installed text-to-speech voice even when the loaded model can speak for itself. Voice mode then needs a voice installed again.",
+    "speechLanguageTitle": "Speech language",
+    "speechLanguageDescription": "Passed to the model's own voice (uz, ru, en). Each voiced reply logs what it spoke as [framePerf] speech.reply in logcat.",
+    "speechLanguagePlaceholder": "empty = the model decides",
     "ttsAvailabilityLowMemoryWarning": "Your device's memory is low — this may not work reliably.",
     "modelLoadingSettings": "Model Loading Settings",
     "autoOffloadLoad": "Auto Offload/Load",
@@ -532,6 +537,7 @@
       "rewriting": "Rewriting",
       "creativity": "Creative writing",
       "vision": "Vision",
+      "voice": "Voice",
       "mtp": "Speculative (MTP)",
       "mtpDraft": "Speculative draft"
     }
@@ -1690,6 +1696,8 @@
     "voiceRowFileMissing": "{{voice}} isn't downloaded yet. Continue gets it.",
     "voiceRowFileFailed": "Couldn't download {{voice}}. Connect to the internet and try again.",
     "chooseVoiceCta": "Choose a voice",
+    "modelVoiceRowTitle": "This model speaks for itself",
+    "modelVoiceRowHint": "It carries a speech decoder, so no TTS voice is needed. One stays installed as the fallback.",
     "micNote": "We'll ask for microphone access next.",
     "micDenied": "Voice mode needs microphone access.",
     "continueCta": "Continue",

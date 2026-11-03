@@ -100,10 +100,15 @@ const withStartTimeout = (loading: Promise<void>): Promise<void> => {
   return Promise.race([loading, timeout]).finally(() => clearTimeout(timer));
 };
 
-async function isSetupComplete(): Promise<boolean> {
+/**
+ * What a session has to have installed before it can run. A model that voices
+ * its own reply needs no TTS voice, so `requireVoice` is the difference between
+ * asking for one and asking a phone for a second voice it does not need.
+ */
+async function isSetupComplete(requireVoice: boolean): Promise<boolean> {
   return (
     asrStore.isSelectedTierReady &&
-    (await isVoiceModeVoiceReady(ttsStore.currentVoice)) &&
+    (!requireVoice || (await isVoiceModeVoiceReady(ttsStore.currentVoice))) &&
     (await isMicGranted())
   );
 }
@@ -189,11 +194,14 @@ class VoiceModeController {
       await this.enter(asrStore.selectedTier);
       return;
     }
-    if (!(await isSetupComplete())) {
+    // Whichever engine listens, the voice that answers decides what this session
+    // must have installed: a model with a speech decoder needs no TTS voice.
+    const speaks = await modelCanVoiceReplies();
+    if (!(await isSetupComplete(!speaks))) {
       this.showSheet({kind: 'setup'});
       return;
     }
-    await this.checkMemoryAndEnter();
+    await this.checkMemoryAndEnter(!speaks);
   }
 
   /**
@@ -223,13 +231,16 @@ class VoiceModeController {
     }
   }
 
-  async checkMemoryAndEnter(): Promise<void> {
+  async checkMemoryAndEnter(requireVoice: boolean): Promise<void> {
     await this.exiting;
     if (this.entryBlocked()) {
       return;
     }
     const voice = ttsStore.currentVoice;
-    if (!isVoiceModeVoice(voice) || !(await hasVoiceFile(voice))) {
+    if (
+      requireVoice &&
+      (!isVoiceModeVoice(voice) || !(await hasVoiceFile(voice)))
+    ) {
       this.showSheet({kind: 'setup'});
       return;
     }
@@ -238,7 +249,11 @@ class VoiceModeController {
       memory: await readDeviceMemory(modelStore),
       chatBytes: modelStore.loadedModelBytes ?? 0,
       sttTier: tier,
-      ttsBytes: TTS_ENGINE_RUNTIME_BYTES[voice.engine],
+      // A model that speaks its own reply adds no second model to the memory
+      // the chat model already occupies; only a session that needs a TTS voice
+      // has to count one.
+      ttsBytes:
+        requireVoice && voice ? TTS_ENGINE_RUNTIME_BYTES[voice.engine] : 0,
     });
     if (fit.status === 'fits') {
       await this.enter(tier);
@@ -310,9 +325,10 @@ class VoiceModeController {
     const session = ++this.session;
     startVoiceTrace();
     // Whether this model can voice its own reply decides what the session
-    // needs to have installed to be heard, so it is settled once, here.
-    const modelVoice =
-      this.engine.id === 'omni' ? await modelCanVoiceReplies() : false;
+    // needs to have installed to be heard, so it is settled once, here. It is
+    // the model that speaks, not the engine that listened, so a cascade session
+    // — Whisper in, this model out — is as eligible as an omni one.
+    const modelVoice = await modelCanVoiceReplies();
     if (session !== this.session) {
       return;
     }
@@ -745,7 +761,12 @@ export function useVoiceMode({
     sheet,
     setupDone: useCallback(() => {
       setSheet(null);
-      return controller.checkMemoryAndEnter();
+      // The sheet may have just installed the thing that made it necessary, or
+      // the model may have gained a voice while it was open; ask again rather
+      // than assume the answer entry gave still holds.
+      return modelCanVoiceReplies().then(speaks =>
+        controller.checkMemoryAndEnter(!speaks),
+      );
     }, [controller]),
     continueAnyway,
     chooseSmallerModel: useCallback(

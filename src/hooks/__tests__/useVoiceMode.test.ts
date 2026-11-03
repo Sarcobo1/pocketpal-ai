@@ -422,6 +422,80 @@ describe('useVoiceMode', () => {
       expect(engine.prepare).toHaveBeenCalledTimes(1);
     });
 
+    it('enters with no TTS voice when the model voices its own reply', async () => {
+      runInAction(() => {
+        tts.currentVoice = null;
+        model.context = {
+          id: 91,
+          getMultimodalSupport: async () => ({
+            vision: true,
+            audio: true,
+            audioGen: true,
+          }),
+        };
+      });
+      const {enter, hook, engine} = renderVoiceMode();
+
+      await enter();
+
+      expect(hook.result.current.sheet).toBeNull();
+      expect(engine.prepare).toHaveBeenCalledTimes(1);
+      expect(hasVoiceFile).not.toHaveBeenCalled();
+      expect(tts.setModelVoice).toHaveBeenCalled();
+    });
+
+    it('counts no TTS model into the memory check when the model speaks', async () => {
+      // The same budget that opens the memory sheet for a TTS voice fits once
+      // the reply is voiced by the model itself, because no second model loads.
+      runInAction(() => {
+        model.loadedModelBytes =
+          5e9 * ASR_IOS_CEILING_SHARE -
+          ASR_TIERS.base.runtimeBytes -
+          TTS_ENGINE_RUNTIME_BYTES.supertonic / 2;
+        model.context = {
+          id: 92,
+          getMultimodalSupport: async () => ({audioGen: true}),
+        };
+      });
+      const {enter, hook, engine} = renderVoiceMode();
+
+      await enter();
+
+      expect(hook.result.current.sheet).toBeNull();
+      expect(engine.prepare).toHaveBeenCalledTimes(1);
+    });
+
+    it('enters on the projector header when the live context reports no voice', async () => {
+      runInAction(() => {
+        tts.currentVoice = null;
+        model.isMultimodalActive = true;
+        model.models = [
+          {
+            ...localModel,
+            mediaSupport: {
+              vision: true,
+              audioInput: true,
+              audioOutput: true,
+            },
+          },
+        ];
+        model.context = {
+          id: 78,
+          getMultimodalSupport: async () => ({
+            vision: true,
+            audio: true,
+            audioGen: false,
+          }),
+        };
+      });
+      const {enter, hook, engine} = renderVoiceMode();
+
+      await enter();
+
+      expect(hook.result.current.sheet).toBeNull();
+      expect(engine.prepare).toHaveBeenCalledTimes(1);
+    });
+
     it("opens the setup sheet when the voice's file is missing", async () => {
       (hasVoiceFile as jest.Mock).mockResolvedValue(false);
       const {enter, hook, engine} = renderVoiceMode();

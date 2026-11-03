@@ -37,6 +37,13 @@ interface VoiceSetupSheetProps {
    * pipeline, which does need one.
    */
   sttRequired?: boolean;
+  /**
+   * False when the model in memory says its own reply out loud: that session
+   * already has a voice, so the row that asks for one would block a setup that
+   * is finished. A TTS voice stays behind the model as the fallback, never in
+   * front of it as a requirement.
+   */
+  voiceRequired?: boolean;
 }
 
 /**
@@ -45,7 +52,7 @@ interface VoiceSetupSheetProps {
  * of the two models the active model does not need.
  */
 export const VoiceSetupSheet: React.FC<VoiceSetupSheetProps> = observer(
-  ({isVisible, onClose, onDone, sttRequired = true}) => {
+  ({isVisible, onClose, onDone, sttRequired = true, voiceRequired = true}) => {
     const theme = useTheme();
     const l10n = useContext(L10nContext);
     const strings = l10n.voiceMode;
@@ -104,7 +111,7 @@ export const VoiceSetupSheet: React.FC<VoiceSetupSheetProps> = observer(
 
     const proceed = async () => {
       const target = ttsStore.currentVoice;
-      if (!target) {
+      if (voiceRequired && !target) {
         return;
       }
       setBusy(true);
@@ -115,16 +122,18 @@ export const VoiceSetupSheet: React.FC<VoiceSetupSheetProps> = observer(
             return;
           }
         }
-        if (file !== 'present') {
-          setFile('downloading');
-        }
-        const downloaded = await ensureVoiceFile(target);
-        if (voiceKey(ttsStore.currentVoice) !== voiceKey(target)) {
-          return;
-        }
-        setFile(downloaded ? 'present' : 'failed');
-        if (!downloaded || setupInterrupted()) {
-          return;
+        if (voiceRequired && target) {
+          if (file !== 'present') {
+            setFile('downloading');
+          }
+          const downloaded = await ensureVoiceFile(target);
+          if (voiceKey(ttsStore.currentVoice) !== voiceKey(target)) {
+            return;
+          }
+          setFile(downloaded ? 'present' : 'failed');
+          if (!downloaded || setupInterrupted()) {
+            return;
+          }
         }
         const result = await ensureMicPermission();
         setMic(result);
@@ -137,7 +146,7 @@ export const VoiceSetupSheet: React.FC<VoiceSetupSheetProps> = observer(
     };
 
     const renderPrimary = () => {
-      if (!voiceReady) {
+      if (voiceRequired && !voiceReady) {
         return (
           <Button
             mode="contained"
@@ -223,22 +232,33 @@ export const VoiceSetupSheet: React.FC<VoiceSetupSheetProps> = observer(
                 />
               </>
             ) : null}
-            <View style={styles.row} testID="voice-setup-voice">
-              <View style={styles.rowText}>
-                <Text variant="titleSmall">{strings.voiceRowTitle}</Text>
+            {voiceRequired ? (
+              <View style={styles.row} testID="voice-setup-voice">
+                <View style={styles.rowText}>
+                  <Text variant="titleSmall">{strings.voiceRowTitle}</Text>
+                  <Text
+                    variant="bodySmall"
+                    testID="voice-setup-voice-status"
+                    style={{
+                      color:
+                        file === 'failed'
+                          ? theme.colors.error
+                          : theme.colors.onSurfaceVariant,
+                    }}>
+                    {voiceStatus()}
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.row} testID="voice-setup-model-voice">
+                <Text variant="titleSmall">{strings.modelVoiceRowTitle}</Text>
                 <Text
                   variant="bodySmall"
-                  testID="voice-setup-voice-status"
-                  style={{
-                    color:
-                      file === 'failed'
-                        ? theme.colors.error
-                        : theme.colors.onSurfaceVariant,
-                  }}>
-                  {voiceStatus()}
+                  style={{color: theme.colors.onSurfaceVariant}}>
+                  {strings.modelVoiceRowHint}
                 </Text>
               </View>
-            </View>
+            )}
           </View>
 
           <Text

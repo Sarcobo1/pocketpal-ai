@@ -54,13 +54,14 @@ const onClose = jest.fn();
 const asr = asrStore as any;
 const tts = ttsStore as any;
 
-const renderSheet = (sttRequired: boolean = true) =>
+const renderSheet = (sttRequired: boolean = true, voiceRequired?: boolean) =>
   render(
     <VoiceSetupSheet
       isVisible
       onClose={onClose}
       onDone={onDone}
       sttRequired={sttRequired}
+      {...(voiceRequired === undefined ? {} : {voiceRequired})}
     />,
   );
 
@@ -102,6 +103,23 @@ describe('VoiceSetupSheet', () => {
 
     await waitFor(() => expect(onDone.mock.calls.length).toBe(doneBefore + 1));
     expect(asrStore.downloadModel).toHaveBeenCalledTimes(downloadsBefore);
+  });
+
+  it('asks for no voice at all when the model speaks for itself', async () => {
+    runInAction(() => {
+      tts.currentVoice = null;
+    });
+    const doneBefore = onDone.mock.calls.length;
+    const {getByText, getByTestId, queryByTestId} = renderSheet(false, false);
+
+    expect(queryByTestId('voice-setup-voice')).toBeNull();
+    expect(queryByTestId('voice-setup-choose-voice')).toBeNull();
+    expect(getByText(strings.modelVoiceRowTitle)).toBeTruthy();
+
+    fireEvent.press(getByTestId('voice-setup-continue'));
+
+    await waitFor(() => expect(onDone.mock.calls.length).toBe(doneBefore + 1));
+    expect(ensureVoiceFile).not.toHaveBeenCalled();
   });
 
   it('shows the in-use tier when it is installed', async () => {

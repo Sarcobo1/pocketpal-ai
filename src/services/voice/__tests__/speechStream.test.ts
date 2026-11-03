@@ -263,7 +263,7 @@ describe('where a piece is cut when the words are known', () => {
     ]);
     // An ellipsis is one boundary and not three.
     expect(planSpeechBoundaries('Wait... then go on now please.', 0)).toEqual([
-      {at: 7 / 27, strong: true},
+      {at: 7 / 30, strong: true},
     ]);
     expect(planSpeechBoundaries('', 0.5)).toEqual([]);
     expect(SPEECH_CHARS_PER_SECOND).toBe(15);

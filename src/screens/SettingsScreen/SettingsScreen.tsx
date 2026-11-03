@@ -24,7 +24,6 @@ import {
   Icon,
   List,
   SegmentedButtons,
-  TextInput,
 } from 'react-native-paper';
 
 import {

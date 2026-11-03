@@ -162,7 +162,11 @@ export const omniModeGuardFor = async (
   if (!ctx) {
     return null;
   }
-  if (guardCache?.contextId === ctx.id) {
+  // The cache has to exist before its id can match: a context with no id at
+  // all — a stand-in, an engine that has not finished building — would compare
+  // `undefined === undefined` against the empty cache and read a guard out of
+  // nothing.
+  if (guardCache && guardCache.contextId === ctx.id) {
     return guardCache.guard;
   }
   const guard = await resolveOmniModeGuard(ctx);

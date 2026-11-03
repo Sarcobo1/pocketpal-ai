@@ -117,6 +117,19 @@ describe('resolveOmniModeGuard', () => {
 });
 
 describe('omniModeGuardFor', () => {
+  it('probes a context that carries no id instead of hitting an empty cache', async () => {
+    // An engine stand-in has no context identity, which used to read as a cache
+    // hit against no cache at all — `undefined === undefined`, then a property
+    // read on nothing. Such a turn is meant to get a guard, not to throw.
+    const source = omniContext();
+    const ctx = {...source, id: undefined};
+
+    const guard = await omniModeGuardFor(ctx as any);
+
+    expect(guard?.stopWords).toEqual([...MODE_SWITCH_TOKENS]);
+    expect(ctx.tokenize).toHaveBeenCalledTimes(MODE_SWITCH_TOKENS.length);
+  });
+
   it('probes a context once and reuses the answer for its turns', async () => {
     const ctx = omniContext(7);
     const first = await omniModeGuardFor(ctx);

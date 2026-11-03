@@ -5,6 +5,7 @@ import {Text, IconButton} from 'react-native-paper';
 import {useTheme} from '../../hooks';
 import {getModelSkills, SkillItem} from '../../utils';
 import {L10nContext} from '../../utils';
+import type {MediaSupport} from '../../utils/types';
 
 import {createStyles} from './styles';
 
@@ -12,6 +13,7 @@ interface SkillsDisplayProps {
   model: {
     capabilities?: string[];
     supportsMultimodal?: boolean;
+    mediaSupport?: MediaSupport;
   };
   onVisionPress?: () => void;
   showLabel?: boolean;

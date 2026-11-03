@@ -14,6 +14,7 @@ import {formatBytes, formatNumber} from './formatters';
 import {getVerboseDateTimeRepresentation} from './formatters';
 import {
   HuggingFaceModel,
+  MediaSupport,
   MessageType,
   Model,
   ModelFile,
@@ -685,6 +686,12 @@ export const SKILL_CONFIG = {
     isSpecial: true, // Gets special visual treatment
     labelKey: 'vision' as const,
   },
+  voice: {
+    icon: 'account-voice',
+    color: 'tertiary' as const,
+    isSpecial: true,
+    labelKey: 'voice' as const,
+  },
   questionAnswering: {
     icon: 'help-circle-outline',
     color: 'primary' as const,
@@ -768,6 +775,7 @@ export interface SkillItem {
 export const getModelSkills = (model: {
   capabilities?: string[];
   supportsMultimodal?: boolean;
+  mediaSupport?: MediaSupport;
 }): SkillItem[] => {
   const skills: SkillItem[] = [];
 
@@ -783,10 +791,24 @@ export const getModelSkills = (model: {
     });
   }
 
+  // A model that carries a speech decoder answers in its own voice. That is a
+  // property of the projector file, not of the repository listing, so it comes
+  // from mediaSupport and not from capabilities.
+  if (model.mediaSupport?.audioOutput) {
+    const voiceConfig = SKILL_CONFIG.voice;
+    skills.push({
+      key: 'voice',
+      labelKey: voiceConfig.labelKey,
+      icon: voiceConfig.icon,
+      color: voiceConfig.color,
+      isSpecial: voiceConfig.isSpecial,
+    });
+  }
+
   // Add other capabilities (excluding vision to avoid duplication)
   if (model.capabilities?.length) {
     const otherCapabilities = model.capabilities.filter(
-      cap => cap !== 'vision',
+      cap => cap !== 'vision' && cap !== 'voice',
     );
 
     otherCapabilities.forEach(capability => {

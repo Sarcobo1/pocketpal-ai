@@ -198,6 +198,9 @@ class StreamSink implements VoiceSink {
   readonly stats = emptyStats('stream');
   private tail: Promise<void> = Promise.resolve();
   private closed = false;
+
+  /** A barge-in: queued audio is stale, so the chunks still on the chain drop. */
+  private abandoned = false;
   private native: {underruns: number; dryMs: number} | null = null;
 
   write(samples: Float32Array): void {
@@ -212,7 +215,10 @@ class StreamSink implements VoiceSink {
 
   private async deliver(base64: string): Promise<void> {
     const native = NativeSpeechStream;
-    if (!native || this.closed || this.stats.error) {
+    // Ending is not refusing: a chunk the reply already committed to play is
+    // still owed to the stream, and native.end is queued behind it for that
+    // reason. Only a barge-in or a refusal the stream already said cancels it.
+    if (!native || this.abandoned || this.stats.error) {
       return;
     }
     const t0 = Date.now();
@@ -226,16 +232,18 @@ class StreamSink implements VoiceSink {
   }
 
   async end(): Promise<VoiceSinkStats> {
-    this.tail = this.tail.then(async () => {
-      const native = NativeSpeechStream;
-      if (!native) {
-        return;
-      }
-      const stats = await native.end().catch(() => null);
-      if (stats) {
-        this.native = {underruns: stats.underruns, dryMs: stats.dryMs};
-      }
-    });
+    if (!this.abandoned) {
+      this.tail = this.tail.then(async () => {
+        const native = NativeSpeechStream;
+        if (!native) {
+          return;
+        }
+        const stats = await native.end().catch(() => null);
+        if (stats) {
+          this.native = {underruns: stats.underruns, dryMs: stats.dryMs};
+        }
+      });
+    }
     this.closed = true;
     await this.tail;
     this.applyNative();
@@ -243,6 +251,10 @@ class StreamSink implements VoiceSink {
   }
 
   abort(reason: string): void {
+    if (this.abandoned) {
+      return;
+    }
+    this.abandoned = true;
     this.stats.error = this.stats.error || reason;
     this.closed = true;
     this.tail = this.tail.then(async () => {
@@ -254,8 +266,8 @@ class StreamSink implements VoiceSink {
       const stats = await native.end().catch(() => null);
       if (stats) {
         this.native = {underruns: stats.underruns, dryMs: stats.dryMs};
-        this.applyNative();
       }
+      this.applyNative();
     });
   }
 
@@ -284,7 +296,12 @@ class SpeechSink implements VoiceSink {
   private inner: VoiceSink | null = null;
   private deciding: Promise<void> | null = null;
   private held: Array<{samples: Float32Array; sampleRate: number}> = [];
+
+  /** The reply is over: what is in hand still gets played. */
   private closed = false;
+
+  /** A barge-in took the output away: nothing in hand is still wanted. */
+  private abandoned = false;
   private reason = '';
 
   constructor(private readonly allowStream: boolean) {}
@@ -316,12 +333,15 @@ class SpeechSink implements VoiceSink {
     this.inner = inner;
     const held = this.held;
     this.held = [];
-    if (this.closed) {
+    if (this.abandoned) {
       // Interrupted before the answer. Nothing more goes into it, and the sink
       // gives the output back — a stream sink aborts the stream it was opened on.
       inner.abort(this.reason);
       return;
     }
+    // The answer arrives a beat after the audio, so a short reply is normally
+    // already over by now. Its pieces were held, not thrown away: they are the
+    // whole reply, and a listener who never interrupted should hear all of it.
     for (const chunk of held) {
       inner.write(chunk.samples, chunk.sampleRate);
     }
@@ -340,14 +360,18 @@ class SpeechSink implements VoiceSink {
 
   abort(reason: string): void {
     this.reason = reason;
+    this.abandoned = true;
     this.closed = true;
     this.held = [];
     if (this.inner) {
       this.inner.abort(reason);
-      return;
     }
-    this.deciding?.then(() => {
-      this.inner?.abort(reason);
+    // A decision still in the air hands the abort to the sink as soon as it
+    // exists, so a barge-in never has to wait for the answer to be silent.
+    void this.deciding?.then(() => {
+      if (this.inner) {
+        this.inner.abort(reason);
+      }
     });
   }
 }

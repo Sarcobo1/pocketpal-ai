@@ -24,6 +24,7 @@ import {
   Icon,
   List,
   SegmentedButtons,
+  TextInput,
 } from 'react-native-paper';
 
 import {
@@ -1277,6 +1278,48 @@ export const SettingsScreen: React.FC = observer(() => {
                     onValueChange={value =>
                       voiceModeStore.setUserVoiceModeOverride(value)
                     }
+                  />
+                </View>
+
+                <Divider />
+
+                {/* A model that carries a speech decoder says its own replies,
+                    which is the only reason voice mode can run without a TTS
+                    voice installed. Both rows are about that trade. */}
+                <View style={styles.switchContainer}>
+                  <View style={styles.textContainer}>
+                    <Text variant="titleMedium" style={styles.textLabel}>
+                      {l10n.settings.forceTTSFallback}
+                    </Text>
+                    <Text variant="labelSmall" style={styles.textDescription}>
+                      {l10n.settings.forceTTSFallbackDescription}
+                    </Text>
+                  </View>
+                  <Switch
+                    testID="force-tts-fallback-switch"
+                    value={ttsStore.forceTTSFallback}
+                    onValueChange={value => ttsStore.setForceTTSFallback(value)}
+                  />
+                </View>
+
+                <View style={styles.switchContainer}>
+                  <View style={styles.textContainer}>
+                    <Text variant="titleMedium" style={styles.textLabel}>
+                      {l10n.settings.speechLanguageTitle}
+                    </Text>
+                    <Text variant="labelSmall" style={styles.textDescription}>
+                      {l10n.settings.speechLanguageDescription}
+                    </Text>
+                  </View>
+                  <TextInput
+                    testID="speech-language-input"
+                    mode="outlined"
+                    value={ttsStore.speechLanguage}
+                    onChangeText={ttsStore.setSpeechLanguage}
+                    placeholder={l10n.settings.speechLanguagePlaceholder}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    style={styles.menuButton}
                   />
                 </View>
 

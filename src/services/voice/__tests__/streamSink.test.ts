@@ -1,6 +1,6 @@
 import {neuralAudioPlayer} from '@pocketpalai/react-native-speech/engine-sdk';
 
-import NativeSpeechStream from '../../specs/NativeSpeechStream';
+import NativeSpeechStream from '../../../specs/NativeSpeechStream';
 import {openVoiceSink} from '../streamSink';
 
 /**
@@ -13,7 +13,7 @@ import {openVoiceSink} from '../streamSink';
  * spent hungry.
  */
 
-jest.mock('../../specs/NativeSpeechStream', () => ({
+jest.mock('../../../specs/NativeSpeechStream', () => ({
   __esModule: true,
   default: {
     begin: jest.fn(),

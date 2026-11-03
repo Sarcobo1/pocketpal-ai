@@ -91,6 +91,10 @@ export interface ModelSpeechReport {
   /** False when this model should not be asked again this session. */
   keepModelVoice: boolean;
   stopReason: string;
+  /** Which step of the native pipeline answered; empty once audio was said. */
+  stage: string;
+  /** What the engine itself blamed, when it said anything. */
+  error: string;
   seconds: number;
   frames: number;
   msPerFrame: number;
@@ -111,6 +115,8 @@ const report = (
   rtf: 0,
   language: 'template',
   voice: 'template',
+  stage: '',
+  error: '',
   ...part,
 });
 
@@ -129,14 +135,23 @@ export const speakWithModel = async (
   const ctx = modelStore.context;
   const language = ttsStore.speechLanguage.trim();
   if (!ctx) {
-    return report({stopReason: 'unsupported', keepModelVoice: false});
+    return report({
+      stopReason: 'unsupported',
+      stage: 'no-context',
+      keepModelVoice: false,
+    });
   }
   // The bridge is a build-time thing: a bundle without the patched llama.rn has
   // no method to call, and saying so is cheaper than a TypeError per reply.
   if (typeof ctx.generateSpeech !== 'function') {
     logPerf('speech.method', {present: false});
-    return report({stopReason: 'unsupported', keepModelVoice: false});
+    return report({
+      stopReason: 'unsupported',
+      stage: 'no-method',
+      keepModelVoice: false,
+    });
   }
+  let thrown = '';
   const out = await ctx
     .generateSpeech({
       text,
@@ -144,12 +159,27 @@ export const speakWithModel = async (
       maxSeconds: MAX_UTTERANCE_SECONDS,
     })
     .catch(err => {
+      thrown = err instanceof Error ? err.message : String(err);
       console.warn('[voice] speech generation failed:', err);
       return null;
     });
   if (!out) {
+    // A throw is the bridge itself failing, so it never named a stage.
+    logPerf('speech.reply', {
+      stop: 'failed',
+      stage: 'js-bridge',
+      err: thrown.slice(0, 200),
+      chars: text.length,
+      frames: 0,
+      seconds: '0.00',
+      rtf: '-',
+      lang: language || 'template',
+      voice: 'template',
+    });
     return report({
       stopReason: 'failed',
+      stage: 'js-bridge',
+      error: thrown,
       keepModelVoice: false,
       language: language || 'template',
     });
@@ -159,6 +189,8 @@ export const speakWithModel = async (
   const msPerFrame = out.frames > 0 ? out.genMs / out.frames : 0;
   logPerf('speech.reply', {
     stop: out.stopReason,
+    stage: out.stage,
+    err: out.error.slice(0, 200),
     chars: text.length,
     frames: out.frames,
     seconds: out.seconds.toFixed(2),
@@ -180,8 +212,16 @@ export const speakWithModel = async (
   // The frames decoded over the positions the conversation owns: whatever the
   // next turn reuses from the cache is now part of this utterance's state.
   if (TOUCHED_CACHE.has(out.stopReason)) {
+    const t0 = Date.now();
     await ctx.clearCache(true).catch(err => {
       console.warn('[voice] cache clear after speech failed:', err);
+    });
+    // The next turn pays for this in full prefill, so its TTFT is read
+    // against this number rather than against the model.
+    logPerf('speech.cache', {
+      cleared: true,
+      ms: Date.now() - t0,
+      stop: out.stopReason,
     });
   }
 
@@ -193,6 +233,8 @@ export const speakWithModel = async (
     !deadEnd && rtf <= MAX_REALTIME_FACTOR && out.pcm.length > 0;
   const done = {
     stopReason: out.stopReason,
+    stage: out.stage,
+    error: out.error,
     keepModelVoice,
     seconds: out.seconds,
     frames: out.frames,
@@ -205,6 +247,7 @@ export const speakWithModel = async (
   }
 
   onPlaying?.();
+  let playError = '';
   const spoken = await neuralAudioPlayer
     .play(
       {
@@ -217,10 +260,25 @@ export const speakWithModel = async (
     )
     .then(() => true)
     .catch(err => {
+      playError = err instanceof Error ? err.message : String(err);
       console.warn('[voice] speech playback failed:', err);
       return false;
     });
-  return report({...done, spoken});
+  logPerf('speech.playback', {
+    ok: spoken,
+    err: playError.slice(0, 200),
+    samples: out.pcm.length,
+    sampleRate: out.sampleRate,
+    channels: 1,
+    seconds: out.seconds.toFixed(2),
+  });
+  // Audio the player refused is still the model's own voice working, so only
+  // the stage moves: the next reply should keep asking the model.
+  return report(
+    spoken
+      ? {...done, spoken}
+      : {...done, spoken, stage: 'playback', error: playError},
+  );
 };
 
 /**

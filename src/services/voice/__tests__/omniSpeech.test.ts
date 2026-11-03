@@ -179,6 +179,8 @@ const speechResult = (over: Record<string, unknown> = {}) => ({
   genMs: 1000,
   aborted: false,
   stopReason: 'eos',
+  stage: 'eos',
+  error: '',
   prompt: '<|speech_start|>english',
   ...over,
 });
@@ -281,6 +283,43 @@ describe('speakWithModel', () => {
       expect(report.keepModelVoice).toBe(false);
     },
   );
+
+  it('reports the stage and the engine words a native refusal left', async () => {
+    withSpeaker(
+      speechResult({
+        stopReason: 'failed',
+        stage: 'prompt-decode',
+        error: 'llama_decode: no memory slot for batch of size 61',
+        pcm: new Float32Array(0),
+        seconds: 0,
+        frames: 0,
+      }),
+    );
+
+    const report = await speakWithModel('Salom');
+
+    expect(report.stopReason).toBe('failed');
+    expect(report.stage).toBe('prompt-decode');
+    expect(report.error).toContain('no memory slot');
+    expect(report.keepModelVoice).toBe(false);
+  });
+
+  it('names playback as the stage when the audio was refused after it was made', async () => {
+    withSpeaker(speechResult());
+    (neuralAudioPlayer.play as jest.Mock).mockRejectedValue(
+      new Error('AudioTrack not ready'),
+    );
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const report = await speakWithModel('Salom');
+
+    expect(report.spoken).toBe(false);
+    expect(report.stage).toBe('playback');
+    expect(report.error).toBe('AudioTrack not ready');
+    // The model did make the audio, so it is worth asking again next reply.
+    expect(report.keepModelVoice).toBe(true);
+    warn.mockRestore();
+  });
 
   it('keeps the model voice for a reply that ran out of seconds', async () => {
     withSpeaker(speechResult({stopReason: 'max'}));

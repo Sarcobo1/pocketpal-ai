@@ -86,7 +86,24 @@ export interface ModelVoiceSink {
     spoken: boolean;
     /** False when this model should not be asked again this session. */
     keepModelVoice: boolean;
+    /** Why the audio is not coming, in the engine's own vocabulary. */
+    stopReason: string;
+    stage: string;
+    error: string;
   }>;
   /** Cut the utterance in flight short. */
   stop(): void;
 }
+
+/**
+ * One line for the UI: what the speech pipeline answered with. The engine's
+ * own words stay in `[framePerf]`, where a decoder message does not belong
+ * inside a status subtitle.
+ */
+export const speechReasonOf = (r: {
+  stopReason: string;
+  stage: string;
+}): string =>
+  r.stage && r.stage !== r.stopReason
+    ? `${r.stopReason} at ${r.stage}`
+    : r.stopReason;

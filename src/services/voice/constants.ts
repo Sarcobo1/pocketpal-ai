@@ -85,3 +85,11 @@ export const VOICE_MIC_WATCHDOG_MS = 3000;
  * warning. A first load on a mid-range phone took about 21 s.
  */
 export const VOICE_START_TIMEOUT_MS = 45_000;
+
+/**
+ * A spoken answer is listened to, not read, and every sentence past the second
+ * costs the listener twice: the wait for the audio and then the words. Voice
+ * turns only — a typed turn with the same model keeps the prompt it always had.
+ */
+export const VOICE_ANSWER_INSTRUCTION =
+  'Answer in one or two short sentences. Your reply is read aloud, not shown as text.';

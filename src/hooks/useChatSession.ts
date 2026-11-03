@@ -54,6 +54,7 @@ import {
   stripControlTokens,
   TEXT_MODE_INSTRUCTION,
 } from '../utils/omniMode';
+import {VOICE_ANSWER_INSTRUCTION} from '../services/voice/constants';
 import {toLocalMediaPath} from '../utils/multimodalPatterns';
 import {LLAMARN_ERROR_PATTERNS} from '../utils/llamaRnErrors';
 import {projectionGapCopy} from '../utils/multimodalHelpers';
@@ -277,14 +278,21 @@ const prepareCompletion = async ({
     maxToolTurns: DEFAULT_MAX_TURNS,
   });
 
+  // A spoken answer is listened to, so its length is a wait the user sits
+  // through; a typed one is read at the pace the reader picks. Voice turns
+  // only, and the setting leaves room for a Pal that needs to be long.
+  const shortVoiceAnswer = spoken && ttsStore.voiceShortAnswers;
+
   const messages = assembleMessages(
     systemMessages,
     // The card appends the mode instruction to whatever system prompt already
     // stands, so it joins the end of the same fragment list instead of
     // replacing the Pal's or the template's text.
-    omniGuard
-      ? [...systemPromptFragments, TEXT_MODE_INSTRUCTION]
-      : systemPromptFragments,
+    [
+      ...systemPromptFragments,
+      ...(omniGuard ? [TEXT_MODE_INSTRUCTION] : []),
+      ...(shortVoiceAnswer ? [VOICE_ANSWER_INSTRUCTION] : []),
+    ],
     [...chatMessages, {role: 'user', content: userMessageContent}],
   );
 
@@ -298,8 +306,12 @@ const prepareCompletion = async ({
     spoken,
     turns: messages.length,
     mode: omniGuard ? 'text-guarded' : 'default',
+    voice: shortVoiceAnswer ? 'short' : '-',
+    // Wide enough to hold both instructions: on a guarded voice turn the short
+    // answer one lands last, and a 48-character window would hide the mode text
+    // that has to stand in front of it.
     systemTail: systemMessage
-      ? String(systemMessage.content).slice(-48).replace(/\n/g, '\\n')
+      ? String(systemMessage.content).slice(-110).replace(/\n/g, '\\n')
       : '-',
     lastRole: lastTurn?.role,
     lastMedia: Array.isArray(lastTurn?.content),

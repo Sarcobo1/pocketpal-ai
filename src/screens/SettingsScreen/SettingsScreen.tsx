@@ -1304,6 +1304,40 @@ export const SettingsScreen: React.FC = observer(() => {
                 <View style={styles.switchContainer}>
                   <View style={styles.textContainer}>
                     <Text variant="titleMedium" style={styles.textLabel}>
+                      {l10n.settings.streamSpeech}
+                    </Text>
+                    <Text variant="labelSmall" style={styles.textDescription}>
+                      {l10n.settings.streamSpeechDescription}
+                    </Text>
+                  </View>
+                  <Switch
+                    testID="stream-speech-switch"
+                    value={ttsStore.streamSpeech}
+                    onValueChange={value => ttsStore.setStreamSpeech(value)}
+                  />
+                </View>
+
+                <View style={styles.switchContainer}>
+                  <View style={styles.textContainer}>
+                    <Text variant="titleMedium" style={styles.textLabel}>
+                      {l10n.settings.voiceShortAnswers}
+                    </Text>
+                    <Text variant="labelSmall" style={styles.textDescription}>
+                      {l10n.settings.voiceShortAnswersDescription}
+                    </Text>
+                  </View>
+                  <Switch
+                    testID="voice-short-answers-switch"
+                    value={ttsStore.voiceShortAnswers}
+                    onValueChange={value =>
+                      ttsStore.setVoiceShortAnswers(value)
+                    }
+                  />
+                </View>
+
+                <View style={styles.switchContainer}>
+                  <View style={styles.textContainer}>
+                    <Text variant="titleMedium" style={styles.textLabel}>
                       {l10n.settings.speechLanguageTitle}
                     </Text>
                     <Text variant="labelSmall" style={styles.textDescription}>

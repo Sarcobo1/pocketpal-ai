@@ -13,6 +13,7 @@ import {
 } from '../../../jest/fixtures/models';
 
 import {useChatSession} from '../useChatSession';
+import {VOICE_ANSWER_INSTRUCTION} from '../../services/voice/constants';
 import {isReadUrlAllowed} from '../../services/talents';
 import {bodyExtras} from '../../api/servers';
 
@@ -203,6 +204,64 @@ describe('useChatSession', () => {
       for (const row of addedRows()) {
         expect(row.metadata).not.toHaveProperty('spoken');
       }
+    });
+
+    const sentMessages = async (opts?: {spoken: boolean}) => {
+      const {result} = renderHook(() =>
+        useChatSession({current: null}, textMessage.author, mockAssistant),
+      );
+
+      await act(async () => {
+        await result.current.handleSendPress(textMessage, opts);
+      });
+
+      const sent = (modelStore.engine!.completion as jest.Mock).mock
+        .calls[0][0] as {messages: Array<{role: string; content: any}>};
+      return sent.messages;
+    };
+
+    const systemText = (messages: Array<{role: string; content: any}>) =>
+      messages
+        .filter(message => message.role === 'system')
+        .map(message => String(message.content))
+        .join('\n\n');
+
+    describe('the short-answer instruction', () => {
+      it('is the last thing a spoken turn tells the model', async () => {
+        const messages = await sentMessages({spoken: true});
+        const system = systemText(messages).trim();
+
+        expect(system.slice(-VOICE_ANSWER_INSTRUCTION.length)).toBe(
+          VOICE_ANSWER_INSTRUCTION,
+        );
+      });
+
+      it('leaves a typed prompt as it was', async () => {
+        const messages = await sentMessages();
+
+        expect(systemText(messages)).not.toContain(VOICE_ANSWER_INSTRUCTION);
+      });
+
+      it('stands down when the setting is off', async () => {
+        ttsStore.setVoiceShortAnswers(false);
+        try {
+          const messages = await sentMessages({spoken: true});
+
+          expect(systemText(messages)).not.toContain(VOICE_ANSWER_INSTRUCTION);
+        } finally {
+          ttsStore.setVoiceShortAnswers(true);
+        }
+      });
+
+      it('costs a spoken turn no extra message', async () => {
+        const messages = await sentMessages({spoken: true});
+
+        // A second system message makes strict chat templates raise, so the
+        // instruction joins the one that already stands instead of following it.
+        expect(
+          messages.filter(message => message.role === 'system').length,
+        ).toBe(1);
+      });
     });
   });
 

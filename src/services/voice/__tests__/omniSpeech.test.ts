@@ -578,6 +578,23 @@ describe('speakWithModel, piece by piece', () => {
     expect(play).not.toHaveBeenCalled();
   });
 
+  it('plays the one buffer a build that ignored the stream flag hands back', async () => {
+    // The flag was sent and the engine answered with a whole clip instead of
+    // pieces. The audio exists, so it is heard: discarding it because it did not
+    // arrive the way the setting asked is how a reply ends up silent.
+    withStream(
+      streamedResult({chunks: 0, pcm: new Float32Array(48000).fill(0.25)}),
+      [],
+    );
+
+    const report = await speakWithModel('Salom');
+
+    expect(play).toHaveBeenCalled();
+    expect(report).toEqual(
+      expect.objectContaining({spoken: true, keepModelVoice: true}),
+    );
+  });
+
   it('drops the pieces a barge-in did not live to hear', async () => {
     let release: () => void = () => {};
     runInAction(() => {

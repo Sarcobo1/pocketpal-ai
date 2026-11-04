@@ -2,7 +2,12 @@ import {neuralAudioPlayer} from '@pocketpalai/react-native-speech/engine-sdk';
 
 import {modelStore, ttsStore} from '../../store';
 import {ModelOrigin} from '../../utils/types';
-import {addTurnInfo, logPerf, markTurn} from '../../utils/mediaPerf';
+import {
+  addTurnInfo,
+  logPerf,
+  markTurn,
+  markTurnLast,
+} from '../../utils/mediaPerf';
 import {vtrace} from '../../utils/voiceTrace';
 import {openSpeechFeed, type SpeechFeed} from './speechStream';
 
@@ -326,6 +331,10 @@ export const speakWithModel = async (
               markTurn('audioOut');
               onPlaying?.();
             }
+            // Every piece overwrites this one, so it ends up being the moment
+            // the engine stopped handing samples over — the other half of a
+            // stutter, which is the span between the first and the last.
+            markTurnLast('audioLast');
             feed.push(samples, sampleRate);
             // The feed has decided this reply cannot be made smooth. Stop the
             // engine rather than finish audio nobody will hear in time; the
@@ -375,9 +384,24 @@ export const speakWithModel = async (
   const audioMs = out.seconds * 1000;
   const rtf = audioMs > 0 ? out.genMs / audioMs : Infinity;
   const msPerFrame = out.frames > 0 ? out.genMs / out.frames : 0;
+  // How the audio reached this call, which is not the same as whether it was
+  // asked to. A build that takes the flag hands back no buffer at all; one that
+  // ignores it hands back the whole clip and calls no chunk, and that is the
+  // delivery failing rather than the reply — so it is said out loud and the
+  // buffer is played instead of thrown away.
+  const fellBack = feed !== null && out.chunks === 0 && out.pcm.length > 0;
+  const nativeStream = !feed
+    ? 'off'
+    : fellBack
+      ? 'fell-back'
+      : out.chunks > 1
+        ? 'used'
+        : out.chunks === 1
+          ? 'single'
+          : 'silent';
   // A streamed reply carries no buffer on the result — the samples went
   // somewhere else — so the pieces it made are what say there was audio.
-  const hasAudio = feed ? out.chunks > 0 : out.pcm.length > 0;
+  const hasAudio = out.chunks > 0 || out.pcm.length > 0;
   // The engine calls both a finished reply and a reply that outran a safety
   // limit the same stop reason, so the reason the voice was given up on is
   // derived from the numbers and written down while they are still on the page.
@@ -412,6 +436,7 @@ export const speakWithModel = async (
     // The two numbers streaming is judged on: what the engine took to make the
     // first sample, and how many pieces it had to make it in.
     stream: feed ? 'on' : 'off',
+    native: nativeStream,
     chunks: out.chunks,
     firstAudioMs: Math.round(out.firstAudioMs),
     drop,
@@ -420,9 +445,13 @@ export const speakWithModel = async (
   // The same numbers on the turn's own line, so one grep gives the whole wait.
   addTurnInfo({
     promptMs: Math.round(out.promptMs),
+    genMs: Math.round(out.genMs),
     firstAudioMs: Math.round(out.firstAudioMs),
     rtf: Number(rtf.toFixed(2)),
     drop,
+    chunks: out.chunks,
+    stream: feed ? 'on' : 'off',
+    native: nativeStream,
     cache: cacheKept ? 'kept' : 'shared',
   });
   // The template decides its own defaults, so the only faithful record of the
@@ -476,6 +505,15 @@ export const speakWithModel = async (
   let spoken = false;
   let playError = '';
   if (feed) {
+    if (fellBack) {
+      // The stream was asked for and not given: hand the one buffer to the same
+      // feed, so the reply is heard as the model's own voice either way.
+      logPerf('speech.streamfall', {
+        samples: out.pcm.length,
+        seconds: out.seconds.toFixed(2),
+      });
+      feed.push(out.pcm, out.sampleRate);
+    }
     // Every piece this reply made is already on its way to the ear; closing is
     // the wait for the last one to play out, which is what the sink asks for.
     const stats = await feed.close();

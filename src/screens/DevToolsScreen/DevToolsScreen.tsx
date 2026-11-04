@@ -10,13 +10,18 @@ import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {useTheme} from '../../hooks';
 import {createStyles} from './styles';
 import {chatSessionRepository} from '../../repositories/ChatSessionRepository';
-import {TestCompletionScreen, DatabaseInspectorScreen} from './screens';
+import {
+  DatabaseInspectorScreen,
+  TestCompletionScreen,
+  VoiceAbScreen,
+} from './screens';
 
 // Define the stack navigator param list
 type DevToolsStackParamList = {
   DevToolsHome: undefined;
   TestCompletion: undefined;
   DatabaseInspector: undefined;
+  VoiceAb: undefined;
 };
 
 const Stack = createStackNavigator<DevToolsStackParamList>();
@@ -102,6 +107,26 @@ const DevToolsHomeScreen: React.FC = observer(() => {
                 onPress={() => navigation.navigate('TestCompletion' as never)}
                 style={styles.button}>
                 Open Test Completion
+              </Button>
+            </View>
+          </Card.Content>
+        </Card>
+
+        {/* Voice A/B Card */}
+        <Card elevation={1} style={styles.card}>
+          <Card.Title title="Voice A/B" />
+          <Card.Content>
+            <Text variant="bodyMedium" style={styles.description}>
+              Run one recorded voice clip through four spoken-turn prompt shapes
+              and compare answers, echo rate and latency. Use this when voice
+              mode replies with the question instead of an answer.
+            </Text>
+            <View style={styles.buttonContainer}>
+              <Button
+                mode="contained"
+                onPress={() => navigation.navigate('VoiceAb' as never)}
+                style={styles.button}>
+                Open Voice A/B
               </Button>
             </View>
           </Card.Content>
@@ -225,6 +250,13 @@ export const DevToolsScreen: React.FC = () => {
         component={DatabaseInspectorScreen}
         options={{
           title: 'Database Inspector',
+        }}
+      />
+      <Stack.Screen
+        name="VoiceAb"
+        component={VoiceAbScreen}
+        options={{
+          title: 'Voice A/B',
         }}
       />
     </Stack.Navigator>

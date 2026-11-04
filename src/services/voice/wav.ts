@@ -18,7 +18,7 @@ const KEEP_TURNS = 40;
  * report can be pulled with `adb pull` and listened to; iOS stays in the
  * cache, which nothing outside the app reads anyway.
  */
-const pullableDir =
+export const pullableDir =
   Platform.OS === 'android'
     ? RNFS.ExternalDirectoryPath || RNFS.CachesDirectoryPath
     : RNFS.CachesDirectoryPath;

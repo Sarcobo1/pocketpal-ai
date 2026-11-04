@@ -76,6 +76,7 @@ const searchHits = (ids: string[]) =>
 
 describe('ModelStore projector search on the Hub', () => {
   let model: Model;
+  let downloadSpy: jest.Mock;
 
   beforeEach(() => {
     jest.spyOn(console, 'warn').mockImplementation();
@@ -104,10 +105,11 @@ describe('ModelStore projector search on the Hub', () => {
     model = modelStore.models.find(m => m.id === 'local-omni')!;
 
     // The download itself belongs to the manager; this suite is about which
-    // file gets asked for.
-    (modelStore as any).downloadProjectionModel = jest
-      .fn()
-      .mockResolvedValue(undefined);
+    // file gets asked for. The store wraps a method back into an action when
+    // it is reassigned, so the handle, not the property, is what the
+    // assertions read.
+    downloadSpy = jest.fn().mockResolvedValue(undefined);
+    (modelStore as any).downloadProjectionModel = downloadSpy;
   });
 
   describe('findProjectionFileInHub', () => {
@@ -191,9 +193,7 @@ describe('ModelStore projector search on the Hub', () => {
       expect(model.defaultProjectionModel).toBe(projectorId);
       expect(model.compatibleProjectionModels).toEqual([projectorId]);
       expect(model.supportsMultimodal).toBe(true);
-      expect(modelStore.downloadProjectionModel).toHaveBeenCalledWith(
-        projectorId,
-      );
+      expect(downloadSpy).toHaveBeenCalledWith(projectorId);
     });
 
     it('adds one row per projector file', async () => {
@@ -221,7 +221,7 @@ describe('ModelStore projector search on the Hub', () => {
       expect(modelStore.models).toHaveLength(1);
       expect(model.supportsMultimodal).toBeUndefined();
       expect(model.defaultProjectionModel).toBeUndefined();
-      expect(modelStore.downloadProjectionModel).not.toHaveBeenCalled();
+      expect(downloadSpy).not.toHaveBeenCalled();
     });
 
     it('never looks a projector up for a projector', async () => {

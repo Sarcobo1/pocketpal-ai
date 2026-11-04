@@ -275,7 +275,9 @@ describe('ModelFileCard', () => {
       expect(modelStore.cancelDownload).toHaveBeenCalledWith(projId);
     });
 
-    it('asks for nothing when the whole pair is on the device', async () => {
+    it('asks about deleting once the whole pair is down', async () => {
+      // Weights and projector are both on the device, so the one button on the
+      // card has nothing left to fetch.
       (downloadManager.isDownloading as jest.Mock).mockReturnValue(false);
       const {getByTestId} = renderPair({isDownloaded: true, progress: 100});
 
@@ -284,22 +286,12 @@ describe('ModelFileCard', () => {
       });
 
       expect(Alert.alert).toHaveBeenCalledWith(
-        'Model Already Downloaded',
-        'The model is already downloaded.',
+        'Delete Model',
+        'Are you sure you want to delete this downloaded model?',
+        expect.any(Array),
       );
       expect(modelStore.downloadProjectionModel).not.toHaveBeenCalled();
-    });
-
-    it('offers delete once the pair is whole and download while it is not', () => {
-      (downloadManager.isDownloading as jest.Mock).mockReturnValue(false);
-
-      expect(renderPair().getByTestId('download-button').props.icon).toBe(
-        'download-outline',
-      );
-      expect(
-        renderPair({isDownloaded: true}).getByTestId('download-button').props
-          .icon,
-      ).toBe('delete');
+      expect(modelStore.downloadHFModel).not.toHaveBeenCalled();
     });
   });
 });

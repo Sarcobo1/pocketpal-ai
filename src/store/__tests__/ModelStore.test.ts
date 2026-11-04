@@ -65,6 +65,7 @@ jest.mock('../../utils/deviceCapabilities', () => ({
 // Mock the HF API
 jest.mock('../../api/hf', () => ({
   fetchModelFilesDetails: jest.fn(),
+  fetchModels: jest.fn(),
 }));
 
 // Mock the download manager

@@ -1244,15 +1244,21 @@ describe('useChatSession', () => {
       const rows = (
         chatSessionStore.addMessageToCurrentSession as jest.Mock
       ).mock.calls.map(([row]) => row);
-      // The last write is the one the finished turn makes.
-      const writes = (chatSessionStore.updateMessage as jest.Mock).mock.calls;
-      const lastWrite = writes[writes.length - 1]?.[2] as
-        | {metadata?: Record<string, any>}
-        | undefined;
+      // What the row ends up carrying: every write merges into metadata, in
+      // whatever order the turn made them.
+      const metadata = (
+        chatSessionStore.updateMessage as jest.Mock
+      ).mock.calls.reduce(
+        (acc: Record<string, any>, [, , patch]) => ({
+          ...acc,
+          ...(patch?.metadata ?? {}),
+        }),
+        {},
+      );
       return {
         messages: sent.messages,
         userRow: rows.find(row => row.author?.id !== mockAssistant.id),
-        metadata: lastWrite?.metadata ?? {},
+        metadata,
       };
     };
 

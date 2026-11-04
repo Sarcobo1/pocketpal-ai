@@ -311,6 +311,11 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
     const l10n = useContext(L10nContext);
     const insets = useSafeAreaInsets();
 
+    // Read into a local: the drawer row is built inside a useMemo, and a store
+    // field reached through a module import is not a dependency that array can
+    // name — the row would stay hidden after the About unlock.
+    const devToolsVisible = __DEV__ || uiStore.devToolsUnlocked;
+
     // Convert groupedSessions to SectionList format
     // observer() HOC handles MobX reactivity, transformation is cheap
     const sections = Object.entries(chatSessionStore.groupedSessions).map(
@@ -605,7 +610,7 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
               style={styles.menuDrawerItem}
             />
             {/* Dev Tools: debug builds always, release after the About unlock */}
-            {(__DEV__ || uiStore.devToolsUnlocked) && (
+            {devToolsVisible && (
               <Drawer.Item
                 label="Dev Tools"
                 icon={() => (
@@ -623,14 +628,7 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
           <Divider style={styles.divider} />
         </View>
       ),
-      [
-        l10n,
-        theme,
-        styles,
-        navigateTo,
-        props.navigation,
-        uiStore.devToolsUnlocked,
-      ],
+      [l10n, theme, styles, navigateTo, props.navigation, devToolsVisible],
     );
 
     return (

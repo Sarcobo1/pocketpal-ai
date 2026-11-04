@@ -177,13 +177,19 @@ export const speechDropReason = ({
   if (DEAD_ENDS.has(stopReason)) {
     return 'stop';
   }
+  // First, and before any rate: a reply that made no samples has no rate at all.
+  // `rtf` is Infinity there only because nothing was spoken to divide by, and
+  // calling that a speed problem blames the wrong thing.
+  if (!hasAudio) {
+    return 'no-audio';
+  }
   if (rtf > MAX_REALTIME_FACTOR) {
     return 'rtf';
   }
   if (stage === 'max-seconds' || seconds >= MAX_UTTERANCE_SECONDS) {
     return 'time';
   }
-  return hasAudio ? 'none' : 'no-audio';
+  return 'none';
 };
 
 export interface ModelSpeechReport {

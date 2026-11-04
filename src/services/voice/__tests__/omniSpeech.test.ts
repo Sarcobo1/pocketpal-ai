@@ -394,6 +394,9 @@ describe('speakWithModel', () => {
         text: 'Salom',
         language: 'uzbek',
         maxSeconds: 30,
+        // Every spoken reply asks for a sequence of its own: the alternative is
+        // the next turn re-prefilling the whole conversation.
+        isolateSeq: true,
       },
       undefined,
     );

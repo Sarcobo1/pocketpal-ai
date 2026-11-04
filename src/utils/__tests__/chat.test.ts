@@ -6,6 +6,7 @@ import {
   derivedText,
   user,
   assistant,
+  measureEcho,
   visibleStepContent,
 } from '../chat';
 import {
@@ -959,5 +960,60 @@ describe('tool-call echo in a device turn', () => {
       'web_search',
       'read_url',
     ]);
+  });
+});
+
+describe('measureEcho', () => {
+  // The failure being counted is a voice answer that is the question said back.
+  // Anything shorter than three words, or a run that does not cover most of the
+  // turn, is ordinary English answering an ordinary English question.
+  it.each([
+    ['What is the capital of France?', 'What is the capital of France?'],
+    [
+      'What is the capital of France?',
+      'You said what is the capital of france. It is Paris.',
+    ],
+    ['Tell me a joke about robots', 'Tell me a joke about robots'],
+    ['Qanday ob-havo Tashkentda?', 'Qanday ob-havo Tashkentda?'],
+  ])('calls the question coming back an echo: %s', (said, reply) => {
+    expect(measureEcho(reply, said).echo).toBe(true);
+  });
+
+  it.each([
+    // Reuses four of the six words, in order, and still answers the question.
+    ['What is the capital of France?', 'The capital of France is Paris.'],
+    ['How are you doing today?', 'I am doing well, thanks for asking.'],
+    [
+      'What did you say about the meeting for next monday at ten',
+      'The meeting moved to next monday at ten.',
+    ],
+    ['hello', 'hello there my friend'],
+    ['', 'Anything at all'],
+  ])('does not call an answer an echo: %s', (said, reply) => {
+    expect(measureEcho(reply, said).echo).toBe(false);
+  });
+
+  it('reads the run over the shorter of the two sides', () => {
+    const said = 'what is the capital of france';
+    expect(measureEcho('the capital of france', said)).toEqual({
+      ratio: 1,
+      shared: 4,
+      echo: true,
+    });
+    // One word in common is a coincidence, not a repeat.
+    expect(measureEcho('it is sunny today', said)).toEqual({
+      ratio: 0.25,
+      shared: 1,
+      echo: false,
+    });
+  });
+
+  it('ignores case and the punctuation a tokenizer leaves behind', () => {
+    const said = 'Where do we eat tonight?';
+    expect(measureEcho('WHERE DO WE EAT TONIGHT.', said)).toEqual({
+      ratio: 1,
+      shared: 5,
+      echo: true,
+    });
   });
 });

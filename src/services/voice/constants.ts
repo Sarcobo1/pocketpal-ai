@@ -93,3 +93,18 @@ export const VOICE_START_TIMEOUT_MS = 45_000;
  */
 export const VOICE_ANSWER_INSTRUCTION =
   'Answer in one or two short sentences. Your reply is read aloud, not shown as text.';
+
+/**
+ * What stands beside the clip in a spoken turn's user message.
+ *
+ * A spoken turn carries no words of its own, so a model that hears has nothing
+ * to answer but the sound — and a model trained to be useful reads that as a
+ * request to say the sound back. This is the turn asking for a reply instead.
+ * It rides the user message and not the system prompt, because only here is the
+ * input something the user spoke; a typed turn with the same model never sees
+ * it. Text output needs no change: the `Respond with text.` guard is appended
+ * to the system prompt separately, and both are in front of the model at once.
+ */
+export const VOICE_AUDIO_INSTRUCTION =
+  'The user spoke the attached audio. Reply to what they said in 1-2 sentences. ' +
+  'Do not repeat or transcribe it.';

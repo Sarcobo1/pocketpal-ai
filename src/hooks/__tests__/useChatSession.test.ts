@@ -13,7 +13,10 @@ import {
 } from '../../../jest/fixtures/models';
 
 import {useChatSession} from '../useChatSession';
-import {VOICE_ANSWER_INSTRUCTION} from '../../services/voice/constants';
+import {
+  VOICE_ANSWER_INSTRUCTION,
+  VOICE_AUDIO_INSTRUCTION,
+} from '../../services/voice/constants';
 import {isReadUrlAllowed} from '../../services/talents';
 import {bodyExtras} from '../../api/servers';
 
@@ -37,6 +40,25 @@ import {
 const mockAssistant = {
   id: 'h3o3lc5xj',
 };
+
+/** What the model is actually handed, read one turn at a time. */
+type SentMessages = Array<{role: string; content: any}>;
+
+const lastUserParts = (messages: SentMessages) => {
+  const last = [...messages].reverse().find(m => m.role === 'user')!;
+  return Array.isArray(last.content)
+    ? last.content
+    : [{type: 'text', text: last.content}];
+};
+const textPartsOf = (parts: Array<{type: string; text?: string}>) =>
+  parts.filter(part => part.type === 'text').map(part => part.text);
+const audioPartsOf = (parts: Array<{type: string}>) =>
+  parts.filter(part => part.type === 'input_audio');
+const promptOf = (messages: SentMessages) =>
+  messages
+    .filter(message => message.role === 'system')
+    .map(message => String(message.content))
+    .join('\n\n');
 
 beforeEach(() => {
   // Reset jest mocks' call counts without removing spies
@@ -1129,6 +1151,104 @@ describe('useChatSession', () => {
         }
       },
     );
+    it('a spoken turn with no clip to answer sends the words it was given', async () => {
+      const restore = withHistory([]);
+      try {
+        const messages = await sendFrame(true);
+
+        // A camera turn has its own text, so nothing is invented for it: the
+        // instruction belongs to a turn that reaches the model with no words.
+        const parts = lastUserParts(messages);
+        expect(textPartsOf(parts)).toEqual(['look at this']);
+        expect(audioPartsOf(parts)).toEqual([]);
+      } finally {
+        restore();
+      }
+    });
+  });
+
+  describe('a spoken turn that carries a clip', () => {
+    const omniModel = {
+      ...mockBasicModel,
+      id: 'omni-1',
+      origin: ModelOrigin.LOCAL,
+      isLocal: true,
+      mediaSupport: {vision: false, audioInput: true, audioOutput: true},
+    } as any;
+
+    const sendClip = async (text: string) => {
+      runInAction(() => {
+        modelStore.models = [omniModel];
+        modelStore.activeModelId = omniModel.id;
+        modelStore.isMultimodalActive = true;
+      });
+      if (modelStore.context) {
+        modelStore.context.completion = jest
+          .fn()
+          .mockResolvedValue({text: 'ok', content: 'ok', timings: {}});
+      }
+      const {result} = renderHook(() =>
+        useChatSession({current: null}, textMessage.author, mockAssistant),
+      );
+      await act(async () => {
+        await result.current.handleSendPress(
+          {
+            id: 'utt-9',
+            author: textMessage.author,
+            type: 'text',
+            text,
+            audioUri: '/voice-audio/utt-9.wav',
+          } as MessageType.Text,
+          {spoken: true},
+        );
+      });
+      const sent = (modelStore.engine!.completion as jest.Mock).mock
+        .calls[0][0] as {messages: Array<{role: string; content: any}>};
+      runInAction(() => {
+        modelStore.models = modelsList as any;
+        modelStore.activeModelId = undefined;
+        modelStore.isMultimodalActive = false;
+      });
+      const rows = (
+        chatSessionStore.addMessageToCurrentSession as jest.Mock
+      ).mock.calls.map(([row]) => row);
+      return {
+        messages: sent.messages,
+        userRow: rows.find(row => row.author?.id !== mockAssistant.id),
+      };
+    };
+
+    it('answers the clip instead of reading it back', async () => {
+      const {messages} = await sendClip('');
+      const parts = lastUserParts(messages);
+
+      expect(audioPartsOf(parts)).toHaveLength(1);
+      // The instruction rides the user turn, beside the audio, because that is
+      // where a model trained to transcribe an input looks for what to do with
+      // it. The system prompt keeps only the short-answer rule.
+      expect(textPartsOf(parts)).toEqual([VOICE_AUDIO_INSTRUCTION]);
+      expect(promptOf(messages)).not.toContain(VOICE_AUDIO_INSTRUCTION);
+    });
+
+    it('keeps the row empty so the bubble keeps its label', async () => {
+      const {messages, userRow} = await sendClip('');
+
+      expect(userRow.text).toBe('');
+      expect(userRow.audioUri).toBe('/voice-audio/utt-9.wav');
+      expect(
+        lastUserParts(messages).some(
+          part => part.type === 'text' && part.text === '',
+        ),
+      ).toBe(false);
+    });
+
+    it('leaves a dictated turn the words it was sent with', async () => {
+      const {messages} = await sendClip('turn the heating on');
+
+      expect(textPartsOf(lastUserParts(messages))).toEqual([
+        'turn the heating on',
+      ]);
+    });
   });
 
   it('should use system prompt as-is when pal has no parameters', async () => {

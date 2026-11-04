@@ -583,3 +583,62 @@ export function removeThinkingParts(text: string): string {
 
   return result;
 }
+
+/**
+ * Word boundaries for the echo check: whitespace and the punctuation that sits
+ * between words. Written as a list rather than `\p{P}` because a release APK
+ * runs on a JS engine that may not accept the property escape, and one that
+ * throws at parse time takes the module with it.
+ */
+const ECHO_BOUNDARY_RE = /[\s,.!?;:'"“”«»(){}\[\]…—–_\-/\\]+/;
+
+/**
+ * How much of an answer is the question said back.
+ *
+ * The symptom this measures is a voice model replying to a spoken question by
+ * repeating it: the reply is built out of the turn it answers. Exact string
+ * comparison cannot see that — a tokenizer leaves `name.` where the input had
+ * `name` — so both sides are read as words, and the comparison is of the
+ * longest *run* of words the two share in order.
+ *
+ * A run, not a bag: an answer that borrows `the`, `capital` and `of` from a
+ * question it is answering is normal English, and a set-overlap score calls
+ * that an echo in every language. `"the capital of france"` standing in the
+ * answer unchanged, next to a new word or two, is the failure the user hears.
+ *
+ * The denominator is the shorter side, so a one-line reply that is the
+ * question verbatim scores 1 whatever length the question was.
+ */
+export function measureEcho(
+  reply: string,
+  source: string,
+): {ratio: number; shared: number; echo: boolean} {
+  const asked = source.toLowerCase().split(ECHO_BOUNDARY_RE).filter(Boolean);
+  const answer = reply.toLowerCase().split(ECHO_BOUNDARY_RE).filter(Boolean);
+  if (!asked.length || !answer.length) {
+    return {ratio: 0, shared: 0, echo: false};
+  }
+  // Longest common contiguous run of words, in the plain DP form: the previous
+  // diagonal extended by a match, broken by anything else. Utterances are a
+  // few dozen words, so the table is nothing.
+  let run = 0;
+  let prev = new Array<number>(asked.length + 1).fill(0);
+  for (let j = 1; j <= answer.length; j++) {
+    const cur = new Array<number>(asked.length + 1).fill(0);
+    for (let i = 1; i <= asked.length; i++) {
+      if (asked[i - 1] === answer[j - 1]) {
+        cur[i] = prev[i - 1] + 1;
+        run = Math.max(run, cur[i]);
+      }
+    }
+    prev = cur;
+  }
+  const ratio = run / Math.min(asked.length, answer.length);
+  return {
+    ratio: Math.round(ratio * 100) / 100,
+    shared: run,
+    // Both, because neither alone: three shared words out of four is an echo,
+    // and ten shared out of two hundred is a topic.
+    echo: run >= 3 && ratio >= 0.7,
+  };
+}

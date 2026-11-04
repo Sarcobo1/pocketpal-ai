@@ -42,19 +42,23 @@ import {
 import {
   convertToChatMessages,
   countMediaParts,
+  measureEcho,
   removeThinkingParts,
   visibleStepContent,
 } from '../utils/chat';
 import {acquireKeepAwake} from '../utils/keepAwake';
 import {vtrace} from '../utils/voiceTrace';
-import {logPerf} from '../utils/mediaPerf';
+import {addTurnInfo, logPerf, markTurn} from '../utils/mediaPerf';
 import {
   controlTokenLoop,
   omniModeGuardFor,
   stripControlTokens,
   TEXT_MODE_INSTRUCTION,
 } from '../utils/omniMode';
-import {VOICE_ANSWER_INSTRUCTION} from '../services/voice/constants';
+import {
+  VOICE_ANSWER_INSTRUCTION,
+  VOICE_AUDIO_INSTRUCTION,
+} from '../services/voice/constants';
 import {toLocalMediaPath} from '../utils/multimodalPatterns';
 import {LLAMARN_ERROR_PATTERNS} from '../utils/llamaRnErrors';
 import {projectionGapCopy} from '../utils/multimodalHelpers';
@@ -81,6 +85,10 @@ import {
   type AgentUiState,
   type TokenDelta,
 } from '../services/agent';
+
+/** A value that still reads as one `k=v` pair once logPerf prints the line. */
+const oneLine = (text: string): string => text.replace(/\s+/g, ' ').trim();
+
 // Helper function to prepare completion parameters using OpenAI-compatible
 // messages API. Creates the empty `assistant_turn` row up-front so the
 // active-vs-persisted predicate sees the right "last message" before the
@@ -155,6 +163,17 @@ const prepareCompletion = async ({
   const canAudio = hasAudio && media.audioInput;
   const multimodalReady = canImages || canAudio;
 
+  // A spoken turn reaches the model with no words at all, which reads as "say
+  // back what you heard" to a model trained to transcribe. The instruction goes
+  // in the prompt part beside the clip and never in the row: the row stays
+  // empty so the bubble keeps its "Voice message" label, the history keeps its
+  // placeholder, and a dictated turn — whose text the engine already knows —
+  // keeps the words it was sent with.
+  const spokenInstruction = canAudio && !message.text.trim();
+  const userTextPart = spokenInstruction
+    ? VOICE_AUDIO_INSTRUCTION
+    : message.text;
+
   // Create user message content - use array format only for multimodal,
   // string for text-only.
   let userMessageContent: any;
@@ -163,7 +182,7 @@ const prepareCompletion = async ({
     userMessageContent = [
       {
         type: 'text',
-        text: message.text,
+        text: userTextPart,
       },
       ...(canImages
         ? imageUris.map(path => ({
@@ -311,8 +330,17 @@ const prepareCompletion = async ({
     // answer one lands last, and a 48-character window would hide the mode text
     // that has to stand in front of it.
     systemTail: systemMessage
-      ? String(systemMessage.content).slice(-110).replace(/\n/g, '\\n')
+      ? oneLine(String(systemMessage.content)).slice(-110)
       : '-',
+    // The whole of a spoken turn as the model receives it: the words beside the
+    // clip, and the clip itself. A question answered with its own text back is a
+    // prompt-shape failure before it is a sampling one, and the chat template
+    // runs natively, so this is the only place the shape is visible.
+    textPart: multimodalReady ? oneLine(userTextPart).slice(-90) : '-',
+    audioPath:
+      canAudio && audioUri
+        ? oneLine(toLocalMediaPath(audioUri)).slice(-46)
+        : '-',
     lastRole: lastTurn?.role,
     lastMedia: Array.isArray(lastTurn?.content),
   });
@@ -445,7 +473,33 @@ const prepareCompletion = async ({
     sessionId: chatSessionStore.activeSessionId!,
   };
 
-  return {cleanCompletionParams, messageInfo, promptMedia};
+  // The words an answer can be diffed against, to count a reply that is really
+  // the question back. A dictated turn has them — the engine wrote them — but an
+  // omni voice turn heard the clip and nothing transcribed it, so the next best
+  // is the last turn that had words of its own: a model that answers the same
+  // question twice running shows up here even with no transcript to read.
+  let prevUserText = '';
+  for (const row of currentMessages) {
+    if (row.type !== 'text' || row.author.id === assistant.id) {
+      continue;
+    }
+    const words = row.text?.trim();
+    if (words) {
+      prevUserText = words;
+    }
+  }
+  const echoSource = message.text.trim() || prevUserText;
+
+  return {
+    cleanCompletionParams,
+    messageInfo,
+    promptMedia,
+    echoSource,
+    // Which of the two the diff ran against, because `no-transcript` is the
+    // number this build cannot read and the report must not dress it up as an
+    // answer of `ok`.
+    echoFrom: message.text.trim() ? 'text' : prevUserText ? 'prev' : 'none',
+  };
 };
 
 // Per-run TTS streaming state. The runner emits content/reasoning
@@ -601,6 +655,11 @@ async function applyEventToStore(
     hasImages: boolean;
     isMultimodalEnabled: boolean;
     promptMedia: {images: number; audio: number} | undefined;
+    /** The turn was spoken, not typed. */
+    spoken: boolean;
+    /** The words this answer can be read against, and where they came from. */
+    echoSource: string;
+    echoFrom: string;
     tts: TtsRunState;
     stopped: boolean;
   },
@@ -648,6 +707,7 @@ async function applyEventToStore(
       const hasFirstTokenSignal = !!(delta.content || delta.reasoningContent);
       if (ctx.timeToFirstTokenMs.value === null && hasFirstTokenSignal) {
         ctx.timeToFirstTokenMs.value = Date.now() - ctx.completionStartTime;
+        markTurn('ttft');
       }
       if (!modelStore.isStreaming) {
         modelStore.setIsStreaming(true);
@@ -766,6 +826,16 @@ async function applyEventToStore(
       // took, next to how much media the prompt carried. Prefill grows with the
       // frames the projector is handed, not with the words.
       if (ctx.promptMedia) {
+        // The engine's own numbers, on the turn's line too: what the listener
+        // waits through is prefill plus the first token, and prefill is where
+        // the clip's tokens and the audio encoder get paid for.
+        addTurnInfo({
+          ppMs: timings.prompt_ms,
+          ppTok: timings.prompt_n,
+          cached: timings.cache_n,
+          genMs: timings.predicted_ms,
+          dev: modelStore.multimodalDevice,
+        });
         logPerf('turn.eval', {
           images: ctx.promptMedia.images,
           audio: ctx.promptMedia.audio,
@@ -779,6 +849,27 @@ async function applyEventToStore(
           ttft: timings.time_to_first_token_ms,
           projector: modelStore.multimodalDevice,
           nCtx: modelStore.activeContextSettings?.n_ctx,
+        });
+      }
+      markTurn('reply');
+
+      // Counted on every spoken turn, where the answer lands: a reply built out
+      // of the question's own words is the failure the user hears, and "sometimes"
+      // only becomes a number one line at a time. `no-transcript` is honest — an
+      // omni voice turn has nothing to diff against, because nothing wrote the
+      // question down — and is reported as itself rather than as an `ok`.
+      if (ctx.spoken || ctx.promptMedia?.audio) {
+        const reply = finalResult.content ?? '';
+        const echo = measureEcho(reply, ctx.echoSource);
+        const reason =
+          ctx.echoFrom === 'none' ? 'no-transcript' : echo.echo ? 'echo' : 'ok';
+        logPerf('turn.echo', {
+          reason,
+          src: ctx.echoFrom,
+          ratio: echo.ratio,
+          run: echo.shared,
+          said: oneLine(ctx.echoSource).slice(0, 48),
+          reply: oneLine(reply).slice(0, 48),
         });
       }
       await chatSessionStore.updateMessage(ctx.messageId, ctx.sessionId, {
@@ -1045,19 +1136,24 @@ export const useChatSession = (
       model: modelStore.activeModel,
     });
 
-    const {cleanCompletionParams, messageInfo, promptMedia} =
-      await prepareCompletion({
-        imageUris: imageUris || [],
-        audioUri,
-        message,
-        systemMessages,
-        contextId,
-        assistant,
-        conversationIdRef: conversationIdRef.current,
-        l10n,
-        currentMessages,
-        spoken: !!opts.spoken,
-      });
+    const {
+      cleanCompletionParams,
+      messageInfo,
+      promptMedia,
+      echoSource,
+      echoFrom,
+    } = await prepareCompletion({
+      imageUris: imageUris || [],
+      audioUri,
+      message,
+      systemMessages,
+      contextId,
+      assistant,
+      conversationIdRef: conversationIdRef.current,
+      l10n,
+      currentMessages,
+      spoken: !!opts.spoken,
+    });
 
     currentMessageInfo.current = messageInfo;
     opts.onTurnCreated?.(messageInfo.id);
@@ -1219,6 +1315,9 @@ export const useChatSession = (
           promptMedia,
           tts,
           stopped: lease.signal.aborted,
+          spoken: !!opts.spoken,
+          echoSource,
+          echoFrom,
         });
 
         if (performance.now() - lastYieldTs >= YIELD_INTERVAL_MS) {

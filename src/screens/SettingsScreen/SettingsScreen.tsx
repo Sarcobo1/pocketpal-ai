@@ -1356,6 +1356,24 @@ export const SettingsScreen: React.FC = observer(() => {
                   />
                 </View>
 
+                {/* The silence that ends a spoken turn is the one part of a
+                    voice turn the listener cannot see: the answer may already
+                    be ready while the mic still waits. Short is fast and cuts
+                    off whoever pauses to think, so the length is their call. */}
+                <View style={styles.settingItemContainer}>
+                  <InputSlider
+                    testID="voice-endpoint-slider"
+                    label={l10n.settings.voiceEndpoint}
+                    description={l10n.settings.voiceEndpointDescription}
+                    value={ttsStore.voiceEndpointMs}
+                    onValueChange={value => ttsStore.setVoiceEndpointMs(value)}
+                    min={300}
+                    max={1500}
+                    step={50}
+                    unit="ms"
+                  />
+                </View>
+
                 <View style={styles.switchContainer}>
                   <View style={styles.textContainer}>
                     <Text variant="titleMedium" style={styles.textLabel}>

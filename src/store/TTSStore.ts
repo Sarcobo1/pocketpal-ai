@@ -35,7 +35,10 @@ import {
   ThinkingStripper,
   pickThinkingPlaceholder,
 } from '../services/tts/thinkingStripper';
-import {VOICE_FIRST_CHUNK_HOLD_MS} from '../services/voice/constants';
+import {
+  VOICE_ENDPOINT_HANG_MS,
+  VOICE_FIRST_CHUNK_HOLD_MS,
+} from '../services/voice/constants';
 import {speechReasonOf} from '../services/voice/types';
 import type {ModelVoiceSink} from '../services/voice/types';
 import {logPerf} from '../utils/mediaPerf';
@@ -206,6 +209,15 @@ export class TTSStore {
    */
   slowSpeech: 'wait' | 'system' = 'wait';
 
+  /**
+   * How long the mic waits on silence before it calls the sentence finished
+   * (ms). It is the one stage of a voice turn the listener does not hear as
+   * thinking — the answer could already be on its way — so a short one is the
+   * cheapest latency there is, and too short a one cuts off whoever pauses to
+   * think. `VOICE_ENDPOINT_HANG_MS` is the tuned default.
+   */
+  voiceEndpointMs: number = VOICE_ENDPOINT_HANG_MS;
+
   // UI state
   isSetupSheetOpen: boolean = false;
   /** Free disk bytes, refreshed each time the setup sheet opens. */
@@ -283,6 +295,7 @@ export class TTSStore {
         'streamSpeech',
         'voiceShortAnswers',
         'slowSpeech',
+        'voiceEndpointMs',
       ],
       storage: AsyncStorage,
     });
@@ -577,6 +590,14 @@ export class TTSStore {
    */
   setSlowSpeech(policy: 'wait' | 'system') {
     this.slowSpeech = policy;
+  }
+
+  /**
+   * The silence that ends a spoken turn (ms). The next turn's mic opening is
+   * what reads it, so a change lands on the sentence after the tap.
+   */
+  setVoiceEndpointMs(ms: number) {
+    this.voiceEndpointMs = Math.min(Math.max(Math.round(ms), 300), 1500);
   }
 
   openSetupSheet() {

@@ -124,6 +124,8 @@
     "voiceShortAnswersDescription": "On a spoken turn, ask the model for one or two sentences — a reply is heard, not read, and every sentence past the second is more to wait for. Typed turns keep the prompt they always had.",
     "slowSpeech": "When speech is slow",
     "slowSpeechDescription": "Off waits longer: a reply the model cannot speak in real time starts later and keeps its own voice. On uses the system voice: the model speaks until it falls behind, then the installed TTS voice finishes the sentence. Each voiced reply logs what it had to wait for as [framePerf] speech.stream in logcat.",
+    "voiceEndpoint": "End of a sentence",
+    "voiceEndpointDescription": "How long the mic waits on silence before it treats your sentence as finished. Shorter replies sooner; too short cuts off a pause. Takes effect on the next thing you say. Each turn logs where its time went as [framePerf] turn.timeline in logcat.",
     "ttsAvailabilityLowMemoryWarning": "Your device's memory is low — this may not work reliably.",
     "modelLoadingSettings": "Model Loading Settings",
     "autoOffloadLoad": "Auto Offload/Load",

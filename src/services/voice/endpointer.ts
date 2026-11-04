@@ -21,7 +21,6 @@ import type {VadFloors} from './speechLevel';
 
 const BYTES_PER_MS = (ASR_SAMPLE_RATE * 2) / 1000;
 const CALIBRATE_BYTES = VOICE_VAD_CALIBRATE_MS * BYTES_PER_MS;
-const HANG_BYTES = VOICE_ENDPOINT_HANG_MS * BYTES_PER_MS;
 
 /** One captured chunk, with the loudness that decided what to do with it. */
 type Entry = {pcm: Uint8Array; rms: number};
@@ -50,6 +49,9 @@ export class Endpointer {
   private speechBytes = 0;
   private started = false;
 
+  /** Silence that closes an utterance (ms), from the setting or the default. */
+  private hangMs = VOICE_ENDPOINT_HANG_MS;
+
   /** Room tone estimate, in RMS, learned from the chunks that are not speech. */
   private noise = VOICE_VAD_TRACK_MIN_RMS;
 
@@ -60,6 +62,11 @@ export class Endpointer {
   /** True once a contiguous run long enough to be speech was heard. */
   get hasSpeech(): boolean {
     return this.started;
+  }
+
+  /** The silence that ended the utterance, as the turn's line reports it. */
+  get hang(): number {
+    return Math.round(this.silentBytes / BYTES_PER_MS);
   }
 
   /** The longest voiced run in the buffer so far (ms). */
@@ -78,6 +85,7 @@ export class Endpointer {
     const {noise, calibrated} = this.learn(chunk.length, rms, onset);
     this.entries.push({pcm: chunk, rms});
     this.bytes += chunk.length;
+    const hangBytes = this.hangMs * BYTES_PER_MS;
 
     const voiced = rms >= (this.started ? hold : onset);
     if (voiced) {
@@ -96,7 +104,7 @@ export class Endpointer {
     }
 
     if (!this.started) {
-      if (this.silentBytes < HANG_BYTES) {
+      if (this.silentBytes < hangBytes) {
         this.trimLeadIn();
         return 'none';
       }
@@ -117,7 +125,7 @@ export class Endpointer {
       return 'none';
     }
 
-    const paused = this.silentBytes >= HANG_BYTES;
+    const paused = this.silentBytes >= hangBytes;
     const tooLong = this.bytes >= ASR_MAX_SEGMENT_MS * BYTES_PER_MS;
     if (paused || tooLong) {
       vtrace('vad.end', {
@@ -155,8 +163,13 @@ export class Endpointer {
    * Called every time the mic opens: the buffered audio goes and the room is
    * measured again, since a phone that was silent on a desk is in a hand, in a
    * different room, by the next turn.
+   *
+   * `hangMs` is the setting, read every time because the setting can change
+   * between two turns of one session. Shorter answers faster and cuts a speaker
+   * off mid-breath; longer is the old behavior.
    */
-  reset(): void {
+  reset(hangMs: number = VOICE_ENDPOINT_HANG_MS): void {
+    this.hangMs = hangMs;
     this.clear();
     this.calibratedBytes = 0;
     this.calibMin = Infinity;

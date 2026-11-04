@@ -1,5 +1,7 @@
 import {makeAutoObservable, observable, runInAction} from 'mobx';
 
+import {VOICE_ENDPOINT_HANG_MS} from '../../src/services/voice/constants';
+
 type DownloadState = 'not_installed' | 'downloading' | 'ready' | 'error';
 
 class MockTTSStore {
@@ -51,6 +53,9 @@ class MockTTSStore {
   streamSpeech = true;
   voiceShortAnswers = true;
   slowSpeech: 'wait' | 'system' = 'wait';
+  // The real default, so a voice test that counts the endpoint wait gets the
+  // one the phone runs with unless it says otherwise.
+  voiceEndpointMs = VOICE_ENDPOINT_HANG_MS;
 
   supertonicDownloadState: DownloadState = 'not_installed';
   supertonicDownloadProgress = 0;
@@ -193,6 +198,11 @@ class MockTTSStore {
     this.setSlowSpeech = jest.fn((policy: 'wait' | 'system') => {
       runInAction(() => {
         this.slowSpeech = policy;
+      });
+    });
+    this.setVoiceEndpointMs = jest.fn((ms: number) => {
+      runInAction(() => {
+        this.voiceEndpointMs = Math.min(Math.max(Math.round(ms), 300), 1500);
       });
     });
     this.openSetupSheet = jest.fn();

@@ -5,7 +5,7 @@ import {ModelOrigin} from '../../utils/types';
 import {vtrace} from '../../utils/voiceTrace';
 
 import {findTurn} from './chatTurns';
-import {logPerf, startPerf} from '../../utils/mediaPerf';
+import {addTurnInfo, logPerf, markTurn, startPerf} from '../../utils/mediaPerf';
 import {captureVoiceFrame} from './frameSource';
 import {gateUtterance} from './speechLevel';
 import {writeUtteranceWav} from './wav';
@@ -90,6 +90,7 @@ export class OmniVoiceEngine implements VoiceEngine {
       const gate = gateUtterance(utterance);
       vtrace('utt.gate', {reason: gate.reason, speechMs: gate.speechMs});
       logPerf('utt.gate', {...gate});
+      markTurn('gate');
       if (!gate.pass) {
         return 'empty';
       }
@@ -101,11 +102,16 @@ export class OmniVoiceEngine implements VoiceEngine {
         return 'reply_failed';
       }
       lap('utt.wav', {bytes: utterance.length});
+      markTurn('wav');
       if (aborted) {
         return 'interrupted';
       }
       const imageUris = await captureVoiceFrame();
       lap('utt.frame', {frames: imageUris.length});
+      markTurn('frame');
+      // How long the clip the model has to listen to is: 16-bit mono at 16 kHz
+      // is 32 bytes per millisecond.
+      addTurnInfo({clipMs: Math.round(utterance.length / 32)});
       if (aborted) {
         return 'interrupted';
       }
@@ -134,6 +140,9 @@ export class OmniVoiceEngine implements VoiceEngine {
           turnId = id;
         },
       );
+      // Everything between here and the first token is the model's, not the
+      // app's: the template, the audio encode and the prefill it costs.
+      markTurn('send');
       let sendFailed = false;
       try {
         await sending;

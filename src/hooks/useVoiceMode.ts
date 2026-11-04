@@ -38,7 +38,14 @@ import type {
   VoiceTurnPort,
 } from '../services/voice';
 import {CascadeVoiceEngine} from '../services/voice/cascadeEngine';
-import {logPerf, startPerf} from '../utils/mediaPerf';
+import {
+  addTurnInfo,
+  closeTurnTimeline,
+  logPerf,
+  markTurn,
+  openTurnTimeline,
+  startPerf,
+} from '../utils/mediaPerf';
 import {OmniVoiceEngine, isOmniVoiceModel} from '../services/voice/omniEngine';
 import {
   modelCanVoiceReplies,
@@ -589,7 +596,9 @@ class VoiceModeController {
       if (!this.isListening(session) || this.listener) {
         return;
       }
-      this.endpointer.reset();
+      // The wait is read every time the mic opens: it is a setting, and the
+      // sentence after a change should be the one that answers sooner.
+      this.endpointer.reset(ttsStore.voiceEndpointMs);
       this.listener = AudioRecord.on('data', (chunk: string) => {
         if (!this.listener) {
           return;
@@ -643,16 +652,28 @@ class VoiceModeController {
   }
 
   private endUtterance(session: number, by: 'auto' | 'tap'): void {
-    vtrace('utt.end', {by, voicedMs: this.endpointer.voicedMs});
+    // Both are read before the buffer goes away, and both are what the turn's
+    // line is judged against: a long wait with a short hang is the setting doing
+    // its job, a long wait with a long prefill is the model's.
+    const spoke = this.endpointer.voicedMs;
+    const hang = this.endpointer.hang;
+    vtrace('utt.end', {by, voicedMs: spoke});
     const utterance = this.endpointer.take();
     this.stopCapture();
+    openTurnTimeline();
+    addTurnInfo({by, spoke, hang});
+    markTurn('endpoint');
     // An omni turn has no transcript to wait for: the model has the audio.
     this.setPhase(this.engine.id === 'omni' ? 'thinking' : 'transcribing', by);
     const current = () => session === this.session;
     const turn = this.engine.runTurn(utterance, this.turnPort, {
       transcribed: () => current() && this.setPhase('thinking', 'transcribed'),
-      speechStarted: () =>
-        current() && this.setPhase('speaking', 'speech_started'),
+      speechStarted: () => {
+        if (current()) {
+          markTurn('firstAudio');
+          this.setPhase('speaking', 'speech_started');
+        }
+      },
     });
     this.turn = turn;
     turn.done
@@ -662,6 +683,9 @@ class VoiceModeController {
         if (!current()) {
           return;
         }
+        // Printed from the endpoint to whatever the turn reached, so an
+        // interrupted turn still shows the half it got through.
+        closeTurnTimeline({outcome, engine: this.engine.id});
         this.turn = null;
         this.setPhase('listening', outcome);
         const error = FAILURES[outcome];

@@ -2,7 +2,7 @@ import {neuralAudioPlayer} from '@pocketpalai/react-native-speech/engine-sdk';
 
 import {modelStore, ttsStore} from '../../store';
 import {ModelOrigin} from '../../utils/types';
-import {logPerf} from '../../utils/mediaPerf';
+import {addTurnInfo, logPerf, markTurn} from '../../utils/mediaPerf';
 import {vtrace} from '../../utils/voiceTrace';
 import {openSpeechFeed, type SpeechFeed} from './speechStream';
 
@@ -243,6 +243,9 @@ export const speakWithModel = async (
   let announced = false;
   /** The words the model's voice gave up on, once it handed the reply over. */
   let resumeText = '';
+  // Where the speech pass begins. Its own prefill is the reason a voice turn
+  // can pay for the conversation twice, and the timeline has to show that.
+  markTurn('speech');
   const out = await ctx
     .generateSpeech(
       {
@@ -258,6 +261,9 @@ export const speakWithModel = async (
             // the jitter buffer is the feed's business, not the caller's.
             if (!announced) {
               announced = true;
+              // The engine's first sample, which is ahead of the first sound:
+              // the difference is the jitter buffer the feed holds.
+              markTurn('audioOut');
               onPlaying?.();
             }
             feed.push(samples, sampleRate);
@@ -348,6 +354,7 @@ export const speakWithModel = async (
       ms: Date.now() - t0,
       stop: out.stopReason,
     });
+    addTurnInfo({cacheMs: Date.now() - t0});
   }
 
   const deadEnd = DEAD_ENDS.has(out.stopReason);

@@ -71,6 +71,24 @@ describe('Endpointer', () => {
     expect(results.indexOf('endpoint')).toBe(results.length - 1);
   });
 
+  it('takes the endpoint wait from the mic, not from the constant', () => {
+    // The setting is read every time the mic opens, so a turn already under way
+    // keeps the wait it started with and the next one gets the new one.
+    const endpointer = new Endpointer();
+    endpointer.reset(300);
+    pushFor(endpointer, voiced, 500);
+    const short = pushFor(endpointer, silent, 350);
+
+    // Six 50 ms chunks is the 300 ms this endpointer was told to wait for.
+    expect(short.indexOf('endpoint')).toBe(5);
+    expect(endpointer.hang).toBeGreaterThanOrEqual(300);
+
+    endpointer.reset();
+    pushFor(endpointer, voiced, 500);
+    const tuned = pushFor(endpointer, silent, 500);
+    expect(tuned).not.toContain('endpoint');
+  });
+
   it('a tap ends the utterance only once speech was heard', () => {
     const endpointer = new Endpointer();
     pushFor(endpointer, silent, 1000);

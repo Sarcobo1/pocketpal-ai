@@ -1147,7 +1147,7 @@ export class TTSStore {
     return {
       appendText: chunk => {
         text += chunk;
-        if (aheadPlaying || !ttsStore.speechFastStart) {
+        if (aheadPlaying || !this.speechFastStart) {
           return;
         }
         const first = firstSpokenSentence(text);

@@ -174,6 +174,14 @@ const emptyStats = (): SpeechFeedStats => ({
 });
 
 /**
+ * Where a spoken reply may stop: a strong mark is where the speaker meant a
+ * sentence to end, a weak one is only where they meant to breathe. The feed and
+ * the fast start cut on the same set, which is why it is written once.
+ */
+const STRONG_BREAK = new Set(['.', '!', '?', ':', '\n']);
+const WEAK_BREAK = new Set([',', ';']);
+
+/**
  * Where in `text` a spoken reply may be paused without cutting a word, as
  * fractions of the whole.
  *
@@ -194,8 +202,6 @@ export const planSpeechBoundaries = (
     1,
     Math.round(minSegmentSeconds * SPEECH_CHARS_PER_SECOND),
   );
-  const strong = new Set(['.', '!', '?', ':', '\n']);
-  const weak = new Set([',', ';']);
   const marks: Array<{at: number; strong: boolean}> = [];
   let previous = 0;
   for (let i = 0; i < length; i++) {
@@ -204,7 +210,7 @@ export const planSpeechBoundaries = (
     // A terminator only counts where the next character starts a word, so an
     // ellipsis is one boundary and "3.5" is none.
     if (
-      !(strong.has(c) || weak.has(c)) ||
+      !(STRONG_BREAK.has(c) || WEAK_BREAK.has(c)) ||
       (next !== undefined && next !== ' ')
     ) {
       continue;
@@ -213,10 +219,77 @@ export const planSpeechBoundaries = (
     if (end - previous < minChars || end / length > 0.97) {
       continue;
     }
-    marks.push({at: end / length, strong: strong.has(c)});
+    marks.push({at: end / length, strong: STRONG_BREAK.has(c)});
     previous = end;
   }
   return marks;
+};
+
+/**
+ * The part of a still-arriving reply that may be said now: its first sentence,
+ * once that sentence is closed.
+ *
+ * A reply is streamed one token at a time, so this is asked over text that is not
+ * finished, and the answer has to be conservative twice over. Nothing is handed
+ * over until a terminator says a sentence ended — speaking half a sentence and
+ * then repeating it is worse than the wait — and a mark at the very end of what
+ * has arrived so far only counts when it is not a decimal point, because "3." may
+ * still be becoming "3.5".
+ *
+ * Past `maxSeconds` of it, a weak mark is taken rather than none: a reply long
+ * enough to have no punctuation for that long is not one the listener should have
+ * to wait out whole.
+ */
+export const firstSpokenSentence = (
+  text: string,
+  {
+    minSeconds = 1.2,
+    maxSeconds = 14,
+  }: {minSeconds?: number; maxSeconds?: number} = {},
+): string => {
+  const minChars = Math.max(
+    1,
+    Math.round(minSeconds * SPEECH_CHARS_PER_SECOND),
+  );
+  const maxChars = Math.max(
+    minChars,
+    Math.round(maxSeconds * SPEECH_CHARS_PER_SECOND),
+  );
+  const length = text.length;
+  if (length < minChars) {
+    return '';
+  }
+  let weakEnd = -1;
+  for (let i = minChars - 1; i < length; i++) {
+    const c = text[i]!;
+    if (!STRONG_BREAK.has(c) && !WEAK_BREAK.has(c)) {
+      continue;
+    }
+    // A mark is only a stop where the next word can begin, or where the text has
+    // stopped — and a digit before the mark means it may still be inside a number.
+    const next = text[i + 1];
+    if (next !== undefined && next !== ' ') {
+      continue;
+    }
+    if (next === undefined && /\d/.test(text[i - 1] ?? '')) {
+      continue;
+    }
+    if (STRONG_BREAK.has(c)) {
+      return text.slice(0, i + 1);
+    }
+    if (weakEnd < 0) {
+      weakEnd = i + 1;
+    }
+  }
+  if (length < maxChars) {
+    return '';
+  }
+  if (weakEnd > 0) {
+    return text.slice(0, weakEnd);
+  }
+  // No mark at all, and too long to keep waiting: stop at a word boundary.
+  const space = text.lastIndexOf(' ', maxChars);
+  return text.slice(0, space > minChars ? space : maxChars);
 };
 
 /**

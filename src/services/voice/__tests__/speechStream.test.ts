@@ -4,6 +4,7 @@ import {
   DEFAULT_MAX_SEGMENT_SECONDS,
   DEFAULT_MIN_SEGMENT_SECONDS,
   SPEECH_CHARS_PER_SECOND,
+  firstSpokenSentence,
   openSpeechFeed,
   planSpeechBoundaries,
   type SpeechFeed,
@@ -411,5 +412,47 @@ describe('the shortest piece', () => {
   it('is long enough to be a phrase', () => {
     expect(DEFAULT_MIN_SEGMENT_SECONDS).toBe(0.5);
     expect(DEFAULT_JITTER_SECONDS).toBe(0.4);
+  });
+});
+
+describe('the first sentence of a reply still arriving', () => {
+  /** The defaults, spelled out so a change to either is a decision. */
+  const at = (text: string) =>
+    firstSpokenSentence(text, {minSeconds: 1.2, maxSeconds: 14});
+
+  it('is nothing until a terminator closes a sentence long enough to say', () => {
+    expect(at('Yes.')).toBe('');
+    expect(at('The park is quiet in the')).toBe('');
+    expect(at('The park is quiet in the morning. Birds work.')).toBe(
+      'The park is quiet in the morning.',
+    );
+  });
+
+  it('waits for a sentence rather than handing over half a phrase', () => {
+    // A comma is where the speaker breathed, not where they ended. Saying this
+    // and then repeating it whole is worse than the wait.
+    expect(at('the garden needs water, and it is open all day')).toBe('');
+  });
+
+  it('takes a breath when a reply is too long to have no punctuation', () => {
+    const long = 'the garden needs water, '.repeat(12);
+    expect(long.length).toBeGreaterThan(210);
+    expect(at(long)).toBe('the garden needs water, ');
+  });
+
+  it('will not call the point in a number the end of a sentence', () => {
+    // "3." is only a full stop if nothing is coming after it, and a reply that
+    // is still arriving always has something coming after it.
+    expect(at('Turn at the marker on the road past 3.')).toBe('');
+  });
+
+  it('agrees with the feed about what a sentence end is', () => {
+    const text = 'The park is quiet. A few birds work along the fence.';
+    const strong = planSpeechBoundaries(
+      text,
+      DEFAULT_MIN_SEGMENT_SECONDS,
+    ).filter(mark => mark.strong);
+    expect(strong.length).toBeGreaterThan(1);
+    expect(at(text)).toBe('The park is quiet.');
   });
 });

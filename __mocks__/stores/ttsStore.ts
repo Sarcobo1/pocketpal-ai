@@ -93,6 +93,7 @@ class MockTTSStore {
   setSpeechLanguage: jest.Mock;
   setStreamSpeech: jest.Mock;
   setVoiceShortAnswers: jest.Mock;
+  setVoiceEndpointMs: jest.Mock;
   setSlowSpeech: jest.Mock;
   openSetupSheet: jest.Mock;
   closeSetupSheet: jest.Mock;

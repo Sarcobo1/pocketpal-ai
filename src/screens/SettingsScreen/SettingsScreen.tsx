@@ -68,6 +68,7 @@ import {
 } from '../../store';
 import {authService} from '../../services';
 import type {SearchProviderId} from '../../services/search/types';
+import type {SpeechPresetId} from '../../services/voice/constants';
 import {
   ASR_DISK_HEADROOM_FACTOR,
   ASR_INSUFFICIENT_STORAGE,
@@ -1301,6 +1302,56 @@ export const SettingsScreen: React.FC = observer(() => {
                   />
                 </View>
 
+                {/* One choice for how the model's voice should trade waiting for
+                    smoothness. The three options are the shapes the speech bench
+                    measures; the switches underneath are what each one sets, so
+                    a device can be left on a setting no preset names — and the
+                    row says so instead of pretending otherwise. */}
+                <View style={styles.settingItemContainer}>
+                  <Text variant="titleMedium" style={styles.textLabel}>
+                    {l10n.settings.speechPreset}
+                  </Text>
+                  <Text variant="labelSmall" style={styles.textDescription}>
+                    {l10n.settings.speechPresetDescription}
+                  </Text>
+                  <SegmentedButtons
+                    value={
+                      ttsStore.speechPreset === 'custom'
+                        ? ''
+                        : ttsStore.speechPreset
+                    }
+                    onValueChange={value =>
+                      ttsStore.setSpeechPreset(value as SpeechPresetId)
+                    }
+                    density="medium"
+                    buttons={[
+                      {
+                        value: 'fast',
+                        label: l10n.settings.speechPresetFast,
+                        labelStyle: {fontSize: 12},
+                        testID: 'speech-preset-fast',
+                      },
+                      {
+                        value: 'balanced',
+                        label: l10n.settings.speechPresetBalanced,
+                        labelStyle: {fontSize: 12},
+                        testID: 'speech-preset-balanced',
+                      },
+                      {
+                        value: 'best',
+                        label: l10n.settings.speechPresetBest,
+                        labelStyle: {fontSize: 12},
+                        testID: 'speech-preset-best',
+                      },
+                    ]}
+                  />
+                  {ttsStore.speechPreset === 'custom' && (
+                    <Text variant="labelSmall" style={styles.textDescription}>
+                      {l10n.settings.speechPresetCustom}
+                    </Text>
+                  )}
+                </View>
+
                 <View style={styles.switchContainer}>
                   <View style={styles.textContainer}>
                     <Text variant="titleMedium" style={styles.textLabel}>
@@ -1353,6 +1404,47 @@ export const SettingsScreen: React.FC = observer(() => {
                     onValueChange={value =>
                       ttsStore.setSlowSpeech(value ? 'system' : 'wait')
                     }
+                  />
+                </View>
+
+                {/* Speaking a reply used to throw away what the conversation had
+                    already paid for. It no longer has to, but the engine is the
+                    one that says whether it managed, and a device whose build
+                    cannot do it should be told in the same place. */}
+                <View style={styles.switchContainer}>
+                  <View style={styles.textContainer}>
+                    <Text variant="titleMedium" style={styles.textLabel}>
+                      {l10n.settings.speechKeepCache}
+                    </Text>
+                    <Text variant="labelSmall" style={styles.textDescription}>
+                      {l10n.settings.speechKeepCacheDescription}
+                    </Text>
+                  </View>
+                  <Switch
+                    testID="speech-keep-cache-switch"
+                    value={ttsStore.speechKeepCache}
+                    onValueChange={value => ttsStore.setSpeechKeepCache(value)}
+                  />
+                </View>
+
+                {/* The first spoken reply of a session pays for work that happens
+                    once per context. Saying a throwaway syllable when voice mode
+                    opens moves that cost to a moment nobody is asking a
+                    question in — and is worth turning off if it ever arrives as
+                    a click in the way. */}
+                <View style={styles.switchContainer}>
+                  <View style={styles.textContainer}>
+                    <Text variant="titleMedium" style={styles.textLabel}>
+                      {l10n.settings.speechPrewarm}
+                    </Text>
+                    <Text variant="labelSmall" style={styles.textDescription}>
+                      {l10n.settings.speechPrewarmDescription}
+                    </Text>
+                  </View>
+                  <Switch
+                    testID="speech-prewarm-switch"
+                    value={ttsStore.speechPrewarm}
+                    onValueChange={value => ttsStore.setSpeechPrewarm(value)}
                   />
                 </View>
 

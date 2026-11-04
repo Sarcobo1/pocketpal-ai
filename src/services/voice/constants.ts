@@ -108,3 +108,34 @@ export const VOICE_ANSWER_INSTRUCTION =
 export const VOICE_AUDIO_INSTRUCTION =
   'The user spoke the attached audio. Reply to what they said in 1-2 sentences. ' +
   'Do not repeat or transcribe it.';
+
+/**
+ * What a model-voice reply trades: how soon it starts against how smoothly it
+ * goes. Three settings make the whole difference — whether the reply is heard
+ * while it is still being decoded, how much audio is held back before the first
+ * sound, and whether a reply falling behind hands itself to the device voice —
+ * so they are grouped here instead of left as four switches to remember.
+ *
+ * The engine-side knobs (threads, batch, flash attention, projector device)
+ * are deliberately absent: they belong to the model's own settings and only a
+ * run on the device says what wins there. The Speech bench prints them.
+ */
+export type SpeechPresetId = 'fast' | 'balanced' | 'best';
+
+export interface SpeechPreset {
+  id: SpeechPresetId;
+  /** Whether the reply is heard in pieces as it is decoded. */
+  stream: boolean;
+  /** The least audio held before the first sound, in seconds. */
+  jitterSeconds: number;
+  /** Whether a reply falling behind is finished by the device voice. */
+  handoff: boolean;
+}
+
+export const SPEECH_PRESETS: Record<SpeechPresetId, SpeechPreset> = {
+  fast: {id: 'fast', stream: true, jitterSeconds: 0.25, handoff: true},
+  balanced: {id: 'balanced', stream: true, jitterSeconds: 0.4, handoff: true},
+  best: {id: 'best', stream: false, jitterSeconds: 0.4, handoff: false},
+};
+
+export const DEFAULT_SPEECH_PRESET: SpeechPresetId = 'balanced';

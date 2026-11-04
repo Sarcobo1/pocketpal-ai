@@ -1,6 +1,11 @@
 import {makeAutoObservable, observable, runInAction} from 'mobx';
 
-import {VOICE_ENDPOINT_HANG_MS} from '../../src/services/voice/constants';
+import {
+  DEFAULT_SPEECH_PRESET,
+  SPEECH_PRESETS,
+  VOICE_ENDPOINT_HANG_MS,
+  type SpeechPresetId,
+} from '../../src/services/voice/constants';
 
 type DownloadState = 'not_installed' | 'downloading' | 'ready' | 'error';
 
@@ -52,10 +57,33 @@ class MockTTSStore {
   // behavior has to say so instead of inheriting it by accident.
   streamSpeech = true;
   voiceShortAnswers = true;
+  // The real default is 'system'. The mock holds the conservative 'wait' so a
+  // suite only exercises the hand-off to system TTS when it says so, and the
+  // assertions about a reply that stays with the model keep meaning that.
   slowSpeech: 'wait' | 'system' = 'wait';
+  // Mirrored from the real defaults: consumers read these on every reply, so
+  // an undefined field here would silently take the code path with the argument
+  // missing instead of the one the phone runs.
+  speechJitterSeconds: number =
+    SPEECH_PRESETS[DEFAULT_SPEECH_PRESET].jitterSeconds;
+  speechKeepCache = true;
+  speechPrewarm = true;
   // The real default, so a voice test that counts the endpoint wait gets the
   // one the phone runs with unless it says otherwise.
   voiceEndpointMs = VOICE_ENDPOINT_HANG_MS;
+
+  // Mirrors the real getter: the preset is what the three flags spell, so a
+  // test that moved one flag alone reads back as `custom`.
+  get speechPreset(): SpeechPresetId | 'custom' {
+    const handoff = this.slowSpeech === 'system';
+    const found = Object.values(SPEECH_PRESETS).find(
+      preset =>
+        preset.stream === this.streamSpeech &&
+        preset.handoff === handoff &&
+        preset.jitterSeconds === this.speechJitterSeconds,
+    );
+    return found?.id ?? 'custom';
+  }
 
   supertonicDownloadState: DownloadState = 'not_installed';
   supertonicDownloadProgress = 0;
@@ -95,6 +123,9 @@ class MockTTSStore {
   setVoiceShortAnswers: jest.Mock;
   setVoiceEndpointMs: jest.Mock;
   setSlowSpeech: jest.Mock;
+  setSpeechPreset: jest.Mock;
+  setSpeechKeepCache: jest.Mock;
+  setSpeechPrewarm: jest.Mock;
   openSetupSheet: jest.Mock;
   closeSetupSheet: jest.Mock;
   onAssistantMessageStart: jest.Mock;
@@ -199,6 +230,24 @@ class MockTTSStore {
     this.setSlowSpeech = jest.fn((policy: 'wait' | 'system') => {
       runInAction(() => {
         this.slowSpeech = policy;
+      });
+    });
+    this.setSpeechPreset = jest.fn((preset: SpeechPresetId) => {
+      const chosen = SPEECH_PRESETS[preset];
+      runInAction(() => {
+        this.streamSpeech = chosen.stream;
+        this.speechJitterSeconds = chosen.jitterSeconds;
+        this.slowSpeech = chosen.handoff ? 'system' : 'wait';
+      });
+    });
+    this.setSpeechKeepCache = jest.fn((on: boolean) => {
+      runInAction(() => {
+        this.speechKeepCache = on;
+      });
+    });
+    this.setSpeechPrewarm = jest.fn((on: boolean) => {
+      runInAction(() => {
+        this.speechPrewarm = on;
       });
     });
     this.setVoiceEndpointMs = jest.fn((ms: number) => {

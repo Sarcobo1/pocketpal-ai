@@ -36,9 +36,12 @@ import {
   pickThinkingPlaceholder,
 } from '../services/tts/thinkingStripper';
 import {
+  DEFAULT_SPEECH_PRESET,
+  SPEECH_PRESETS,
   VOICE_ENDPOINT_HANG_MS,
   VOICE_FIRST_CHUNK_HOLD_MS,
 } from '../services/voice/constants';
+import type {SpeechPresetId} from '../services/voice/constants';
 import {speechReasonOf} from '../services/voice/types';
 import type {ModelVoiceSink} from '../services/voice/types';
 import {logPerf} from '../utils/mediaPerf';
@@ -206,8 +209,30 @@ export class TTSStore {
    * What to do when the model's voice is clearly generating slower than it can
    * speak. `wait` holds a bigger buffer and accepts a slow start; `system` lets
    * the device voice finish a reply the model's voice is falling behind on.
+   * The listener is left waiting for nothing in the second case, so it is the
+   * default and `wait` is the opt-out.
    */
-  slowSpeech: 'wait' | 'system' = 'wait';
+  slowSpeech: 'wait' | 'system' = 'system';
+
+  /**
+   * The least audio a streamed reply holds before its first sound, in seconds.
+   * Small starts sooner and stutters more; the preset row moves it.
+   */
+  speechJitterSeconds: number =
+    SPEECH_PRESETS[DEFAULT_SPEECH_PRESET].jitterSeconds;
+
+  /**
+   * Decode the utterance on a KV sequence of its own and drop only that
+   * sequence, so the conversation's prefix survives being spoken and the next
+   * turn does not pay a full prefill for it. Off spends the cache every reply.
+   */
+  speechKeepCache: boolean = true;
+
+  /**
+   * Voice one throwaway syllable when a voice session opens, so the first real
+   * reply is not the one that pays for building the speech generator.
+   */
+  speechPrewarm: boolean = true;
 
   /**
    * How long the mic waits on silence before it calls the sentence finished
@@ -295,6 +320,9 @@ export class TTSStore {
         'streamSpeech',
         'voiceShortAnswers',
         'slowSpeech',
+        'speechJitterSeconds',
+        'speechKeepCache',
+        'speechPrewarm',
         'voiceEndpointMs',
       ],
       storage: AsyncStorage,
@@ -590,6 +618,43 @@ export class TTSStore {
    */
   setSlowSpeech(policy: 'wait' | 'system') {
     this.slowSpeech = policy;
+  }
+
+  /**
+   * The speed/quality preset the speech flags currently spell, or `custom` when
+   * a switch has been moved on its own. Derived rather than stored: two answers
+   * to one question is how a setting ends up lying about the audio it gave.
+   */
+  get speechPreset(): SpeechPresetId | 'custom' {
+    const handoff = this.slowSpeech === 'system';
+    const found = Object.values(SPEECH_PRESETS).find(
+      preset =>
+        preset.stream === this.streamSpeech &&
+        preset.handoff === handoff &&
+        preset.jitterSeconds === this.speechJitterSeconds,
+    );
+    return found?.id ?? 'custom';
+  }
+
+  /**
+   * Choose how long the listener waits for the first sound against how smoothly
+   * the reply then goes. Takes effect on the next reply.
+   */
+  setSpeechPreset(preset: SpeechPresetId) {
+    const chosen = SPEECH_PRESETS[preset];
+    this.streamSpeech = chosen.stream;
+    this.speechJitterSeconds = chosen.jitterSeconds;
+    this.slowSpeech = chosen.handoff ? 'system' : 'wait';
+  }
+
+  /** Decode the utterance on its own KV sequence, keeping the chat's prefix. */
+  setSpeechKeepCache(on: boolean) {
+    this.speechKeepCache = on;
+  }
+
+  /** Voice a throwaway syllable when a voice session opens. */
+  setSpeechPrewarm(on: boolean) {
+    this.speechPrewarm = on;
   }
 
   /**

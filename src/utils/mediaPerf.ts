@@ -101,14 +101,17 @@ export function closeTurnTimeline(extra?: Record<string, PerfValue>): void {
     prev = offset;
   }
   const endpoint = at('endpoint');
-  const firstAudio = at('firstAudio');
+  // The first sound, when there was one: `firstAudio` is the engine's first
+  // sample, which reaches the ear a jitter buffer later, and the buffer is
+  // exactly the wait being measured.
+  const firstSound = at('firstSound') ?? at('firstAudio');
   logPerf('turn.timeline', {
     ...done.info,
     ...data,
     ...extra,
     // From the end of the speaker's sentence to the first sound of the answer.
     toFirstAudio:
-      firstAudio === undefined ? undefined : firstAudio - (endpoint ?? 0),
+      firstSound === undefined ? undefined : firstSound - (endpoint ?? 0),
     span: Date.now() - done.t0,
   });
 }

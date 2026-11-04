@@ -62,8 +62,13 @@ const QUIET_FRAME_MS = 20;
  */
 const QUIET_RMS = 0.01;
 
-/** A reply this far behind real time will not be smoothed by any buffer. */
-const SLOW_SPEECH_RTF = 2.5;
+/**
+ * A reply this far behind real time will not be smoothed by any buffer: the
+ * listener has heard a second of it and has another one and a half to wait per
+ * second spoken, which is the point at which the device voice is simply the
+ * better offer. Exported because the bench prints the number it judged by.
+ */
+export const SLOW_SPEECH_RTF = 1.5;
 
 /** Judged only after this much of it has been heard, so one slow frame is not it. */
 const SLOW_SPEECH_AFTER_MS = 1000;
@@ -138,6 +143,12 @@ export interface SpeechFeedOptions {
   maxSegmentSeconds?: number;
   /** Offer the rest of the reply to the device voice once it is hopeless. */
   allowHandoff?: boolean;
+  /**
+   * The first piece on its way to the output. The engine's own first sample is
+   * earlier than this by the jitter buffer, and the listener waits for this one,
+   * so the turn's timeline is marked here rather than at the first `push`.
+   */
+  onFirstPiece?: () => void;
 }
 
 const emptyStats = (): SpeechFeedStats => ({
@@ -319,6 +330,7 @@ export const openSpeechFeed = (options?: SpeechFeedOptions): SpeechFeed => {
   const maxSeconds = options?.maxSegmentSeconds ?? DEFAULT_MAX_SEGMENT_SECONDS;
   const text = options?.text ?? '';
   const allowHandoff = options?.allowHandoff ?? false;
+  const onFirstPiece = options?.onFirstPiece;
   const sink = options?.sink ?? openVoiceSink();
   const t0 = Date.now();
 
@@ -414,6 +426,7 @@ export const openSpeechFeed = (options?: SpeechFeedOptions): SpeechFeed => {
       playStartMs = Date.now();
       stats.firstPlayMs = playStartMs - t0;
       stats.jitterMs = Math.round(((handedOver + len) / rate) * 1000);
+      onFirstPiece?.();
     }
   };
 

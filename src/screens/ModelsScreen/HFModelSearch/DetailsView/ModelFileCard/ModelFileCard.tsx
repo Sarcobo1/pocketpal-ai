@@ -22,7 +22,9 @@ import {
   isProjectionModel,
   getVisionModelSizeBreakdown,
   isVisionRepo,
+  pairedDownloadProgress,
 } from '../../../../../utils';
+import type {DownloadPart} from '../../../../../utils';
 import {t} from '../../../../../locales';
 import {isLegacyQuantization} from '../../../../../utils/modelSettings';
 import {
@@ -76,25 +78,8 @@ export const ModelFileCard: FC<ModelFileCardProps> = observer(
 
     const storeModel = modelStore.models.find(m => m.id === convertedModel.id);
 
-    const isDownloading = storeModel
-      ? modelStore.isDownloading(storeModel.id)
-      : false;
-    const downloadSpeed = storeModel?.downloadSpeed;
-
-    const isBookmarked = computed(() =>
-      modelStore.models.some(model => model.hfModelFile?.oid === modelFile.oid),
-    ).get();
-
-    const isDownloaded = computed(() =>
-      modelStore.models.some(
-        model => model.hfModelFile?.oid === modelFile.oid && model.isDownloaded,
-      ),
-    ).get();
-    const downloadProgress =
-      isDownloading || isDownloaded ? storeModel?.progress || 0 : 0;
-
-    // Resolve projection model for memory check
-    // Resolve projection model for memory check
+    // The store row of the projector this file pairs with, if one was ever
+    // added: the memory check needs its size and the card needs its progress.
     const projectionModelForCheck = useMemo(
       () => {
         if (
@@ -110,6 +95,65 @@ export const ModelFileCard: FC<ModelFileCardProps> = observer(
       // eslint-disable-next-line react-hooks/exhaustive-deps -- MobX observable tracked by observer()
       [convertedModel, modelStore.models],
     );
+
+    // The card is one entry, but an Omni model is two files: the weights and
+    // the projector that lets those weights hear and see. Whatever the store
+    // holds of both is what this card shows progress for, cancels and deletes,
+    // so a bar that stops at the first file never reads as finished.
+    const projector =
+      projectionModelForCheck &&
+      modelStore.getModelVisionPreference(storeModel ?? convertedModel)
+        ? projectionModelForCheck
+        : undefined;
+
+    type Part = DownloadPart & {id: string};
+    const downloadParts: Part[] = [
+      storeModel && {
+        id: storeModel.id,
+        bytes: storeModel.size,
+        done: storeModel.isDownloaded,
+        progress: storeModel.progress,
+      },
+      projector && {
+        id: projector.id,
+        bytes: projector.size,
+        done: projector.isDownloaded,
+        progress: projector.progress,
+      },
+    ].filter((part): part is Part => !!part);
+
+    const isDownloading = downloadParts.some(part =>
+      modelStore.isDownloading(part.id),
+    );
+    // The speed of the file that is actually moving, which is the projector for
+    // the last stretch of a pair.
+    const downloadSpeed =
+      downloadParts
+        .map(part => modelStore.models.find(m => m.id === part.id))
+        .find(model => !!model && modelStore.isDownloading(model.id))
+        ?.downloadSpeed ?? storeModel?.downloadSpeed;
+
+    const isBookmarked = computed(() =>
+      modelStore.models.some(model => model.hfModelFile?.oid === modelFile.oid),
+    ).get();
+
+    const isDownloaded = computed(() =>
+      modelStore.models.some(
+        model => model.hfModelFile?.oid === modelFile.oid && model.isDownloaded,
+      ),
+    ).get();
+    // The pair counts as present only when both files are: a model whose
+    // projector is still missing has more to download, not something to delete.
+    const missingProjector = !!projector && !projector.isDownloaded;
+    const isPairDownloaded = isDownloaded && !missingProjector;
+    // Progress a card shows: the pair as one bar while the pair is arriving,
+    // and nothing at all once it has stopped — progress left over from a failed
+    // download reads as a part-finished bar the user cannot account for.
+    const downloadProgress = isPairDownloaded
+      ? 100
+      : isDownloading
+        ? pairedDownloadProgress(downloadParts)
+        : 0;
 
     const {shortMemoryWarning, multimodalWarning} = useMemoryCheck(
       convertedModel,
@@ -197,7 +241,17 @@ export const ModelFileCard: FC<ModelFileCardProps> = observer(
     };
 
     const handleDownload = () => {
-      if (isDownloaded) {
+      // The weights are here and the projector is not: one more tap brings the
+      // half that is missing, into the folder of the model that owns it. This
+      // is what a stopped two-file download is resumed with — the download
+      // manager restarts a cancelled job from the beginning of the file, never
+      // from the middle of it, so the only cheap resume is the file that never
+      // started.
+      if (isDownloaded && missingProjector && projector) {
+        modelStore.downloadProjectionModel(projector.id);
+        return;
+      }
+      if (isPairDownloaded) {
         Alert.alert(
           l10n.models.modelFile.alerts.alreadyDownloadedTitle,
           l10n.models.modelFile.alerts.alreadyDownloadedMessage,
@@ -210,8 +264,10 @@ export const ModelFileCard: FC<ModelFileCardProps> = observer(
     };
 
     const handleCancel = () => {
-      if (storeModel && isDownloading) {
-        modelStore.cancelDownload(storeModel.id);
+      for (const part of downloadParts) {
+        if (modelStore.isDownloading(part.id)) {
+          modelStore.cancelDownload(part.id);
+        }
       }
     };
 
@@ -236,9 +292,9 @@ export const ModelFileCard: FC<ModelFileCardProps> = observer(
       }
     };
 
-    const downloadIcon = isDownloaded
+    const downloadIcon = isPairDownloaded
       ? 'delete'
-      : modelFile.canFitInStorage
+      : modelFile.canFitInStorage || missingProjector
         ? 'download-outline'
         : 'download-off-outline';
 
@@ -347,7 +403,7 @@ export const ModelFileCard: FC<ModelFileCardProps> = observer(
                     style={styles.visionChip}
                     textStyle={styles.visionChipText}
                     onPress={() => setShowVisionSheet(true)}>
-                    {isDownloaded
+                    {isPairDownloaded
                       ? l10n.models.multimodal.visionControls.visionEnabled
                       : l10n.models.multimodal.visionControls
                           .includesVisionCapability}
@@ -399,7 +455,7 @@ export const ModelFileCard: FC<ModelFileCardProps> = observer(
                       accessibilityLabel="Download model"
                       icon={downloadIcon}
                       onPress={
-                        isDownloaded
+                        isPairDownloaded
                           ? handleDelete
                           : isDownloading
                             ? handleCancel
@@ -409,7 +465,9 @@ export const ModelFileCard: FC<ModelFileCardProps> = observer(
                       animated
                       disabled={
                         !isModelInfoReady ||
-                        (!isDownloaded && !modelFile.canFitInStorage)
+                        (!isPairDownloaded &&
+                          !missingProjector &&
+                          !modelFile.canFitInStorage)
                       }
                     />
                   </View>

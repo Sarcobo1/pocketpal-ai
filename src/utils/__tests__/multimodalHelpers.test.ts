@@ -6,6 +6,7 @@ import {
   getLLMFiles,
   projectorsForLocalModel,
   projectionGapCopy,
+  pairedDownloadProgress,
 } from '../multimodalHelpers';
 import {toLocalMediaPath} from '../multimodalPatterns';
 import {ModelFile} from '../types';
@@ -350,5 +351,43 @@ describe('projectionGapCopy', () => {
     ] as const) {
       expect(projectionGapCopy(gap, l10n)).not.toContain('{{file}}');
     }
+  });
+
+  describe('pairedDownloadProgress', () => {
+    it('weights the pair by bytes, not by file count', () => {
+      // 1.6 GB of weights arrived and half of a 400 MB projector: nine tenths
+      // of the pair, which is what the listener waited for.
+      expect(
+        pairedDownloadProgress([
+          {bytes: 1_600_000_000, done: true, progress: 100},
+          {bytes: 400_000_000, done: false, progress: 50},
+        ]),
+      ).toBe(90);
+    });
+
+    it('reads as finished only when every file of it is', () => {
+      const llm = {bytes: 1_600_000_000, done: true, progress: 100};
+      expect(pairedDownloadProgress([llm])).toBe(100);
+      expect(
+        pairedDownloadProgress([
+          llm,
+          {bytes: 400_000_000, done: false, progress: 0},
+        ]),
+      ).toBe(80);
+    });
+
+    it('counts nothing for a pair that has not started', () => {
+      expect(pairedDownloadProgress([])).toBe(0);
+      // A file whose size is still being fetched cannot carry a weight.
+      expect(
+        pairedDownloadProgress([{bytes: 0, done: false, progress: 40}]),
+      ).toBe(0);
+    });
+
+    it('never reads past the end', () => {
+      expect(
+        pairedDownloadProgress([{bytes: 100, done: false, progress: 130}]),
+      ).toBe(100);
+    });
   });
 });

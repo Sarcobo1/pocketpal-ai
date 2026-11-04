@@ -296,3 +296,34 @@ export function getVisionModelSizeBreakdown(
     hasProjection,
   };
 }
+
+/** One file of a pair, as the bar reads it. */
+export type DownloadPart = {
+  bytes: number;
+  done: boolean;
+  progress: number;
+};
+
+/**
+ * Percent of a two-file download that has arrived, weighted by bytes.
+ *
+ * An Omni model is two files and one wait: the bar a card draws from the LLM
+ * alone reaches 100% while the projector that makes it hear is still coming,
+ * and the user reads that as finished. Weighting by bytes is what makes the
+ * two halves line up — the projector is a tenth of the pair, so it should take
+ * about a tenth of the bar.
+ */
+export function pairedDownloadProgress(parts: DownloadPart[]): number {
+  const wanted = parts.filter(part => part.bytes > 0);
+  const total = wanted.reduce((sum, part) => sum + part.bytes, 0);
+  if (!total) {
+    return 0;
+  }
+  const arrived = wanted.reduce((sum, part) => {
+    const fraction = part.done
+      ? 1
+      : Math.min(Math.max(part.progress / 100, 0), 1);
+    return sum + part.bytes * fraction;
+  }, 0);
+  return Math.min(100, Math.round((arrived / total) * 100));
+}

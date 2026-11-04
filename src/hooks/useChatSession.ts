@@ -40,9 +40,10 @@ import {
   resolveSystemMessages,
 } from '../utils/systemPromptResolver';
 import {
+  classifyReply,
   convertToChatMessages,
   countMediaParts,
-  measureEcho,
+  excludeEchoedAssistantTurns,
   removeThinkingParts,
   visibleStepContent,
 } from '../utils/chat';
@@ -264,7 +265,12 @@ const prepareCompletion = async ({
     return next;
   };
 
-  const historyMessages = currentMessages.map(stripHistoryMedia);
+  // A row marked `echoExcluded` is a repeat of the question that produced it.
+  // It stays in the chat the user reads; it does not go into the next prompt,
+  // because a history of restated questions is a history of examples that say
+  // restating the question is how you answer.
+  const historyMessages =
+    excludeEchoedAssistantTurns(currentMessages).map(stripHistoryMedia);
 
   let chatMessages = convertToChatMessages(
     historyMessages.filter(msg => msg.type !== 'image'),
@@ -858,16 +864,27 @@ async function applyEventToStore(
       // only becomes a number one line at a time. `no-transcript` is honest — an
       // omni voice turn has nothing to diff against, because nothing wrote the
       // question down — and is reported as itself rather than as an `ok`.
+      //
+      // A turn caught either way is marked `echoExcluded`, which keeps it out of
+      // the next prompt: an answer that repeats its own question is a bad
+      // example, and leaving it in the history teaches the model to answer the
+      // next question by repeating that one too.
+      let echoExcluded = false;
       if (ctx.spoken || ctx.promptMedia?.audio) {
         const reply = finalResult.content ?? '';
-        const echo = measureEcho(reply, ctx.echoSource);
-        const reason =
-          ctx.echoFrom === 'none' ? 'no-transcript' : echo.echo ? 'echo' : 'ok';
+        const cls = classifyReply(reply, ctx.echoSource);
+        echoExcluded = cls.reason !== 'ok';
+        const reason = echoExcluded
+          ? cls.reason
+          : ctx.echoFrom === 'none'
+            ? 'no-transcript'
+            : 'ok';
         logPerf('turn.echo', {
           reason,
           src: ctx.echoFrom,
-          ratio: echo.ratio,
-          run: echo.shared,
+          ratio: cls.ratio,
+          run: cls.shared,
+          excluded: echoExcluded,
           said: oneLine(ctx.echoSource).slice(0, 48),
           reply: oneLine(reply).slice(0, 48),
         });
@@ -879,6 +896,7 @@ async function applyEventToStore(
           multimodal: ctx.hasImages && ctx.isMultimodalEnabled,
           completionResult: snapshot,
           ...(event.result.hitMaxTurns ? {hitMaxTurns: true} : {}),
+          ...(echoExcluded ? {echoExcluded: true} : {}),
         },
       });
       chatSessionStore.recordCompletionSnapshot(snapshot);

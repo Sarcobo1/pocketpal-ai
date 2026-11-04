@@ -1151,6 +1151,38 @@ describe('useChatSession', () => {
         }
       },
     );
+    // An assistant row the app judged to be a repeat of its own question is
+    // poison for the next turn: left in the history it is an example that says
+    // restating the question is how you answer. The row stays in the chat the
+    // user reads; it does not reach the model.
+    it('keeps a turn marked as an echo out of the next prompt', async () => {
+      const restore = withHistory([
+        voiceRow('utt-1'),
+        {
+          id: 'echo-1',
+          author: assistant,
+          type: 'assistant_turn',
+          steps: [{content: 'what is the weather like'}],
+          metadata: {echoExcluded: true},
+        } as MessageType.AssistantTurn,
+        {
+          id: 'kept-1',
+          author: assistant,
+          type: 'assistant_turn',
+          steps: [{content: 'A kettle on the stove.'}],
+          metadata: {},
+        } as MessageType.AssistantTurn,
+      ]);
+      try {
+        const sent = JSON.stringify(await sendFrame(false));
+
+        expect(sent).toContain('A kettle on the stove.');
+        expect(sent).not.toContain('what is the weather like');
+      } finally {
+        restore();
+      }
+    });
+
     it('a spoken turn with no clip to answer sends the words it was given', async () => {
       const restore = withHistory([]);
       try {
@@ -1176,7 +1208,7 @@ describe('useChatSession', () => {
       mediaSupport: {vision: false, audioInput: true, audioOutput: true},
     } as any;
 
-    const sendClip = async (text: string) => {
+    const sendClip = async (text: string, reply = 'ok') => {
       runInAction(() => {
         modelStore.models = [omniModel];
         modelStore.activeModelId = omniModel.id;
@@ -1185,7 +1217,7 @@ describe('useChatSession', () => {
       if (modelStore.context) {
         modelStore.context.completion = jest
           .fn()
-          .mockResolvedValue({text: 'ok', content: 'ok', timings: {}});
+          .mockResolvedValue({text: reply, content: reply, timings: {}});
       }
       const {result} = renderHook(() =>
         useChatSession({current: null}, textMessage.author, mockAssistant),
@@ -1212,9 +1244,15 @@ describe('useChatSession', () => {
       const rows = (
         chatSessionStore.addMessageToCurrentSession as jest.Mock
       ).mock.calls.map(([row]) => row);
+      // The last write is the one the finished turn makes.
+      const writes = (chatSessionStore.updateMessage as jest.Mock).mock.calls;
+      const lastWrite = writes[writes.length - 1]?.[2] as
+        | {metadata?: Record<string, any>}
+        | undefined;
       return {
         messages: sent.messages,
         userRow: rows.find(row => row.author?.id !== mockAssistant.id),
+        metadata: lastWrite?.metadata ?? {},
       };
     };
 
@@ -1248,6 +1286,24 @@ describe('useChatSession', () => {
       expect(textPartsOf(lastUserParts(messages))).toEqual([
         'turn the heating on',
       ]);
+    });
+
+    // The write side of the same rule: an omni voice turn has no transcript to
+    // diff against, so the reply that reports the speaker is caught by its
+    // shape. Marked here, filtered out of every later prompt.
+    it('marks a reply that reports the speaker instead of answering', async () => {
+      const {metadata} = await sendClip(
+        '',
+        'The user asked what the weather is like.',
+      );
+
+      expect(metadata.echoExcluded).toBe(true);
+    });
+
+    it('leaves a reply that answers the clip unmarked', async () => {
+      const {metadata} = await sendClip('', 'It is raining in Tashkent.');
+
+      expect(metadata.echoExcluded).toBeUndefined();
     });
   });
 

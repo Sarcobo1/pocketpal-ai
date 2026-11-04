@@ -1,12 +1,15 @@
 import {Templates} from 'chat-formatter';
 import {
   applyChatTemplate,
+  classifyReply,
   convertToChatMessages,
   countMediaParts,
   derivedText,
+  excludeEchoedAssistantTurns,
+  isReportedSpeech,
+  measureEcho,
   user,
   assistant,
-  measureEcho,
   visibleStepContent,
 } from '../chat';
 import {
@@ -1015,5 +1018,105 @@ describe('measureEcho', () => {
       shared: 5,
       echo: true,
     });
+  });
+});
+
+describe('isReportedSpeech', () => {
+  // The same failure seen from the side that has no transcript: the reply
+  // reports the speaker instead of answering them.
+  it.each([
+    'The user said "what is the capital of France".',
+    'the user asked what the capital of France is',
+    'The user is saying they want a joke about robots.',
+    '- The user says hello.',
+    'The user repeated their question about the weather.',
+  ])('calls a reported turn reported: %s', reply => {
+    expect(isReportedSpeech(reply)).toBe(true);
+  });
+
+  it.each([
+    'The capital of France is Paris.',
+    'They asked about the weather, so I said it is sunny.',
+    'User: the manual says to press both keys.',
+    'Paris.',
+    '',
+  ])('does not call an answer reported: %s', reply => {
+    expect(isReportedSpeech(reply)).toBe(false);
+  });
+
+  it('accepts a reply that reports only later in the sentence', () => {
+    // "the user" as the subject of a relative clause is not a report of a turn,
+    // so the match stays anchored to the opening of the reply.
+    expect(isReportedSpeech('A city the user said they liked is Paris.')).toBe(
+      false,
+    );
+  });
+});
+
+describe('classifyReply', () => {
+  // Both shapes are the same defect, and only one of them needs a transcript to
+  // see. A voice turn with no words to diff against still gets judged.
+  it('names the repeat it can measure', () => {
+    expect(
+      classifyReply(
+        'What is the capital of France?',
+        'what is the capital of france',
+      ),
+    ).toEqual({reason: 'echo', ratio: 1, shared: 6});
+  });
+
+  it('catches the report an echo cannot see', () => {
+    expect(
+      classifyReply('The user asked what the weather is like.', ''),
+    ).toEqual({reason: 'reported', ratio: 0, shared: 0});
+  });
+
+  it('leaves a normal answer alone', () => {
+    expect(classifyReply('Paris.', 'what is the capital of france')).toEqual({
+      reason: 'ok',
+      ratio: 0,
+      shared: 0,
+    });
+  });
+
+  it('reports the same numbers the echo measurement gives', () => {
+    const said = 'tell me a joke about robots';
+    const reply = 'tell me a joke about robots';
+    expect(classifyReply(reply, said)).toEqual({
+      reason: 'echo',
+      ratio: measureEcho(reply, said).ratio,
+      shared: measureEcho(reply, said).shared,
+    });
+  });
+});
+
+describe('excludeEchoedAssistantTurns', () => {
+  // The mark is a prompt-side decision: the row stays where the user reads it.
+  const said = makeUserText('what is the capital of france');
+  const echoed = {
+    ...makeAssistantTurn([{content: 'what is the capital of france'}], 'e'),
+    metadata: {echoExcluded: true},
+  };
+  const answered = makeAssistantTurn([{content: 'Paris'}], 'a');
+
+  it('drops only the marked turn', () => {
+    expect(excludeEchoedAssistantTurns([said, echoed, answered])).toEqual([
+      said,
+      answered,
+    ]);
+  });
+
+  it('keeps a user row that carries the same mark', () => {
+    const marked = {...said, metadata: {echoExcluded: true}};
+    expect(excludeEchoedAssistantTurns([marked, echoed])).toEqual([marked]);
+  });
+
+  it('leaves an unmarked conversation untouched', () => {
+    const history = [said, answered];
+    expect(excludeEchoedAssistantTurns(history)).toEqual(history);
+  });
+
+  it('returns an empty history as empty', () => {
+    expect(excludeEchoedAssistantTurns([])).toEqual([]);
   });
 });

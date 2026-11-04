@@ -642,3 +642,55 @@ export function measureEcho(
     echo: run >= 3 && ratio >= 0.7,
   };
 }
+
+/**
+ * A reply that opens by reporting the speaker instead of answering them.
+ *
+ * `measureEcho` needs the words to diff against, and an omni voice turn has
+ * none: the model heard the clip and nothing wrote it down. This shape does not
+ * need them — `"The user asked what the capital of France is"` is the same
+ * failure seen from the other side, and a model that keeps a turn like this in
+ * its history learns that restating the question is what an answer looks like.
+ */
+const REPORTED_SPEECH_RE =
+  /^[^\w]{0,3}the\s+user\s+(?:said|says|asked|asks|is\s+saying|was\s+saying|spoke|repeated|repeats|replied|replies)\b/i;
+
+export function isReportedSpeech(reply: string): boolean {
+  return REPORTED_SPEECH_RE.test((reply ?? '').trim());
+}
+
+/**
+ * Whether a reply repeats the turn it answers, by either of the two shapes it
+ * repeats it in.
+ */
+export function classifyReply(
+  reply: string,
+  source: string,
+): {reason: 'echo' | 'reported' | 'ok'; ratio: number; shared: number} {
+  const echo = measureEcho(reply, source);
+  if (echo.echo) {
+    return {reason: 'echo', ratio: echo.ratio, shared: echo.shared};
+  }
+  if (isReportedSpeech(reply)) {
+    return {reason: 'reported', ratio: echo.ratio, shared: echo.shared};
+  }
+  return {reason: 'ok', ratio: echo.ratio, shared: echo.shared};
+}
+
+/**
+ * The history as the next prompt should see it: an assistant row the app has
+ * already judged to be a repeat of its own question is left out.
+ *
+ * The row stays in the chat — the user heard it, and quietly replacing what a
+ * model said would rewrite the conversation they were part of. It is the
+ * prompt that must not carry it: every echoed answer that goes back in teaches
+ * the model to answer the next question with its own text too.
+ */
+export function excludeEchoedAssistantTurns(
+  messages: MessageType.Any[],
+): MessageType.Any[] {
+  return messages.filter(
+    message =>
+      message.type !== 'assistant_turn' || !message.metadata?.echoExcluded,
+  );
+}

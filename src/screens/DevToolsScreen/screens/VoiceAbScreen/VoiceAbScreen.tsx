@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  type ScrollViewInstance,
   TouchableOpacity,
   SafeAreaView,
   Alert,
@@ -39,7 +40,7 @@ const VoiceAbScreen = () => {
   const [lines, setLines] = useState<string[]>([]);
   const [summary, setSummary] = useState<AbSummaryRow[]>([]);
   const [busy, setBusy] = useState(false);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const cancelRef = useRef(false);
 
   const append = (line: string) =>

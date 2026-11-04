@@ -18,6 +18,7 @@ import {
   assembleMessages,
   resolveSystemMessages,
 } from '../../utils/systemPromptResolver';
+import {DEFAULT_MAX_TURNS} from '../agent';
 import type {ToolDefinition} from '../talents/types';
 import {collectSystemPromptFragments} from '../talents';
 
@@ -342,7 +343,7 @@ export const runAbBench = async ({
     if (!rows.some(row => row.variant === variant.id)) {
       try {
         const formatted = await modelStore.context?.getFormattedChat?.(
-          params.messages,
+          params.messages ?? [],
           null,
           {jinja: true},
         );

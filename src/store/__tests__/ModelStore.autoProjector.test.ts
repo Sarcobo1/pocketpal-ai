@@ -10,7 +10,10 @@ jest.mock('../../services/deviceRules/signals', () => ({
     .fn()
     .mockResolvedValue({ramBytes: 8 * 1e9, socModel: 'SM8850'}),
 }));
+// Only the two calls this suite steers are mocked; the rest of the module stays
+// real so that stores imported alongside do not lose their own API functions.
 jest.mock('../../api/hf', () => ({
+  ...jest.requireActual('../../api/hf'),
   fetchModels: jest.fn(),
   fetchModelFilesDetails: jest.fn(),
 }));

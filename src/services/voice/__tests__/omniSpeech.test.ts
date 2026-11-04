@@ -6,7 +6,10 @@ import {modelStore, ttsStore} from '../../../store';
 import {ModelOrigin} from '../../../utils/types';
 
 import {
+  MAX_REALTIME_FACTOR,
+  MAX_UTTERANCE_SECONDS,
   modelCanVoiceReplies,
+  prewarmSpeech,
   speakWithModel,
   stopModelSpeech,
 } from '../omniSpeech';
@@ -617,5 +620,297 @@ describe('speakWithModel, piece by piece', () => {
     expect(play).toHaveBeenCalledTimes(1);
     expect(play.mock.calls[0][0].duration).toBeCloseTo(0.4, 3);
     expect(report.spoken).toBe(true);
+  });
+});
+
+/**
+ * The conversation cache. Asking for a sequence of its own is one thing; a
+ * bridge that has no such option answers without saying it isolated anything,
+ * and then the cache was touched all the same — so the clear is decided by what
+ * came back, not by what was asked for.
+ */
+describe('the cache a spoken reply leaves behind', () => {
+  const calls: string[] = [];
+  let generateSpeech: jest.Mock;
+  let clearCache: jest.Mock;
+
+  const speaker = (result: Record<string, unknown>) => {
+    runInAction(() => {
+      store.activeModelId = 'model-1';
+      store.context = {
+        id: nextId++,
+        generateSpeech,
+        clearCache,
+        stopSpeech: jest.fn(),
+        getMultimodalSupport: jest
+          .fn()
+          .mockResolvedValue({audioGen: true, audio: true}),
+      };
+    });
+    generateSpeech.mockImplementation(async () => {
+      calls.push('generate');
+      return result;
+    });
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    calls.length = 0;
+    generateSpeech = jest.fn();
+    clearCache = jest.fn().mockResolvedValue(undefined);
+    runInAction(() => {
+      tts.streamSpeech = false;
+      tts.speechLanguage = '';
+      tts.forceTTSFallback = false;
+      tts.speechKeepCache = true;
+    });
+  });
+
+  it('asks the engine to speak on a sequence of its own', async () => {
+    speaker(speechResult());
+
+    await speakWithModel('Salom');
+
+    expect(generateSpeech).toHaveBeenCalledWith(
+      expect.objectContaining({isolateSeq: true}),
+      undefined,
+    );
+  });
+
+  it('asks for the old shared positions when the setting is off', async () => {
+    runInAction(() => {
+      tts.speechKeepCache = false;
+    });
+    speaker(speechResult());
+
+    await speakWithModel('Salom');
+
+    expect(generateSpeech.mock.calls[0][0]).not.toHaveProperty('isolateSeq');
+  });
+
+  it('leaves the cache standing when the engine says it took the utterance back', async () => {
+    speaker(speechResult({seqIsolated: true}));
+
+    const report = await speakWithModel('Salom');
+
+    expect(clearCache).not.toHaveBeenCalled();
+    expect(report.cacheKept).toBe(true);
+    expect(report.spoken).toBe(true);
+  });
+
+  it('clears what it did after a build that answered without the flag', async () => {
+    speaker(speechResult({seqIsolated: false}));
+
+    const report = await speakWithModel('Salom');
+
+    expect(clearCache).toHaveBeenCalledWith(true);
+    expect(report.cacheKept).toBe(false);
+  });
+});
+
+/**
+ * The two safety limits are invisible in the engine's own words: a reply that
+ * ran out of time and a reply that finished both say `max`/`eos`. The report has
+ * to name which one gave up, because that is what the next setting is chosen
+ * against.
+ */
+describe('the limit a reply was dropped on', () => {
+  let generateSpeech: jest.Mock;
+  let clearCache: jest.Mock;
+
+  const speaker = (result: Record<string, unknown>) => {
+    runInAction(() => {
+      store.activeModelId = 'model-1';
+      store.context = {
+        id: nextId++,
+        generateSpeech,
+        clearCache,
+        stopSpeech: jest.fn(),
+        getMultimodalSupport: jest
+          .fn()
+          .mockResolvedValue({audioGen: true, audio: true}),
+      };
+    });
+    generateSpeech.mockImplementation(async () => result);
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    generateSpeech = jest.fn();
+    clearCache = jest.fn().mockResolvedValue(undefined);
+    (neuralAudioPlayer.play as jest.Mock).mockResolvedValue(undefined);
+    runInAction(() => {
+      tts.streamSpeech = false;
+      tts.speechLanguage = '';
+      tts.forceTTSFallback = false;
+      tts.speechKeepCache = true;
+    });
+  });
+
+  it('names the real-time factor when generating outran the audio', async () => {
+    speaker(
+      speechResult({
+        genMs: (MAX_REALTIME_FACTOR + 1) * 2000,
+        seconds: 2,
+      }),
+    );
+
+    const report = await speakWithModel('Salom');
+
+    expect(report.drop).toBe('rtf');
+    expect(report.keepModelVoice).toBe(false);
+    expect(neuralAudioPlayer.play).not.toHaveBeenCalled();
+  });
+
+  it('names the length limit a reply ran into', async () => {
+    speaker(
+      speechResult({
+        seconds: MAX_UTTERANCE_SECONDS,
+        genMs: 2000,
+        stopReason: 'max',
+        stage: 'max-seconds',
+        pcm: new Float32Array(24000 * MAX_UTTERANCE_SECONDS).fill(0.2),
+      }),
+    );
+
+    const report = await speakWithModel('Salom');
+
+    expect(report.drop).toBe('time');
+    // Long is not the same as impossible: what it did say is still worth hearing.
+    expect(report.keepModelVoice).toBe(true);
+    expect(neuralAudioPlayer.play).toHaveBeenCalledTimes(1);
+  });
+
+  it('says a reply that made no audio at all', async () => {
+    speaker(
+      speechResult({
+        seconds: 0,
+        frames: 0,
+        genMs: 500,
+        pcm: new Float32Array(0),
+      }),
+    );
+
+    const report = await speakWithModel('Salom');
+
+    expect(report.drop).toBe('no-audio');
+    expect(report.spoken).toBe(false);
+  });
+
+  it('leaves a reply that simply finished alone', async () => {
+    speaker(speechResult({seqIsolated: true}));
+
+    const report = await speakWithModel('Salom');
+
+    expect(report.drop).toBe('none');
+  });
+});
+
+/**
+ * The warm-up. It spends the one-time cost of a context at the moment nobody is
+ * waiting, so it must happen once per context, must not be asked of a model that
+ * has no voice, and must not leave the conversation cache it decoded over.
+ */
+describe('prewarmSpeech', () => {
+  let generateSpeech: jest.Mock;
+  let clearCache: jest.Mock;
+  let stopSpeech: jest.Mock;
+
+  const warmable = () => {
+    runInAction(() => {
+      store.activeModelId = 'model-1';
+      store.context = {
+        id: nextId++,
+        generateSpeech,
+        clearCache,
+        stopSpeech,
+        getMultimodalSupport: jest
+          .fn()
+          .mockResolvedValue({audioGen: true, audio: true}),
+      };
+    });
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    generateSpeech = jest.fn();
+    clearCache = jest.fn().mockResolvedValue(undefined);
+    stopSpeech = jest.fn();
+    runInAction(() => {
+      tts.speechKeepCache = true;
+      tts.forceTTSFallback = false;
+    });
+  });
+
+  it('voices one syllable, once per context, and stops it as it lands', async () => {
+    warmable();
+    generateSpeech.mockImplementation(async (_opts, onChunk) => {
+      onChunk(new Float32Array(2400), 24000);
+      return speechResult({stopReason: 'aborted', aborted: true});
+    });
+
+    await prewarmSpeech();
+    await prewarmSpeech();
+
+    expect(generateSpeech).toHaveBeenCalledTimes(1);
+    expect(generateSpeech.mock.calls[0][0]).toEqual(
+      expect.objectContaining({text: 'Aa.', maxSeconds: 1, isolateSeq: true}),
+    );
+    expect(stopSpeech).toHaveBeenCalledTimes(1);
+  });
+
+  it('owes the next turn a clear when it decoded over their positions', async () => {
+    warmable();
+    generateSpeech.mockImplementation(async (_opts, onChunk) => {
+      onChunk(new Float32Array(2400), 24000);
+      return speechResult({stopReason: 'aborted', aborted: true});
+    });
+
+    await prewarmSpeech();
+
+    expect(clearCache).toHaveBeenCalledWith(true);
+  });
+
+  it('leaves the cache alone when the engine took its own sequence back', async () => {
+    warmable();
+    generateSpeech.mockImplementation(async () =>
+      speechResult({stopReason: 'aborted', aborted: true, seqIsolated: true}),
+    );
+
+    await prewarmSpeech();
+
+    expect(clearCache).not.toHaveBeenCalled();
+  });
+
+  it('does not ask a model that has no voice', async () => {
+    runInAction(() => {
+      store.activeModelId = 'model-1';
+      store.context = {
+        id: nextId++,
+        generateSpeech,
+        clearCache,
+        stopSpeech,
+        getMultimodalSupport: jest
+          .fn()
+          .mockResolvedValue({audioGen: false, audio: true}),
+      };
+    });
+
+    await prewarmSpeech();
+
+    expect(generateSpeech).not.toHaveBeenCalled();
+  });
+
+  it('asks again after a warm-up that threw, because nothing was learned', async () => {
+    warmable();
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    generateSpeech.mockRejectedValue(new Error('native refused'));
+
+    await prewarmSpeech();
+    generateSpeech.mockImplementation(async () => speechResult());
+    await prewarmSpeech();
+
+    expect(generateSpeech).toHaveBeenCalledTimes(2);
+    warn.mockRestore();
   });
 });

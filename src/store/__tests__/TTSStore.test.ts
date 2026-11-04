@@ -183,6 +183,7 @@ jest.mock('../../services/tts', () => {
 
 // Import after mocks
 import {TTSStore} from '../TTSStore';
+import {SPEECH_PRESETS} from '../../services/voice/constants';
 import type {Voice} from '../../services/tts';
 import {ttsRuntime} from '../../services/tts';
 import {chatSessionStore} from '../ChatSessionStore';
@@ -1451,6 +1452,38 @@ describe('TTSStore', () => {
       expect(store.isSetupSheetOpen).toBe(true);
       store.closeSetupSheet();
       expect(store.isSetupSheetOpen).toBe(false);
+    });
+
+    it('speechPreset reads the flags back instead of storing a second answer', () => {
+      const store = new TTSStore();
+      // The default the phone ships with, spelled out of the same flags.
+      expect(store.speechPreset).toBe('balanced');
+
+      store.setSpeechPreset('fast');
+      expect(store.streamSpeech).toBe(SPEECH_PRESETS.fast.stream);
+      expect(store.speechJitterSeconds).toBe(SPEECH_PRESETS.fast.jitterSeconds);
+      expect(store.slowSpeech).toBe('system');
+      expect(store.speechPreset).toBe('fast');
+
+      store.setSpeechPreset('best');
+      expect(store.streamSpeech).toBe(false);
+      expect(store.slowSpeech).toBe('wait');
+      expect(store.speechPreset).toBe('best');
+
+      // A switch moved on its own is not a preset, and the row has to say so
+      // rather than keep showing a name the audio no longer matches.
+      store.setStreamSpeech(true);
+      expect(store.speechPreset).toBe('custom');
+    });
+
+    it('setSpeechKeepCache and setSpeechPrewarm toggle their own flags', () => {
+      const store = new TTSStore();
+      expect(store.speechKeepCache).toBe(true);
+      expect(store.speechPrewarm).toBe(true);
+      store.setSpeechKeepCache(false);
+      store.setSpeechPrewarm(false);
+      expect(store.speechKeepCache).toBe(false);
+      expect(store.speechPrewarm).toBe(false);
     });
   });
 

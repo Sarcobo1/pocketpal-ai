@@ -66,6 +66,7 @@ jobs:
             src/services/voice/__tests__/frameSource.test.ts \
             src/services/voice/__tests__/omniEngine.test.ts \
             src/services/voice/__tests__/omniSpeech.test.ts \
+            src/services/voice/__tests__/speechBench.test.ts \
             src/services/voice/__tests__/speechStream.test.ts \
             src/services/voice/__tests__/streamSink.test.ts \
             src/services/voice/__tests__/speechLevel.test.ts \

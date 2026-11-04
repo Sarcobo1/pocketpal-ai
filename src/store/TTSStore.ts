@@ -42,9 +42,10 @@ import {
   VOICE_FIRST_CHUNK_HOLD_MS,
 } from '../services/voice/constants';
 import type {SpeechPresetId} from '../services/voice/constants';
+import {firstSpokenSentence} from '../services/voice/speechStream';
 import {speechReasonOf} from '../services/voice/types';
 import type {ModelVoiceSink} from '../services/voice/types';
-import {logPerf} from '../utils/mediaPerf';
+import {logPerf, markTurn} from '../utils/mediaPerf';
 import {vtrace} from '../utils/voiceTrace';
 import {chatSessionStore} from './ChatSessionStore';
 
@@ -235,6 +236,21 @@ export class TTSStore {
   speechPrewarm: boolean = true;
 
   /**
+   * Say the first sentence with the device voice as soon as it is complete,
+   * while the model is still choosing its second one, and let the model's own
+   * voice take over from the next sentence.
+   *
+   * The model cannot do this itself: one context serves one thing at a time
+   * (`ContextClaim` throws "Context is busy" rather than waiting), so a sample
+   * cannot be asked for until the text generation has ended. The device voice is
+   * a separate pipeline, so it can — which buys the listener the whole length of
+   * the text generation and one speech prefill, at the cost of hearing two
+   * voices in one reply. Off is the default because the single voice is the
+   * quieter surprise; the number this moves is `toFirstAudio`.
+   */
+  speechFastStart: boolean = false;
+
+  /**
    * How long the mic waits on silence before it calls the sentence finished
    * (ms). It is the one stage of a voice turn the listener does not hear as
    * thinking — the answer could already be on its way — so a short one is the
@@ -323,6 +339,7 @@ export class TTSStore {
         'speechJitterSeconds',
         'speechKeepCache',
         'speechPrewarm',
+        'speechFastStart',
         'voiceEndpointMs',
       ],
       storage: AsyncStorage,
@@ -658,6 +675,15 @@ export class TTSStore {
   }
 
   /**
+   * Let the device voice say the first sentence while the model is still
+   * generating the reply. Takes effect on the next reply: the sentence is
+   * chosen from the text as it arrives.
+   */
+  setSpeechFastStart(on: boolean) {
+    this.speechFastStart = on;
+  }
+
+  /**
    * The silence that ends a spoken turn (ms). The next turn's mic opening is
    * what reads it, so a change lands on the sentence after the tap.
    */
@@ -850,15 +876,7 @@ export class TTSStore {
       if (this.playbackState !== playing) {
         return;
       }
-      const engine = getEngine(voice.engine);
-      if (voice.engine === 'supertonic') {
-        await (engine as SupertonicEngine).play(spokenText, voice, {
-          language: this.supertonicLanguage,
-          inferenceSteps: this.supertonicSteps,
-        });
-      } else {
-        await engine.play(spokenText, voice);
-      }
+      await this.engineUtterance(voice, spokenText);
     } catch (err) {
       console.warn('[TTSStore] play failed:', err);
       if (voice.engine === 'phonon') {
@@ -871,6 +889,26 @@ export class TTSStore {
         }
       });
     }
+  }
+
+  /**
+   * Hand one finished text to `voice`'s engine and wait for it to be said.
+   *
+   * `play` wraps the store's playback state around this; the fast start calls it
+   * on its own, because a sentence said while the rest of the reply is still
+   * arriving is not a playback of its own — the stream owns that state, and a
+   * sentence must not cancel the reply it belongs to.
+   */
+  private async engineUtterance(voice: Voice, text: string): Promise<void> {
+    const engine = getEngine(voice.engine);
+    if (voice.engine === 'supertonic') {
+      await (engine as SupertonicEngine).play(text, voice, {
+        language: this.supertonicLanguage,
+        inferenceSteps: this.supertonicSteps,
+      });
+      return;
+    }
+    await engine.play(text, voice);
   }
 
   /**
@@ -1026,11 +1064,75 @@ export class TTSStore {
   }
 
   /**
+   * The voice a reply the model would not say is said with: the installed one,
+   * else the OS one, else none.
+   */
+  private async fallbackVoice(): Promise<Voice | null> {
+    return this.currentVoice ?? (await this.resolveSystemVoice());
+  }
+
+  /**
+   * Say the first sentence of a reply while the rest of it is still being
+   * generated, and report what was actually handed over.
+   *
+   * The model cannot do this: one context serves one thing at a time, so a
+   * sample cannot be asked for before the text generation ends. The device voice
+   * is a separate pipeline and can, which is the whole of the wait this saves.
+   * It resolves its own voice asynchronously, because `appendText` may not wait.
+   */
+  private async sayFirstSentence(
+    messageId: string,
+    sentence: string,
+    onVoice: (voice: Voice | null) => void,
+  ): Promise<string> {
+    const voice = await this.fallbackVoice();
+    onVoice(voice);
+    if (!voice || !this.isTTSAvailable) {
+      // Nothing to say it with: the reply keeps its single voice and the model
+      // says all of it, which is the old behaviour rather than a failure.
+      logPerf('speech.faststart', {
+        said: 0,
+        left: sentence.length,
+        why: 'no-voice',
+      });
+      return '';
+    }
+    if (this.playbackState.mode !== 'streaming') {
+      return '';
+    }
+    runInAction(() => {
+      this.voiceSpeechStarted = messageId;
+    });
+    // Marked as it is handed to the engine: the device voice reports no start of
+    // its own, and what is being measured is the order of the two voices, not the
+    // engine's own few tens of milliseconds.
+    markTurn('firstSound');
+    const started = Date.now();
+    const ok = await this.engineUtterance(voice, sentence)
+      .then(() => true)
+      .catch(err => {
+        console.warn('[TTSStore] fast start failed:', err);
+        return false;
+      });
+    logPerf('speech.faststart', {
+      ms: Date.now() - started,
+      chars: sentence.length,
+      engine: voice.engine,
+      said: ok ? sentence.length : 0,
+    });
+    // An engine that threw halfway is not counted as having said it: the reply
+    // goes to the model whole. Being heard twice is the smaller wrong than a
+    // sentence nobody hears.
+    return ok ? sentence : '';
+  }
+
+  /**
    * The streaming session of a model that speaks for itself. It has the same
    * contract as an engine's handle, because everything around a handle — the
    * stripper, the hold, the UI's "speaking" state, `stop()` for a barge-in —
    * already means exactly the right thing here. Only `finalize` differs: the
-   * text arrives whole rather than already having been spoken as it came.
+   * text arrives whole rather than already having been spoken as it came —
+   * unless the fast start has already said its first sentence out loud.
    */
   private modelVoiceHandle(
     sink: ModelVoiceSink,
@@ -1038,16 +1140,44 @@ export class TTSStore {
   ): StreamingHandle {
     let text = '';
     let cancelled = false;
+    /** The sentence the device voice has said, and the voice it used. */
+    let ahead = '';
+    let aheadVoice: Voice | null = null;
+    let aheadPlaying: Promise<void> | null = null;
     return {
       appendText: chunk => {
         text += chunk;
+        if (aheadPlaying || !ttsStore.speechFastStart) {
+          return;
+        }
+        const first = firstSpokenSentence(text);
+        if (!first) {
+          return;
+        }
+        aheadPlaying = this.sayFirstSentence(messageId, first, voice => {
+          aheadVoice = voice;
+        }).then(said => {
+          ahead = said;
+        });
       },
       finalize: async () => {
         if (cancelled || text.trim().length === 0) {
           return;
         }
-        const said = text;
-        const report = await sink.speak(said, () => {
+        if (aheadPlaying) {
+          // One voice at a time: the device sentence has to be heard before the
+          // model's own audio starts, or the reply is heard twice at once.
+          await aheadPlaying;
+          if (cancelled) {
+            return;
+          }
+        }
+        const rest = text.slice(ahead.length).trim();
+        if (!rest) {
+          // The fast start said the whole reply. The model has nothing left.
+          return;
+        }
+        const report = await sink.speak(rest, () => {
           if (this.voiceStream?.messageId === messageId) {
             runInAction(() => {
               this.voiceSpeechStarted = messageId;
@@ -1073,11 +1203,20 @@ export class TTSStore {
           runInAction(() => {
             this.speechReason = speechReasonOf(report);
           });
-          await this.sayWithFallbackVoice(messageId, said);
+          await this.sayWithFallbackVoice(messageId, rest);
         }
       },
       cancel: async () => {
         cancelled = true;
+        if (aheadVoice) {
+          // The device voice is not reachable through the sink, and the stream's
+          // own state belongs to the reply, not to this one sentence.
+          await getEngine(aheadVoice.engine)
+            .stop()
+            .catch(err => {
+              console.warn('[TTSStore] fast start stop failed:', err);
+            });
+        }
         sink.stop();
       },
     };
@@ -1108,7 +1247,7 @@ export class TTSStore {
    * state to speak through, not a reason for silence.
    */
   private async sayWithFallbackVoice(messageId: string, text: string) {
-    const voice = this.currentVoice ?? (await this.resolveSystemVoice());
+    const voice = await this.fallbackVoice();
     logPerf('speech.fallback', {
       engine: voice?.engine ?? 'none',
       id: voice?.id ?? '-',

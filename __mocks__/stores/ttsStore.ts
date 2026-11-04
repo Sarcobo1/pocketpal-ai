@@ -68,6 +68,7 @@ class MockTTSStore {
     SPEECH_PRESETS[DEFAULT_SPEECH_PRESET].jitterSeconds;
   speechKeepCache = true;
   speechPrewarm = true;
+  speechFastStart = false;
   // The real default, so a voice test that counts the endpoint wait gets the
   // one the phone runs with unless it says otherwise.
   voiceEndpointMs = VOICE_ENDPOINT_HANG_MS;
@@ -126,6 +127,7 @@ class MockTTSStore {
   setSpeechPreset: jest.Mock;
   setSpeechKeepCache: jest.Mock;
   setSpeechPrewarm: jest.Mock;
+  setSpeechFastStart: jest.Mock;
   openSetupSheet: jest.Mock;
   closeSetupSheet: jest.Mock;
   onAssistantMessageStart: jest.Mock;
@@ -248,6 +250,11 @@ class MockTTSStore {
     this.setSpeechPrewarm = jest.fn((on: boolean) => {
       runInAction(() => {
         this.speechPrewarm = on;
+      });
+    });
+    this.setSpeechFastStart = jest.fn((on: boolean) => {
+      runInAction(() => {
+        this.speechFastStart = on;
       });
     });
     this.setVoiceEndpointMs = jest.fn((ms: number) => {

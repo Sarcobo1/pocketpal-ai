@@ -134,6 +134,8 @@
     "speechKeepCacheDescription": "Say the reply on a piece of memory of its own and give it back afterwards, so the next question does not read the conversation again. Off restores the old behavior, where a voiced reply cleared what the chat had already paid for. Measured as [framePerf] speech.cache and, on the next turn, as the prefill in [framePerf] turn.timeline.",
     "speechPrewarm": "Warm up the voice",
     "speechPrewarmDescription": "When voice mode opens, have the model form one short sound and throw it away, so the first real reply does not pay for the setup. Nothing is played at that moment. What it cost is logged as [framePerf] speech.prewarm in logcat.",
+    "speechFastStart": "Fast start (system voice for first sentence)",
+    "speechFastStartDescription": "The model does one thing at a time, so its own voice cannot begin until the reply's text is finished. On says the first sentence with the system voice as soon as that sentence exists, and the model's voice carries the rest. Off keeps a single voice for the whole reply and starts it later. What either way cost is the toFirstAudio number on [framePerf] turn.timeline in logcat.",
     "voiceEndpoint": "End of a sentence",
     "voiceEndpointDescription": "How long the mic waits on silence before it treats your sentence as finished. Shorter replies sooner; too short cuts off a pause. Takes effect on the next thing you say. Each turn logs where its time went as [framePerf] turn.timeline in logcat.",
     "ttsAvailabilityLowMemoryWarning": "Your device's memory is low — this may not work reliably.",

@@ -1212,6 +1212,139 @@ describe('TTSStore', () => {
 
       expect(sink.speak).not.toHaveBeenCalled();
     });
+
+    describe('fast start (the device voice says the first sentence)', () => {
+      const FIRST = 'Paris is the capital of France.';
+      const SECOND = 'It sits on the Seine.';
+
+      /** A reply that arrives in tokens, the way a streamed turn does. */
+      const streamChunks = async (store: TTSStore, chunks: string[]) => {
+        store.onAssistantMessageStart('msg-1');
+        for (const chunk of chunks) {
+          store.onAssistantMessageChunk('msg-1', chunk);
+        }
+        store.onAssistantMessageComplete('msg-1', chunks.join(''));
+        await flush();
+      };
+
+      it('leaves the whole reply to the model while the switch is off', async () => {
+        const sink = makeSink();
+        const store = await makeModelStore(sink, SYSTEM_VOICE);
+
+        await streamChunks(store, [`${FIRST} `, SECOND]);
+
+        // The default is the behaviour that shipped before this option existed:
+        // one voice, starting when the text is whole.
+        expect(mockSystemPlay).not.toHaveBeenCalled();
+        expect(sink.speak.mock.calls[0]![0]).toBe(`${FIRST} ${SECOND}`);
+      });
+
+      it('says the first sentence on the device voice and the rest on the model', async () => {
+        const sink = makeSink();
+        const store = await makeModelStore(sink, SYSTEM_VOICE);
+        store.setSpeechFastStart(true);
+
+        await streamChunks(store, [
+          'Paris is the ',
+          'capital of France. ',
+          SECOND,
+        ]);
+
+        expect(mockSystemPlay).toHaveBeenCalledWith(FIRST, SYSTEM_VOICE);
+        expect(sink.speak.mock.calls[0]![0]).toBe(SECOND);
+        expect(store.voiceSpeechStarted).toBe('msg-1');
+      });
+
+      it('asks the model for nothing the device voice already said whole', async () => {
+        const sink = makeSink();
+        const store = await makeModelStore(sink, SYSTEM_VOICE);
+        store.setSpeechFastStart(true);
+
+        await streamChunks(store, [FIRST]);
+
+        expect(mockSystemPlay).toHaveBeenCalledWith(FIRST, SYSTEM_VOICE);
+        expect(sink.speak).not.toHaveBeenCalled();
+        expect(store.playbackState.mode).toBe('idle');
+      });
+
+      it('waits for a sentence to close before handing anything over', async () => {
+        const sink = makeSink();
+        const store = await makeModelStore(sink, SYSTEM_VOICE);
+        store.setSpeechFastStart(true);
+
+        // Half a sentence spoken and then repeated by the model is worse than
+        // the wait, so nothing goes to the device voice until a terminator ends
+        // one — here only the last chunk supplies one.
+        await streamChunks(store, [
+          'Paris is ',
+          'the capital of ',
+          'France. ',
+          SECOND,
+        ]);
+
+        expect(mockSystemPlay).toHaveBeenCalledTimes(1);
+        expect(mockSystemPlay).toHaveBeenCalledWith(
+          'Paris is the capital of France.',
+          SYSTEM_VOICE,
+        );
+        expect(sink.speak.mock.calls[0]![0]).toBe(SECOND);
+      });
+
+      it('keeps the reply single-voiced when there is no device voice', async () => {
+        mockSystemGetVoices.mockResolvedValueOnce([]);
+        const sink = makeSink();
+        const store = await makeModelStore(sink);
+        store.setSpeechFastStart(true);
+
+        await streamChunks(store, [`${FIRST} `, SECOND]);
+
+        // No OS voice to say it with is the old behaviour, not a failure: the
+        // model still gets the whole reply, so the listener still hears it.
+        expect(mockSystemPlay).not.toHaveBeenCalled();
+        expect(sink.speak.mock.calls[0]![0]).toBe(`${FIRST} ${SECOND}`);
+        expect(store.voiceStreamFailed).toBeNull();
+      });
+
+      it('gives the model a sentence the device voice failed to say', async () => {
+        mockSystemPlay.mockRejectedValueOnce(new Error('engine died'));
+        const sink = makeSink();
+        const store = await makeModelStore(sink, SYSTEM_VOICE);
+        store.setSpeechFastStart(true);
+
+        await streamChunks(store, [`${FIRST} `, SECOND]);
+
+        // Heard twice beats a sentence nobody hears.
+        expect(sink.speak.mock.calls[0]![0]).toBe(`${FIRST} ${SECOND}`);
+      });
+
+      it('stops the device sentence with the reply it belongs to', async () => {
+        let saySentence: (() => void) | null = null;
+        mockSystemPlay.mockImplementationOnce(
+          () =>
+            new Promise<void>(resolve => {
+              saySentence = resolve;
+            }),
+        );
+        const sink = makeSink();
+        const store = await makeModelStore(sink, SYSTEM_VOICE);
+        store.setSpeechFastStart(true);
+
+        store.onAssistantMessageStart('msg-1');
+        store.onAssistantMessageChunk('msg-1', `${FIRST} `);
+        await flush();
+        expect(mockSystemPlay).toHaveBeenCalledTimes(1);
+
+        await store.stop('barge_in');
+
+        // The engine the fast start talks through is not the sink, so a barge-in
+        // has to reach both.
+        expect(mockSystemStop).toHaveBeenCalled();
+        expect(sink.stop).toHaveBeenCalledTimes(1);
+        saySentence?.();
+        await flush();
+        expect(sink.speak).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe('thinking-tag stripping', () => {

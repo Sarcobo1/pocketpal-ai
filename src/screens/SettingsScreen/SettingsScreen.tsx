@@ -1448,6 +1448,27 @@ export const SettingsScreen: React.FC = observer(() => {
                   />
                 </View>
 
+                {/* A model speaks one thing at a time, so its own voice cannot
+                    start before the reply's text is finished. The device voice
+                    is a separate pipeline and can say the first sentence as
+                    soon as it exists — which is the wait this removes, at the
+                    cost of hearing two voices in one reply. */}
+                <View style={styles.switchContainer}>
+                  <View style={styles.textContainer}>
+                    <Text variant="titleMedium" style={styles.textLabel}>
+                      {l10n.settings.speechFastStart}
+                    </Text>
+                    <Text variant="labelSmall" style={styles.textDescription}>
+                      {l10n.settings.speechFastStartDescription}
+                    </Text>
+                  </View>
+                  <Switch
+                    testID="speech-faststart-switch"
+                    value={ttsStore.speechFastStart}
+                    onValueChange={value => ttsStore.setSpeechFastStart(value)}
+                  />
+                </View>
+
                 {/* The silence that ends a spoken turn is the one part of a
                     voice turn the listener cannot see: the answer may already
                     be ready while the mic still waits. Short is fast and cuts

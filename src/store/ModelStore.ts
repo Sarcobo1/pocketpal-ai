@@ -14,7 +14,7 @@ import {
   toApiCompletionParams,
 } from '../utils/completionTypes';
 
-import {fetchModelFilesDetails} from '../api/hf';
+import {fetchModelFilesDetails, fetchModels} from '../api/hf';
 import {profileFor} from '../api/servers';
 import {
   LocalCompletionEngine,
@@ -36,6 +36,7 @@ import {
 import {checkGpuSupport} from '../utils/deviceCapabilities';
 import {resolveDeviceSelection} from '../utils/deviceSelection';
 import {
+  createSiblingsFromFileDetails,
   deepMerge,
   getSHA256Hash,
   hfAsModel,
@@ -44,6 +45,7 @@ import {
   formatBytes,
   inferRepoFromModelId,
   parseSizeLabel,
+  processHFSearchResults,
   type SkillKey,
 } from '../utils';
 import {
@@ -52,6 +54,7 @@ import {
   isProjectionModel,
   preferredProjectorModel,
   projectorsForLocalModel,
+  searchTermFromFilename,
   type ProjectionGap,
 } from '../utils/multimodalHelpers';
 import {localFileSource, scanGGUFHeader} from '../utils/ggufHeader';
@@ -2616,6 +2619,116 @@ class ModelStore {
       model.mmprojPath = destination;
     });
     this.refreshPairedMediaSupport(model);
+    return projector;
+  };
+
+  /**
+   * Ask the Hub for a projector that fits a filename, without touching the
+   * store. A model imported from device storage carries nothing but its name,
+   * so every candidate has to pass the same family-token test the folder scan
+   * uses: pairing a foreign projector would load another model's encoder into
+   * the context, which is worse than the model staying text-only.
+   */
+  findProjectionFileInHub = async (
+    modelFilename: string,
+  ): Promise<{hfModel: HuggingFaceModel; modelFile: ModelFile} | undefined> => {
+    const search = searchTermFromFilename(modelFilename);
+    if (!search) {
+      return undefined;
+    }
+    const authToken = hfStore.shouldUseToken ? hfStore.hfToken : null;
+    let candidates: HuggingFaceModel[] = [];
+    try {
+      const response = await fetchModels({
+        search,
+        filter: 'gguf',
+        sort: 'downloads',
+        direction: '-1',
+        limit: 10,
+        full: false,
+        config: false,
+        authToken,
+      });
+      candidates = response.models ?? [];
+    } catch (error) {
+      console.warn('[ModelStore] Projector search failed:', error);
+      return undefined;
+    }
+
+    // The repository has to be the right one, not merely the most downloaded, so
+    // a few candidates are listed before giving up.
+    for (const candidate of candidates.slice(0, 4)) {
+      let files: ModelFile[];
+      try {
+        files = createSiblingsFromFileDetails(
+          candidate.id,
+          await fetchModelFilesDetails(candidate.id, authToken),
+        );
+      } catch (error) {
+        console.warn('[ModelStore] Could not list', candidate.id, error);
+        continue;
+      }
+      const filename = preferredProjectorModel(
+        projectorsForLocalModel(
+          modelFilename,
+          files.map(file => file.rfilename),
+        ),
+      );
+      const modelFile = files.find(file => file.rfilename === filename);
+      if (modelFile?.url) {
+        return {
+          hfModel: processHFSearchResults([{...candidate, siblings: files}])[0],
+          modelFile,
+        };
+      }
+    }
+    return undefined;
+  };
+
+  /**
+   * Pair a model with a projector found on the Hub and bring the file down. The
+   * projector keeps its repository folder — a model imported from storage reaches
+   * it through the cross-folder pairing, and a second copy in the local folder
+   * would let deleting either model remove a file the other still needs.
+   */
+  autoFetchProjectionModel = async (
+    modelId: string,
+  ): Promise<Model | undefined> => {
+    const model = this.models.find(m => m.id === modelId);
+    if (!model?.filename || model.modelType === ModelType.PROJECTION) {
+      return undefined;
+    }
+    const found = await this.findProjectionFileInHub(model.filename);
+    if (!found) {
+      return undefined;
+    }
+    const projectorId = `${found.hfModel.id}/${found.modelFile.rfilename}`;
+    if (!this.models.some(m => m.id === projectorId)) {
+      runInAction(() => {
+        this.models.push(hfAsModel(found.hfModel, found.modelFile));
+      });
+    }
+    const projector = this.models.find(m => m.id === projectorId);
+    if (!projector) {
+      return undefined;
+    }
+    runInAction(() => {
+      model.supportsMultimodal = true;
+      model.compatibleProjectionModels = Array.from(
+        new Set([...(model.compatibleProjectionModels ?? []), projector.id]),
+      );
+      model.defaultProjectionModel = projector.id;
+    });
+    // The projector's own capabilities are read when its file lands, and
+    // propagateProjectorMediaSupport pushes them here afterwards.
+    this.refreshPairedMediaSupport(model);
+    console.log(
+      '[ModelStore] Auto-paired',
+      model.filename,
+      'with',
+      projectorId,
+    );
+    await this.downloadProjectionModel(projector.id);
     return projector;
   };
 

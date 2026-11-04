@@ -100,6 +100,7 @@ class MockModelStore {
   registerOnboardingPalModel: jest.Mock;
   downloadHFModel: jest.Mock;
   downloadProjectionModel: jest.Mock;
+  autoFetchProjectionModel: jest.Mock;
   cancelDownload: jest.Mock;
   disableAutoRelease: jest.Mock;
   enableAutoRelease: jest.Mock;
@@ -165,6 +166,7 @@ class MockModelStore {
       registerOnboardingPalModel: false,
       downloadHFModel: false,
       downloadProjectionModel: false,
+      autoFetchProjectionModel: false,
       cancelDownload: false,
       disableAutoRelease: false,
       enableAutoRelease: false,
@@ -257,6 +259,7 @@ class MockModelStore {
     );
     this.downloadHFModel = jest.fn();
     this.downloadProjectionModel = jest.fn().mockResolvedValue(undefined);
+    this.autoFetchProjectionModel = jest.fn().mockResolvedValue(undefined);
     this.cancelDownload = jest.fn();
     this.disableAutoRelease = jest.fn();
     this.enableAutoRelease = jest.fn();

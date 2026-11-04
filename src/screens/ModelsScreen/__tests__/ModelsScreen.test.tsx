@@ -127,6 +127,58 @@ describe('ModelsScreen', () => {
     });
   });
 
+  it('offers the projector a freshly imported model has no file for', async () => {
+    const filename = 'LFM3-Omni-2B-Q8_0.gguf';
+    const permanentPath = `/path/to/documents/models/local/${filename}`;
+    modelStore.models = [
+      {
+        ...basicModel,
+        id: 'imported-omni',
+        filename,
+        fullPath: permanentPath,
+        isDownloaded: true,
+        supportsMultimodal: undefined,
+        modelType: undefined,
+      },
+    ];
+    (pick as jest.Mock).mockResolvedValue([
+      {uri: '/mock/file/path', name: filename},
+    ]);
+    (RNFS.exists as jest.Mock).mockResolvedValue(false);
+
+    const choices: string[] = [];
+    jest
+      .spyOn(Alert, 'alert')
+      .mockImplementation((title, _message, buttons) => {
+        choices.push(String(title));
+        if (title === 'Look for a projector online?') {
+          buttons?.[1].onPress?.();
+        }
+      });
+
+    const {getByTestId} = render(<ModelsScreen />);
+    fireEvent.press(getByTestId('fab-group'));
+    await waitFor(() => {
+      expect(
+        getByTestId('local-fab', {includeHiddenElements: true}),
+      ).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.press(getByTestId('local-fab', {includeHiddenElements: true}));
+    });
+
+    // The import itself never asks, but a model that arrived alone does — and
+    // only after its file is on the phone.
+    await waitFor(() => {
+      expect(modelStore.addLocalModel).toHaveBeenCalledWith(permanentPath);
+      expect(modelStore.autoFetchProjectionModel).toHaveBeenCalledWith(
+        'imported-omni',
+      );
+    });
+    expect(choices).toContain('Look for a projector online?');
+  });
+
   it('shows a confirmation alert if file already exists and replaces it', async () => {
     (RNFS.exists as jest.Mock).mockResolvedValue(true);
     (pick as jest.Mock).mockResolvedValue([

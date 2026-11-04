@@ -70,10 +70,12 @@ jobs:
             src/services/voice/__tests__/speechLevel.test.ts \
             src/services/voice/__tests__/wav.test.ts \
             src/store/__tests__/ModelStore.localMultimodal.test.ts \
+            src/store/__tests__/ModelStore.autoProjector.test.ts \
             src/store/__tests__/ModelStore.projectorMedia.test.ts \
             src/store/__tests__/TTSStore.test.ts \
             src/components/VoiceModeView/__tests__/VoiceModeView.test.tsx \
             src/components/VoiceSetupSheet/__tests__/VoiceSetupSheet.test.tsx \
+            src/screens/ModelsScreen/HFModelSearch/DetailsView/ModelFileCard/__tests__/ModelFileCard.test.tsx \
             src/hooks/__tests__/useChatSession.test.ts \
             src/hooks/__tests__/useChatSession.assistantTurn.test.ts \
             src/hooks/__tests__/useVoiceMode.test.ts

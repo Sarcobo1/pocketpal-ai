@@ -315,6 +315,16 @@
       "copyingModel": "Copying model file...",
       "copyFailed": "Failed to copy model file"
     },
+    "autoProjector": {
+      "title": "Look for a projector online?",
+      "message": "{{model}} has no projector file beside it, so it answers from text only. The matching projector can be downloaded from Hugging Face.",
+      "search": "Search Hugging Face",
+      "searching": "Searching Hugging Face for a projector...",
+      "foundTitle": "Projector found",
+      "foundMessage": "Downloading {{projector}} from {{repo}}. The model gains image and audio input once the file arrives.",
+      "notFoundTitle": "No projector found",
+      "notFoundMessage": "Nothing on Hugging Face matched {{model}}. Use Add projector (mmproj) on the model card to place the file beside it yourself."
+    },
     "labels": {
       "localModel": "Local",
       "hfModel": "HF",

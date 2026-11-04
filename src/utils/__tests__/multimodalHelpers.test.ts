@@ -7,6 +7,7 @@ import {
   projectorsForLocalModel,
   projectionGapCopy,
   pairedDownloadProgress,
+  searchTermFromFilename,
 } from '../multimodalHelpers';
 import {toLocalMediaPath} from '../multimodalPatterns';
 import {ModelFile} from '../types';
@@ -351,6 +352,34 @@ describe('projectionGapCopy', () => {
     ] as const) {
       expect(projectionGapCopy(gap, l10n)).not.toContain('{{file}}');
     }
+  });
+
+  describe('searchTermFromFilename', () => {
+    it.each([
+      ['LFM3-Omni-2B-Q8_0.gguf', 'LFM3-Omni-2B'],
+      ['lfm3-omni-2b-Q4_K_M.GGUF', 'lfm3-omni-2b'],
+      [
+        'DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf',
+        'DeepSeek-R1-Distill-Qwen-1.5B',
+      ],
+      ['SmolVLM-256M-Instruct-IQ4_XS.gguf', 'SmolVLM-256M-Instruct'],
+      ['Qwen2.5-VL-3B-Instruct-f16.gguf', 'Qwen2.5-VL-3B-Instruct'],
+      // A size tag is part of the name, not a quant: taking it off would search
+      // for a model that does not exist.
+      ['Gemma-3-4B-it.gguf', 'Gemma-3-4B-it'],
+      ['LFM3-8.17B-A1M-MoE-F16.gguf', 'LFM3-8.17B-A1M-MoE'],
+    ])('searches %s as %s', (filename, term) => {
+      expect(searchTermFromFilename(filename)).toBe(term);
+    });
+
+    it.each(['model.gguf', 'model-Q4_K_M.gguf', 'MMProj.gguf', ''])(
+      'finds nothing to search for in %s',
+      filename => {
+        // Nothing here names a model, so a search would return an arbitrary
+        // repository and pair a foreign projector with the file.
+        expect(searchTermFromFilename(filename)).toBe('');
+      },
+    );
   });
 
   describe('pairedDownloadProgress', () => {

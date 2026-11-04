@@ -27,8 +27,8 @@ import {
 
 import {uiStore, modelStore, hfStore, UIStore, serverStore} from '../../store';
 
-import {L10nContext} from '../../utils';
-import {Model, ModelOrigin} from '../../utils/types';
+import {L10nContext, isProjectionModel} from '../../utils';
+import {Model, ModelOrigin, ModelType} from '../../utils/types';
 import {ErrorState} from '../../utils/errors';
 
 export const ModelsScreen: React.FC = observer(() => {
@@ -36,6 +36,7 @@ export const ModelsScreen: React.FC = observer(() => {
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [hfSearchVisible, setHFSearchVisible] = useState(false);
   const [isCopyingModel, setIsCopyingModel] = useState(false);
+  const [isSearchingProjector, setIsSearchingProjector] = useState(false);
   const [selectedModel, setSelectedModel] = useState<Model | undefined>();
   const [settingsVisible, setSettingsVisible] = useState(false);
 
@@ -181,6 +182,69 @@ export const ModelsScreen: React.FC = observer(() => {
     setErrorToReport(null);
   };
 
+  /**
+   * A model carried onto the phone usually arrives alone, and without its
+   * projector it answers from text only. Offer to fetch the missing half by
+   * name; "Add projector (mmproj)" on the card stays the manual fallback for
+   * the file that lives on a repository the search cannot reach.
+   */
+  const offerProjectorForImportedModel = async (fullPath: string) => {
+    const model = modelStore.models.find(m => m.fullPath === fullPath);
+    if (
+      !model ||
+      model.modelType === ModelType.PROJECTION ||
+      isProjectionModel(model.filename ?? '') ||
+      model.supportsMultimodal
+    ) {
+      return;
+    }
+
+    const search = await new Promise<boolean>(resolve => {
+      Alert.alert(
+        l10n.models.autoProjector.title,
+        l10n.models.autoProjector.message.replace('{{model}}', model.name),
+        [
+          {
+            text: l10n.common.cancel,
+            style: 'cancel',
+            onPress: () => resolve(false),
+          },
+          {
+            text: l10n.models.autoProjector.search,
+            onPress: () => resolve(true),
+          },
+        ],
+      );
+    });
+    if (!search) {
+      return;
+    }
+
+    setIsSearchingProjector(true);
+    let projector: Model | undefined;
+    try {
+      projector = await modelStore.autoFetchProjectionModel(model.id);
+    } catch (error) {
+      console.warn('[ModelsScreen] Projector search threw:', error);
+    } finally {
+      setIsSearchingProjector(false);
+    }
+
+    Alert.alert(
+      projector
+        ? l10n.models.autoProjector.foundTitle
+        : l10n.models.autoProjector.notFoundTitle,
+      projector
+        ? l10n.models.autoProjector.foundMessage
+            .replace('{{projector}}', projector.filename ?? projector.name)
+            .replace('{{repo}}', projector.hfModel?.id ?? projector.repo ?? '')
+        : l10n.models.autoProjector.notFoundMessage.replace(
+            '{{model}}',
+            model.name,
+          ),
+    );
+  };
+
   const handleAddLocalModel = async () => {
     if (isCopyingModel) {
       return;
@@ -258,8 +322,15 @@ export const ModelsScreen: React.FC = observer(() => {
               l10n.models.fileManagement.copyFailed,
               e instanceof Error ? e.message : String(e),
             );
+            return;
           } finally {
             setIsCopyingModel(false);
+          }
+
+          // An imported model is only as multimodal as the file sitting beside
+          // it — and that file is the one thing a copy from a computer loses.
+          if (permanentPath.toLowerCase().endsWith('.gguf')) {
+            await offerProjectorForImportedModel(permanentPath);
           }
         }
       })
@@ -441,6 +512,13 @@ export const ModelsScreen: React.FC = observer(() => {
         onDismiss={() => {}}
         duration={86400000}>
         {l10n.models.fileManagement.copyingModel}
+      </Snackbar>
+      <Snackbar
+        testID="projector-search-snackbar"
+        visible={isSearchingProjector}
+        onDismiss={() => {}}
+        duration={86400000}>
+        {l10n.models.autoProjector.searching}
       </Snackbar>
       <FABGroup
         onAddHFModel={() => setHFSearchVisible(true)}

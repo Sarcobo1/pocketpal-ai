@@ -183,6 +183,34 @@ export function projectorsForLocalModel(
 }
 
 /**
+ * The part of a filename a repository search can match against: the name with
+ * its extension and quant tag removed, since repositories are named after the
+ * model and not after one of its quants. An empty result means the name carried
+ * nothing but a quant or a stop word ("model-IQ4_XS.gguf"), which no search can
+ * resolve — better to say so than to fetch an unrelated repository.
+ */
+export function searchTermFromFilename(filename: string): string {
+  const term = filename
+    .replace(/\.gguf$/i, '')
+    .replace(
+      /[-_.]((?:[iI]?[qQ][0-8]|[bB][fF]16|[fFpP]16|[fF]32)(?:[-_][a-zA-Z0-9]+)*)$/,
+      '',
+    )
+    .replace(/[-_.]+$/, '')
+    .trim();
+  const identifies = term
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .some(
+      token =>
+        token.length > 2 &&
+        /[a-z]/.test(token) &&
+        !IDENTITY_STOP_TOKENS.has(token),
+    );
+  return identifies ? term : '';
+}
+
+/**
  * Why the running model has no projector attached, and the single move that
  * puts it back. A media turn that degrades to text is otherwise silent, and
  * "multimodal is not enabled" is not something a user can act on.

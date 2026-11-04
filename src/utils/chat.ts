@@ -685,12 +685,20 @@ export function classifyReply(
  * model said would rewrite the conversation they were part of. It is the
  * prompt that must not carry it: every echoed answer that goes back in teaches
  * the model to answer the next question with its own text too.
+ *
+ * The shape is checked as well as the mark, because the mark is new: a session
+ * recorded before it existed still holds the replies that started repeating the
+ * speaker, and the fix would otherwise only apply to chats started after it.
  */
 export function excludeEchoedAssistantTurns(
   messages: MessageType.Any[],
 ): MessageType.Any[] {
-  return messages.filter(
-    message =>
-      message.type !== 'assistant_turn' || !message.metadata?.echoExcluded,
-  );
+  return messages.filter(message => {
+    if (message.type !== 'assistant_turn') {
+      return true;
+    }
+    return (
+      !message.metadata?.echoExcluded && !isReportedSpeech(derivedText(message))
+    );
+  });
 }

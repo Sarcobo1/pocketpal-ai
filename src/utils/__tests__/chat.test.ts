@@ -1116,6 +1116,29 @@ describe('excludeEchoedAssistantTurns', () => {
     expect(excludeEchoedAssistantTurns(history)).toEqual(history);
   });
 
+  it('drops a reported turn stored before the mark existed', () => {
+    // The mark is new; the sessions it has to clean up are not.
+    const reported = makeAssistantTurn(
+      [{content: 'The user asked what the capital of France is.'}],
+      'r',
+    );
+    expect(excludeEchoedAssistantTurns([said, reported, answered])).toEqual([
+      said,
+      answered,
+    ]);
+  });
+
+  it('keeps an answer that only mentions the user partway through', () => {
+    const mentioned = makeAssistantTurn(
+      [{content: 'A city the user said they liked is Paris.'}],
+      'm',
+    );
+    expect(excludeEchoedAssistantTurns([mentioned, answered])).toEqual([
+      mentioned,
+      answered,
+    ]);
+  });
+
   it('returns an empty history as empty', () => {
     expect(excludeEchoedAssistantTurns([])).toEqual([]);
   });

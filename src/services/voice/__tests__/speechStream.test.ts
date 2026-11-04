@@ -437,7 +437,9 @@ describe('the first sentence of a reply still arriving', () => {
   it('takes a breath when a reply is too long to have no punctuation', () => {
     const long = 'the garden needs water, '.repeat(12);
     expect(long.length).toBeGreaterThan(210);
-    expect(at(long)).toBe('the garden needs water, ');
+    // The cut ends at the mark: the space after it belongs to the words that
+    // follow, and both callers trim what they are handed.
+    expect(at(long)).toBe('the garden needs water,');
   });
 
   it('will not call the point in a number the end of a sentence', () => {
@@ -447,12 +449,18 @@ describe('the first sentence of a reply still arriving', () => {
   });
 
   it('agrees with the feed about what a sentence end is', () => {
-    const text = 'The park is quiet. A few birds work along the fence.';
+    const text =
+      'The park is quiet. A few birds work along the fence. The gate stays open.';
     const strong = planSpeechBoundaries(
       text,
       DEFAULT_MIN_SEGMENT_SECONDS,
     ).filter(mark => mark.strong);
     expect(strong.length).toBeGreaterThan(1);
+    // The same mark, not merely the same kind of mark: where the fast start
+    // stops is the first place the feed would have stopped too.
+    expect(at(text)).toBe(
+      text.slice(0, Math.round(strong[0]!.at * text.length)),
+    );
     expect(at(text)).toBe('The park is quiet.');
   });
 });

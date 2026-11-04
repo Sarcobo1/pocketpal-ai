@@ -24,9 +24,11 @@ import {
   runSpeechBench,
   runSpeechCacheProbe,
   runSpeechQuantBench,
+  runSpeechStartBench,
   speechQuantOptions,
   type SpeechCellSummary,
   type SpeechFileOption,
+  type SpeechStartRow,
 } from '../../../../services/voice/speechBench';
 import {modelStore} from '../../../../store';
 import {voiceAudioDir} from '../../../../services/voice/wav';
@@ -61,6 +63,7 @@ const VoiceAbScreen = () => {
   const [selTexts, setSelTexts] = useState<string[]>([]);
   const [selProjectors, setSelProjectors] = useState<string[]>([]);
   const [quantSummary, setQuantSummary] = useState<SpeechCellSummary[]>([]);
+  const [startRows, setStartRows] = useState<SpeechStartRow[]>([]);
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<ScrollViewInstance>(null);
   const cancelRef = useRef(false);
@@ -131,6 +134,31 @@ const VoiceAbScreen = () => {
       const message = error instanceof Error ? error.message : String(error);
       Alert.alert('Speech bench failed', message);
       append(`speech failed: ${message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Where the wait for a spoken reply is, measured on the reply itself. */
+  const runStart = async () => {
+    if (busy) {
+      return;
+    }
+    cancelRef.current = false;
+    setBusy(true);
+    setStartRows([]);
+    append(`=== speech start evidence, ${runs} replies x2 phases ===`);
+    try {
+      const result = await runSpeechStartBench({
+        replies: Math.max(1, Math.min(10, Number(runs) || 5)),
+        isCancelled: () => cancelRef.current,
+        onLine: append,
+      });
+      setStartRows(result.rows);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      Alert.alert('Speech start failed', message);
+      append(`speech start failed: ${message}`);
     } finally {
       setBusy(false);
     }
@@ -365,6 +393,65 @@ const VoiceAbScreen = () => {
             </Button>
           </Card.Content>
         </Card>
+
+        <Card elevation={1} style={styles.card}>
+          <Card.Title
+            title="Speech start"
+            subtitle="six moments of one spoken reply, twice: model voice only, then fast start"
+          />
+          <Card.Content>
+            <Text style={styles.note}>
+              Runs the real turn — a text completion, then the reply spoken —{' '}
+              {runs} times with the device voice kept out of it and {runs} times
+              with it saying the first sentence as soon as that sentence exists.
+              Every reply is asked cold, so one does not inherit the cache the
+              last left. It answers two things directly: whether the audio
+              arrives in pieces at all, and whether the sound waits for the
+              text. The replies are played out loud. Table and verdict are also
+              on logcat as [speech-bench], and in {abDir}.
+            </Text>
+            <Button
+              mode="contained"
+              onPress={runStart}
+              disabled={busy}
+              style={styles.button}>
+              {busy ? 'Running…' : 'Run speech start'}
+            </Button>
+          </Card.Content>
+        </Card>
+
+        {startRows.length > 0 && (
+          <Card elevation={1} style={styles.card}>
+            <Card.Title
+              title="Speech start table"
+              subtitle="all columns are ms from the end of your sentence"
+            />
+            <Card.Content>
+              {startRows.map(row => (
+                <View
+                  key={`${row.fastStart ? 'on' : 'off'}-${row.n}`}
+                  style={styles.row}>
+                  <Text style={styles.rowHead}>
+                    {row.fastStart ? 'fast on' : 'fast off'} #{row.n} · first
+                    sound {row.firstPlayMs}ms · text ended {row.textEndMs}ms ·
+                    speech asked {row.genCallMs}ms
+                  </Text>
+                  <Text style={styles.rowMeta}>
+                    first token {row.textStartMs}ms · first chunk{' '}
+                    {row.firstChunkMs}ms · last chunk {row.lastChunkMs}ms ·
+                    pieces {row.chunks} · stream {row.stream}/{row.native} · rtf{' '}
+                    {row.rtf}
+                  </Text>
+                  <Text style={styles.rowSample}>
+                    {row.chars} chars / {row.sentences} sentences · waited on
+                    text {row.waitTextMs}ms
+                    {row.error ? ` · ${row.error}` : ''}
+                  </Text>
+                </View>
+              ))}
+            </Card.Content>
+          </Card>
+        )}
 
         {speechSummary.length > 0 && (
           <Card elevation={1} style={styles.card}>

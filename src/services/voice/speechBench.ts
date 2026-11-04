@@ -2,13 +2,25 @@ import * as RNFS from '@dr.pogodin/react-native-fs';
 import {fromByteArray} from 'base64-js';
 import {initLlama, type ContextParams, type LlamaContext} from 'llama.rn';
 
-import {modelStore} from '../../store';
+import {modelStore, ttsStore} from '../../store';
 import {ModelType, type Model} from '../../utils/types';
 import {acquireKeepAwake} from '../../utils/keepAwake';
-import {logPerf} from '../../utils/mediaPerf';
+import {
+  closeTurnTimeline,
+  logPerf,
+  markTurn,
+  openTurnTimeline,
+} from '../../utils/mediaPerf';
 
 import {abDir} from './abBench';
-import {MAX_UTTERANCE_SECONDS, TOUCHED_CACHE} from './omniSpeech';
+import {VOICE_ANSWER_INSTRUCTION} from './constants';
+import {
+  MAX_UTTERANCE_SECONDS,
+  modelCanVoiceReplies,
+  speakWithModel,
+  stopModelSpeech,
+  TOUCHED_CACHE,
+} from './omniSpeech';
 import {speechRunMs} from './speechLevel';
 import {float32PcmToWav} from './wav';
 
@@ -1192,4 +1204,375 @@ export const runSpeechQuantBench = async ({
     );
 
   return {rows, summary, wavs, dump};
+};
+
+/**
+ * Where the wait for a spoken reply actually is, measured on the reply rather
+ * than reasoned about.
+ *
+ * Two questions have been argued in prose long enough, and one build can settle
+ * both: does the engine hand the audio over in pieces at all, and does the
+ * speech pass start only once the text of the reply is finished? The answer to
+ * the first is `chunks` and the gap between the engine's first sample and its
+ * last; the answer to the second is where `speech` lands against `reply`. Both
+ * come from the same six moments of one turn, so this runs the app's real path —
+ * the store's streaming handle, the real template, the real player — over a
+ * fixed question and prints those moments for every reply.
+ *
+ * It runs the question twice, with the fast start off and then on, because the
+ * fix and the measurement have to be compared in one sitting on one phone, and
+ * the wait they differ by is the whole argument for the setting.
+ */
+
+/** The question every reply answers, asked the way a spoken turn asks it. */
+const START_QUESTION = 'What makes a garden path last?';
+
+/** Enough for two spoken sentences, short enough that no reply runs away. */
+const START_N_PREDICT = 90;
+
+/** How many sentences a reply said, from the punctuation it closed with. */
+const countSentences = (text: string): number =>
+  (text.match(/[.!?]/g) ?? []).length;
+
+export interface SpeechStartRow {
+  /** Whether the device voice was allowed to say the first sentence. */
+  fastStart: boolean;
+  n: number;
+  chars: number;
+  sentences: number;
+  // Every one of these is milliseconds since the turn opened, which in a real
+  // voice turn is the end of the speaker's sentence — so `firstPlayMs` is read
+  // directly as the wait the listener felt.
+  /** First token of the text reply. */
+  textStartMs: number;
+  /** The text reply finished. */
+  textEndMs: number;
+  /** The speech pass was asked for. */
+  genCallMs: number;
+  /** The engine's first sample reached the app. */
+  firstChunkMs: number;
+  /** The first sound reached the ear. */
+  firstPlayMs: number;
+  /** The engine handed its last sample over. */
+  lastChunkMs: number;
+  /** What the engine itself reported about how the audio arrived. */
+  chunks: number;
+  stream: string;
+  native: string;
+  rtf: string;
+  firstAudioMs: number;
+  genMs: number;
+  /** `genCall - textEnd`: the wait the fast start exists to remove. -1 unknown. */
+  waitTextMs: number;
+  error?: string;
+}
+
+/**
+ * One turn's marks and numbers, in the shape the table prints. Pure so the two
+ * verdicts can be pinned without a phone: which stage is which mark is exactly
+ * the thing a bench gets silently wrong.
+ */
+export const speechStartRow = ({
+  fastStart,
+  n,
+  chars,
+  sentences,
+  marks,
+  info,
+}: {
+  fastStart: boolean;
+  n: number;
+  chars: number;
+  sentences: number;
+  marks: Record<string, number>;
+  info: Record<string, string | number | boolean | null | undefined>;
+}): SpeechStartRow => {
+  const num = (key: string): number => {
+    const value = info[key];
+    if (typeof value === 'number') {
+      return value;
+    }
+    return typeof value === 'string' ? Number(value) || 0 : 0;
+  };
+  const textEnd = marks.reply ?? -1;
+  const genCall = marks.speech ?? -1;
+  return {
+    fastStart,
+    n,
+    chars,
+    sentences,
+    textStartMs: marks.ttft ?? -1,
+    textEndMs: textEnd,
+    genCallMs: genCall,
+    firstChunkMs: marks.audioOut ?? -1,
+    firstPlayMs: marks.firstSound ?? -1,
+    lastChunkMs: marks.audioLast ?? -1,
+    chunks: num('chunks'),
+    stream: String(info.stream ?? '-'),
+    native: String(info.native ?? '-'),
+    rtf: String(info.rtf ?? '-'),
+    firstAudioMs: num('firstAudioMs'),
+    genMs: num('genMs'),
+    waitTextMs: textEnd >= 0 && genCall >= 0 ? genCall - textEnd : -1,
+  };
+};
+
+export interface SpeechStartFindings {
+  rows: number;
+  /** (a) Does in-reply streaming work? */
+  streaming: 'works' | 'broken' | 'off';
+  /** (b) Is the speech pass only asked for once the text is whole? */
+  speechAskedAfterText: 'yes' | 'no' | 'unknown';
+  /** Does the listener hear anything before the text is whole? */
+  soundBeforeText: 'yes' | 'no' | 'mixed' | 'unknown';
+  medianTtfaMs: number | null;
+  medianWaitTextMs: number | null;
+  medianChunks: number | null;
+  medianFirstAudioMs: number | null;
+  medianGenMs: number | null;
+}
+
+export const speechStartFindings = (
+  rows: SpeechStartRow[],
+): SpeechStartFindings => {
+  const ok = rows.filter(row => !row.error);
+  const streamed = ok.filter(row => row.stream === 'on');
+  const med = (values: number[]): number | null =>
+    values.length ? median(values) : null;
+  // The two numbers a streaming reply is judged on: it arrived in pieces, and
+  // the first piece came long before the last one did. One piece and the flag
+  // did nothing; a first piece at the end of the generation is a whole clip
+  // wearing a stream's name.
+  const streaming: SpeechStartFindings['streaming'] = !streamed.length
+    ? 'off'
+    : (med(streamed.map(row => row.chunks)) ?? 0) > 1 &&
+        (med(streamed.map(row => row.firstAudioMs)) ?? 0) <
+          (med(streamed.map(row => row.genMs)) ?? 0)
+      ? 'works'
+      : 'broken';
+  const waits = ok.filter(
+    row => row.textEndMs >= 0 && row.genCallMs >= 0 && row.waitTextMs >= 0,
+  );
+  const early = ok.filter(row => row.firstPlayMs >= 0 && row.textEndMs >= 0);
+  return {
+    rows: ok.length,
+    streaming,
+    // The two halves of the same complaint: the engine is only asked once the
+    // text is whole, and — with the fast start — the ear can still have been
+    // given something before it was.
+    speechAskedAfterText: !waits.length
+      ? 'unknown'
+      : waits.every(row => row.genCallMs >= row.textEndMs)
+        ? 'yes'
+        : 'no',
+    soundBeforeText: !early.length
+      ? 'unknown'
+      : early.every(row => row.firstPlayMs < row.textEndMs)
+        ? 'yes'
+        : early.some(row => row.firstPlayMs < row.textEndMs)
+          ? 'mixed'
+          : 'no',
+    medianTtfaMs: med(ok.map(row => row.firstPlayMs).filter(v => v >= 0)),
+    medianWaitTextMs: med(waits.map(row => row.waitTextMs)),
+    medianChunks: med(streamed.map(row => row.chunks)),
+    medianFirstAudioMs: med(streamed.map(row => row.firstAudioMs)),
+    medianGenMs: med(streamed.map(row => row.genMs)),
+  };
+};
+
+/** One reply, on one line, in the order the listener met them. */
+const startLine = (row: SpeechStartRow): string =>
+  `${row.fastStart ? 'on' : 'off'}#${row.n} chars=${row.chars} sent=${
+    row.sentences
+  } text ${row.textStartMs}→${row.textEndMs} speech=${row.genCallMs} chunk=${
+    row.firstChunkMs
+  } play=${row.firstPlayMs} last=${row.lastChunkMs} chunks=${row.chunks} ` +
+  `stream=${row.stream} native=${row.native} rtf=${row.rtf} ` +
+  `firstAudio=${row.firstAudioMs}ms gen=${row.genMs}ms waitText=${
+    row.waitTextMs
+  }ms${row.error ? ` ERR ${row.error}` : ''}`;
+
+const findingsLine = (phase: string, f: SpeechStartFindings): string =>
+  `${phase} n=${f.rows} (a)streaming=${f.streaming} chunks=${
+    f.medianChunks
+  } firstAudio=${f.medianFirstAudioMs}ms gen=${f.medianGenMs}ms ` +
+  `(b)speechAfterText=${f.speechAskedAfterText} soundBeforeText=${
+    f.soundBeforeText
+  } waitText=${f.medianWaitTextMs}ms ttfa=${f.medianTtfaMs}ms`;
+
+/**
+ * Five replies, twice: once with the model's own voice saying everything after
+ * the text is whole, once with the device voice saying the first sentence as
+ * soon as it exists.
+ *
+ * The store's handle is driven rather than `speakWithModel` called directly,
+ * because the thing being measured is when the first sound lands relative to the
+ * text — and that decision lives in the handle. Every context state is put back
+ * the way it was found, and the context is cleared between replies so that one
+ * reply is not charged with the prefix the one before it left.
+ */
+export const runSpeechStartBench = async ({
+  replies = 5,
+  isCancelled,
+  onLine,
+}: {
+  replies?: number;
+  isCancelled?: () => boolean;
+  onLine?: (line: string) => void;
+} = {}): Promise<{rows: SpeechStartRow[]; dump: string}> => {
+  const say = (line: string) => {
+    console.log(`[speech-bench] ${line}`);
+    onLine?.(line);
+  };
+  const ctx = modelStore.context;
+  if (!ctx) {
+    throw new Error('no loaded context — open the Omni model in a chat first');
+  }
+  if (typeof ctx.generateSpeech !== 'function') {
+    throw new Error(
+      'this build has no generateSpeech on the bridge — the llama.rn patch did not apply',
+    );
+  }
+  if (!(await modelCanVoiceReplies())) {
+    throw new Error('this model has no voice on this build — nothing to time');
+  }
+
+  const wasActive = ttsStore.voiceOutputActive;
+  const wasFast = ttsStore.speechFastStart;
+  // The speak promise of the reply in flight, so the turn waits for its own
+  // audio instead of racing the store's fire-and-forget finalize.
+  const pending: Array<Promise<unknown>> = [];
+  ttsStore.setModelVoice({
+    speak: (text, onFirstPiece) => {
+      const said = speakWithModel(text, onFirstPiece);
+      pending.push(said);
+      return said;
+    },
+    stop: () => stopModelSpeech(),
+  });
+  ttsStore.setVoiceOutputActive(true);
+
+  const rows: SpeechStartRow[] = [];
+  const releaseWake = acquireKeepAwake();
+  const dump = `${abDir}/speech-start-${Date.now()}.json`;
+
+  try {
+    say(
+      `speech start: ${replies} replies x2 phases · stream=${
+        ttsStore.streamSpeech ? 'on' : 'off'
+      } jitter=${ttsStore.speechJitterSeconds}s preset=${
+        ttsStore.speechPreset
+      }`,
+    );
+    for (const fastStart of [false, true]) {
+      ttsStore.setSpeechFastStart(fastStart);
+      const phase = fastStart ? 'fast start ON' : 'fast start OFF';
+      say(`---- speech start: ${phase} ----`);
+      for (let n = 1; n <= replies; n++) {
+        if (isCancelled?.()) {
+          break;
+        }
+        pending.length = 0;
+        const id = `speech-start-${fastStart ? 'on' : 'off'}-${n}`;
+        const text = {value: ''};
+        let error = '';
+        openTurnTimeline();
+        markTurn('endpoint');
+        try {
+          // Cold, every time: a reply that re-used the last one's prefix would
+          // not be paying what a first spoken answer pays.
+          await ctx.clearCache(true);
+          ttsStore.onAssistantMessageStart(id);
+          await ctx.completion(
+            {
+              messages: [
+                {role: 'system', content: VOICE_ANSWER_INSTRUCTION},
+                {role: 'user', content: START_QUESTION},
+              ],
+              n_predict: START_N_PREDICT,
+              temperature: 0,
+            },
+            data => {
+              const token = data?.token ?? data?.content ?? '';
+              if (!token) {
+                return;
+              }
+              if (!text.value) {
+                markTurn('ttft');
+              }
+              text.value += token;
+              ttsStore.onAssistantMessageChunk(id, token);
+            },
+          );
+          markTurn('reply');
+          ttsStore.onAssistantMessageComplete(id, text.value);
+          // The handle speaks on its own schedule; the turn's own audio is what
+          // has to be waited out before the marks mean anything.
+          await pending[0];
+        } catch (err) {
+          error = String(err).slice(0, 160);
+        }
+        const {marks, info} = closeTurnTimeline({start: id});
+        const row = speechStartRow({
+          fastStart,
+          n,
+          chars: text.value.length,
+          sentences: countSentences(text.value),
+          marks,
+          info,
+        });
+        if (error) {
+          row.error = error;
+        }
+        rows.push(row);
+        say(startLine(row));
+      }
+      const mine = rows.filter(row => row.fastStart === fastStart);
+      say(findingsLine(phase, speechStartFindings(mine)));
+    }
+  } finally {
+    await Promise.allSettled(pending);
+    ttsStore.setModelVoice(null);
+    ttsStore.setVoiceOutputActive(wasActive);
+    ttsStore.setSpeechFastStart(wasFast);
+    releaseWake();
+  }
+
+  const off = speechStartFindings(rows.filter(row => !row.fastStart));
+  const on = speechStartFindings(rows.filter(row => row.fastStart));
+  say('---- speech start verdict ----');
+  say(`(a) in-reply streaming: ${on.streaming} / ${off.streaming}`);
+  say(
+    `(b) speech asked only after the text: ${on.speechAskedAfterText} / ${off.speechAskedAfterText} ` +
+      `— first sound before the text ended: ${on.soundBeforeText} / ${off.soundBeforeText}`,
+  );
+  say(
+    `time to first audio: off ${off.medianTtfaMs}ms → on ${on.medianTtfaMs}ms ` +
+      `(waited on text ${off.medianWaitTextMs}ms → ${on.medianWaitTextMs}ms)`,
+  );
+
+  await RNFS.mkdir(abDir).catch(() => undefined);
+  await RNFS.writeFile(
+    dump,
+    JSON.stringify(
+      {
+        scope: 'start',
+        replies,
+        question: START_QUESTION,
+        stream: ttsStore.streamSpeech,
+        jitterSeconds: ttsStore.speechJitterSeconds,
+        preset: ttsStore.speechPreset,
+        findings: {off, on},
+        rows,
+      },
+      null,
+      1,
+    ),
+  )
+    .then(() => say(`saved ${dump}`))
+    .catch(err =>
+      console.warn('[speech-bench] start dump failed:', String(err)),
+    );
+
+  return {rows, dump};
 };

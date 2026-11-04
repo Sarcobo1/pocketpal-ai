@@ -4,8 +4,11 @@ import {
   buildSpeechCells,
   estimateSpeechBenchMs,
   speechQuantOptions,
+  speechStartFindings,
+  speechStartRow,
   type SpeechBaseline,
   type SpeechCell,
+  type SpeechStartRow,
 } from '../speechBench';
 
 /**
@@ -198,5 +201,148 @@ describe('speechQuantOptions', () => {
     // to be downloaded first is not a comparison.
     expect(options.texts).toEqual([]);
     expect(options.projectors.map(option => option.id)).toEqual(['here']);
+  });
+});
+
+/**
+ * A reply is a set of marks and a handful of engine numbers, so which stage is
+ * which mark is the whole of what the table claims. Got it wrong, the table
+ * still fills up — with a wait attributed to the wrong half of the turn, which
+ * is how an optimization ends up aimed at a stage that was never slow.
+ */
+describe('speechStartRow', () => {
+  const row = (
+    marks: Record<string, number>,
+    info: Record<string, string | number | boolean> = {},
+  ) =>
+    speechStartRow({
+      fastStart: false,
+      n: 1,
+      chars: 120,
+      sentences: 2,
+      marks,
+      info,
+    });
+
+  it('reads each stage off the mark that means it', () => {
+    const r = row(
+      {
+        endpoint: 0,
+        ttft: 400,
+        reply: 2600,
+        speech: 2650,
+        audioOut: 2900,
+        firstSound: 3000,
+        audioLast: 5100,
+      },
+      {
+        chunks: 18,
+        stream: 'on',
+        native: 'used',
+        rtf: '0.9',
+        firstAudioMs: 250,
+        genMs: 2450,
+      },
+    );
+
+    expect(r.textStartMs).toBe(400);
+    expect(r.textEndMs).toBe(2600);
+    expect(r.genCallMs).toBe(2650);
+    expect(r.firstChunkMs).toBe(2900);
+    expect(r.firstPlayMs).toBe(3000);
+    expect(r.lastChunkMs).toBe(5100);
+    expect(r.chunks).toBe(18);
+    expect(r.firstAudioMs).toBe(250);
+    // The wait the fast start exists to remove, measured on the turn itself.
+    expect(r.waitTextMs).toBe(50);
+  });
+
+  it('leaves a stage that never landed unknown rather than at the opening', () => {
+    const r = row({ttft: 400, reply: 2600});
+
+    // A missing mark read as 0 would say "the first sound was immediate" — the
+    // exact opposite of what a reply that never spoke shows.
+    expect(r.firstPlayMs).toBe(-1);
+    expect(r.genCallMs).toBe(-1);
+    expect(r.lastChunkMs).toBe(-1);
+    expect(r.chunks).toBe(0);
+    expect(r.stream).toBe('-');
+    expect(r.waitTextMs).toBe(-1);
+  });
+});
+
+describe('speechStartFindings', () => {
+  const base: SpeechStartRow = {
+    fastStart: false,
+    n: 1,
+    chars: 120,
+    sentences: 2,
+    textStartMs: 400,
+    textEndMs: 2600,
+    genCallMs: 2650,
+    firstChunkMs: 2900,
+    firstPlayMs: 3000,
+    lastChunkMs: 5100,
+    chunks: 18,
+    stream: 'on',
+    native: 'used',
+    rtf: '0.9',
+    firstAudioMs: 250,
+    genMs: 2450,
+    waitTextMs: 50,
+  };
+  const at = (over: Partial<SpeechStartRow> = {}): SpeechStartRow => ({
+    ...base,
+    ...over,
+  });
+
+  it('accepts a stream only when the pieces arrive as it makes them', () => {
+    expect(speechStartFindings([at()]).streaming).toBe('works');
+    // One callback for the whole reply is a clip wearing a stream's name, and a
+    // first piece at the end of the generation is the same thing measured by
+    // time rather than by count.
+    expect(speechStartFindings([at({chunks: 1})]).streaming).toBe('broken');
+    expect(speechStartFindings([at({firstAudioMs: 2500})]).streaming).toBe(
+      'broken',
+    );
+    expect(
+      speechStartFindings([at({stream: 'off', native: 'off', chunks: 0})])
+        .streaming,
+    ).toBe('off');
+  });
+
+  it('separates when the engine is asked from when the ear is given', () => {
+    // Without the fast start both are true: the speech waits for the text, and
+    // nothing is audible before the text is whole.
+    expect(speechStartFindings([at()]).speechAskedAfterText).toBe('yes');
+    expect(speechStartFindings([at()]).soundBeforeText).toBe('no');
+
+    // With it, the engine is still asked after the text — the context is busy —
+    // but the device voice already spoke.
+    expect(
+      speechStartFindings([at({genCallMs: 2590})]).speechAskedAfterText,
+    ).toBe('no');
+    expect(speechStartFindings([at({firstPlayMs: 900})]).soundBeforeText).toBe(
+      'yes',
+    );
+    expect(
+      speechStartFindings([at(), at({n: 2, firstPlayMs: 900})]).soundBeforeText,
+    ).toBe('mixed');
+  });
+
+  it('says nothing about replies that did not run', () => {
+    const f = speechStartFindings([
+      at({error: 'aborted'}),
+      at({n: 2, firstPlayMs: -1, textEndMs: -1, waitTextMs: -1}),
+    ]);
+
+    // A reply that failed is not evidence, and a stage the turn never reached is
+    // not a measurement — the verdicts that need either stay unknown instead of
+    // answering off the one row that has the number.
+    expect(f.rows).toBe(1);
+    expect(f.speechAskedAfterText).toBe('unknown');
+    expect(f.soundBeforeText).toBe('unknown');
+    expect(f.medianTtfaMs).toBeNull();
+    expect(f.medianWaitTextMs).toBeNull();
   });
 });

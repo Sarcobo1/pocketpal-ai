@@ -1009,11 +1009,10 @@ export const runSpeechQuantBench = async ({
   }
   const texts = textIds.map(id => pick(id, 'model'));
   const projectors = projectorIds.map(id => pick(id, 'projector'));
-  const combos: Array<{text: Model; projector: Model | null}> = texts.flatMap(
-    text =>
-      projectors.length
-        ? projectors.map(projector => ({text, projector}))
-        : [{text, projector: null}],
+  const combos = texts.flatMap<{text: Model; projector: Model | null}>(text =>
+    projectors.length
+      ? projectors.map(projector => ({text, projector}))
+      : [{text, projector: null}],
   );
 
   say(

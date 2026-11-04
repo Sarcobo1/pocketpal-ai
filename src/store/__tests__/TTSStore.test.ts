@@ -1318,11 +1318,11 @@ describe('TTSStore', () => {
       });
 
       it('stops the device sentence with the reply it belongs to', async () => {
-        let saySentence: (() => void) | null = null;
+        let settleSentence: () => void = () => {};
         mockSystemPlay.mockImplementationOnce(
           () =>
             new Promise<void>(resolve => {
-              saySentence = resolve;
+              settleSentence = resolve;
             }),
         );
         const sink = makeSink();
@@ -1340,7 +1340,7 @@ describe('TTSStore', () => {
         // has to reach both.
         expect(mockSystemStop).toHaveBeenCalled();
         expect(sink.stop).toHaveBeenCalledTimes(1);
-        saySentence?.();
+        settleSentence();
         await flush();
         expect(sink.speak).not.toHaveBeenCalled();
       });

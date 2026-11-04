@@ -15,10 +15,16 @@ import {useNavigation} from '@react-navigation/native';
 import {
   AB_VARIANTS,
   abClipPath,
+  abDir,
   runAbBench,
   saveNewestClip,
 } from '../../../../services/voice/abBench';
 import type {AbSummaryRow} from '../../../../services/voice/abBench';
+import {
+  runSpeechBench,
+  runSpeechCacheProbe,
+  type SpeechCellSummary,
+} from '../../../../services/voice/speechBench';
 import {voiceAudioDir} from '../../../../services/voice/wav';
 
 /**
@@ -28,6 +34,10 @@ import {voiceAudioDir} from '../../../../services/voice/wav';
  * Everything the bench prints goes to the console as well, so the same numbers
  * can be read out of `logcat` after the fact — this list is only so a run can
  * be judged without a cable attached.
+ *
+ * The speech half below answers a different question — which setting on THIS
+ * phone makes the model's voice keep up — and so it runs speech only: no
+ * microphone, no text completion, no playback.
  */
 
 const MAX_LOG_LINES = 400;
@@ -39,6 +49,7 @@ const VoiceAbScreen = () => {
   const [runs, setRuns] = useState('5');
   const [lines, setLines] = useState<string[]>([]);
   const [summary, setSummary] = useState<AbSummaryRow[]>([]);
+  const [speechSummary, setSpeechSummary] = useState<SpeechCellSummary[]>([]);
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<ScrollViewInstance>(null);
   const cancelRef = useRef(false);
@@ -83,6 +94,61 @@ const VoiceAbScreen = () => {
     }
   };
 
+  /**
+   * The speech matrix. It builds its own context per setting it measures, so it
+   * unloads the model the chat is holding and the model has to be tapped again
+   * when the table is done — said here rather than discovered by a blank chat.
+   */
+  const runSpeech = async (scope: 'quick' | 'full') => {
+    if (busy) {
+      return;
+    }
+    cancelRef.current = false;
+    setBusy(true);
+    setSpeechSummary([]);
+    append(`=== speech bench ${scope} ${runs}x 1/2/3 sentences ===`);
+    try {
+      const result = await runSpeechBench({
+        scope,
+        runs: Math.max(1, Math.min(20, Number(runs) || 5)),
+        isCancelled: () => cancelRef.current,
+        onLine: append,
+      });
+      setSpeechSummary(result.summary);
+      append('model unloaded — tap it again to resume chat or voice mode');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      Alert.alert('Speech bench failed', message);
+      append(`speech failed: ${message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Whether a spoken reply leaves the next turn's prefix cache standing. */
+  const runProbe = async () => {
+    if (busy) {
+      return;
+    }
+    cancelRef.current = false;
+    setBusy(true);
+    append('=== next-turn cache probe ===');
+    try {
+      await runSpeechCacheProbe({
+        runs: Math.max(1, Math.min(10, Number(runs) || 3)),
+        isCancelled: () => cancelRef.current,
+        onLine: append,
+      });
+      append('model unloaded — tap it again to resume chat or voice mode');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      Alert.alert('Probe failed', message);
+      append(`probe failed: ${message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const best = useMemo(() => {
     const clean = summary
       .filter(row => row.failed === 0)
@@ -91,6 +157,14 @@ const VoiceAbScreen = () => {
       );
     return clean[0];
   }, [summary]);
+
+  /** The cell that says the most per second of waiting, failures aside. */
+  const bestSpeech = useMemo(() => {
+    const clean = speechSummary
+      .filter(row => row.failed === 0 && row.medianRtf !== null)
+      .sort((a, b) => (a.medianRtf ?? 99) - (b.medianRtf ?? 99));
+    return clean[0];
+  }, [speechSummary]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -185,7 +259,91 @@ const VoiceAbScreen = () => {
         )}
 
         <Card elevation={1} style={styles.card}>
-          <Card.Title title="Log" subtitle="also on logcat as [voice-ab]" />
+          <Card.Title
+            title="Speech bench"
+            subtitle="same words, one setting at a time, no mic and no playback"
+          />
+          <Card.Content>
+            <Text style={styles.note}>
+              Runs the decoder over three fixed texts — one, two and three
+              sentences — {runs} times each, once per cell. Quick takes the axes
+              a phone answers in minutes (projector device, threads, streaming,
+              cache isolation); Full adds batch size and flash attention. Every
+              cell that changes a context parameter builds its own context, so
+              the model is unloaded when the run ends. Results are written next
+              to the A/B dump in {abDir}.
+            </Text>
+            <View style={styles.buttonRow}>
+              <Button
+                mode="contained"
+                onPress={() => runSpeech('quick')}
+                disabled={busy}
+                style={styles.button}>
+                {busy ? 'Running…' : 'Run quick'}
+              </Button>
+              <Button
+                mode="outlined"
+                onPress={() => runSpeech('full')}
+                disabled={busy}
+                style={styles.button}>
+                Run full
+              </Button>
+            </View>
+            <Button mode="outlined" onPress={runProbe} disabled={busy}>
+              Next-turn cache probe
+            </Button>
+            <Button
+              mode="outlined"
+              onPress={() => {
+                cancelRef.current = true;
+                append('stop asked');
+              }}
+              disabled={!busy}
+              style={styles.button}>
+              Stop
+            </Button>
+          </Card.Content>
+        </Card>
+
+        {speechSummary.length > 0 && (
+          <Card elevation={1} style={styles.card}>
+            <Card.Title
+              title="Speech table"
+              subtitle={
+                bestSpeech
+                  ? `fastest: ${bestSpeech.cell} (rtf ${bestSpeech.medianRtf})`
+                  : 'no clean run'
+              }
+            />
+            <Card.Content>
+              {speechSummary.map(row => (
+                <View key={row.cell} style={styles.row}>
+                  <Text style={styles.rowHead}>
+                    {row.cell} · rtf {row.medianRtf ?? '-'} · first{' '}
+                    {row.medianFirstAudioMs}ms
+                  </Text>
+                  <Text style={styles.rowMeta}>
+                    prefill {row.medianPromptMs}ms · p95 frame{' '}
+                    {row.worstP95Frame}ms · ok {row.runs - row.failed}/
+                    {row.runs} · audio {row.audioSeconds}s
+                  </Text>
+                  <Text style={styles.rowSample}>
+                    s1 {row.perLen[0].medianRtf ?? '-'} / s2{' '}
+                    {row.perLen[1].medianRtf ?? '-'} / s3{' '}
+                    {row.perLen[2].medianRtf ?? '-'} — first sound{' '}
+                    {row.perLen.map(p => p.medianFirstAudioMs).join('/')}ms
+                  </Text>
+                </View>
+              ))}
+            </Card.Content>
+          </Card>
+        )}
+
+        <Card elevation={1} style={styles.card}>
+          <Card.Title
+            title="Log"
+            subtitle="also on logcat, as [voice-ab] and [speech-bench]"
+          />
           <Card.Content>
             <ScrollView
               ref={scrollRef}

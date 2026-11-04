@@ -262,7 +262,7 @@ index eb522720cc4bd1e12ac9f1e28781635ff0abad24..9ff97ada3962f583595167758a97c8ec
      void invokeAsyncTracked(
          std::shared_ptr<react::CallInvoker> callInvoker,
 diff --git a/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.cpp b/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.cpp
-index ffd7942d1e897e036f7952a223a809a351000e46..d6f1f7d4436cd4cd294ba069fb34598383534137 100644
+index ffd7942d1e897e036f7952a223a809a351000e46..7965246164c308e22a3b0859e76c47f79eb42044 100644
 --- a/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.cpp
 +++ b/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.cpp
 --- a/node_modules/llama.rn/cpp/jsi/RNLlamaJSI.cpp
@@ -680,21 +680,25 @@ index ffd7942d1e897e036f7952a223a809a351000e46..d6f1f7d4436cd4cd294ba069fb345983
                          return [audio_data](jsi::Runtime& rt) {
                              return makeFloat32Array(rt, audio_data);
                          };
-@@ -2331,6 +2355,97 @@
+@@ -2331,6 +2355,106 @@
          );
          runtime.global().setProperty(runtime, "llamaClearCache", clearCache);
  
 +        // generateSpeech — the audio_gen model voices `text` itself. Args:
 +        //   (contextId, opts, onChunk?)
-+        // opts: { text, language?, voice?, maxSeconds?, seed?, stream?, chunkSeconds? }
++        // opts: { text, language?, voice?, maxSeconds?, seed?, stream?,
++        //         chunkSeconds?, isolateSeq? }
 +        // onChunk(samples: Float32Array, sampleRate: number) is called on the JS
 +        // thread for every chunkSeconds of audio as it is decoded, and `pcm`
 +        // then comes back empty — the caller already holds those samples.
 +        // Returns { pcm: Float32Array, sampleRate, frames, chunks, seconds,
-+        //           promptMs, genMs, firstAudioMs, aborted, stopReason, stage,
++        //           promptMs, genMs, firstAudioMs, frameP50Ms, frameP95Ms,
++        //           frameMaxMs, seqIsolated, aborted, stopReason, stage,
 +        //           error, prompt }.
-+        // The utterance decodes over the chat's own positions, so the caller
-+        // clears the cache before the next turn (see llamaClearCache).
++        // On sequence 0 the utterance decodes over the chat's own positions, so
++        // the caller clears the cache before the next turn (see llamaClearCache);
++        // with isolateSeq it has a sequence of its own and `seqIsolated` says the
++        // conversation's prefix was left standing.
 +        auto generateSpeech = jsi::Function::createFromHostFunction(runtime,
 +            jsi::PropNameID::forAscii(runtime, "llamaGenerateSpeech"),
 +            3,
@@ -749,6 +753,11 @@ index ffd7942d1e897e036f7952a223a809a351000e46..d6f1f7d4436cd4cd294ba069fb345983
 +                        out.setProperty(rt, "promptMs", (double) res.prompt_us / 1000.0);
 +                        out.setProperty(rt, "genMs", (double) res.gen_us / 1000.0);
 +                        out.setProperty(rt, "firstAudioMs", (double) res.first_audio_us / 1000.0);
++                        // The shape of the frame times, not just their sum.
++                        out.setProperty(rt, "frameP50Ms", (double) res.frame_p50_us / 1000.0);
++                        out.setProperty(rt, "frameP95Ms", (double) res.frame_p95_us / 1000.0);
++                        out.setProperty(rt, "frameMaxMs", (double) res.frame_max_us / 1000.0);
++                        out.setProperty(rt, "seqIsolated", res.seq_isolated);
 +                        out.setProperty(rt, "aborted", res.aborted);
 +                        out.setProperty(rt, "stopReason", jsi::String::createFromUtf8(rt, res.stop_reason));
 +                        out.setProperty(rt, "stage", jsi::String::createFromUtf8(rt, res.stage));
@@ -778,7 +787,7 @@ index ffd7942d1e897e036f7952a223a809a351000e46..d6f1f7d4436cd4cd294ba069fb345983
          auto releaseVocoder = jsi::Function::createFromHostFunction(runtime,
              jsi::PropNameID::forAscii(runtime, "llamaReleaseVocoder"),
              1,
-@@ -2358,19 +2473,9 @@
+@@ -2358,19 +2482,9 @@
          llama_log_set(llama_log_callback_default, nullptr);
  
          RequestManager::getInstance().clearAll();
@@ -801,7 +810,7 @@ index ffd7942d1e897e036f7952a223a809a351000e46..d6f1f7d4436cd4cd294ba069fb345983
          }
  
          if (contexts.empty()) {
-@@ -2379,12 +2484,9 @@
+@@ -2379,12 +2493,9 @@
          }
          ThreadPool::getInstance().shutdown();
  
@@ -997,7 +1006,7 @@ index d1524784deeaab297c5769cce75e0af9bf5d3552..13c490faf3d11412331c15edc85acb24
      void startGenerationTiming();
      void updateGenerationTiming();
 diff --git a/node_modules/llama.rn/cpp/rn-llama.cpp b/node_modules/llama.rn/cpp/rn-llama.cpp
-index 87e7ec86f981c08a0f9853b974cb075b2facab8e..2146a1ee379d15d1340250983ecc223c6c300389 100644
+index 87e7ec86f981c08a0f9853b974cb075b2facab8e..8306cafc4234718c9f8f66faf207aede1602f107 100644
 --- a/node_modules/llama.rn/cpp/rn-llama.cpp
 +++ b/node_modules/llama.rn/cpp/rn-llama.cpp
 --- a/node_modules/llama.rn/cpp/rn-llama.cpp
@@ -1095,7 +1104,7 @@ index 87e7ec86f981c08a0f9853b974cb075b2facab8e..2146a1ee379d15d1340250983ecc223c
  void llama_rn_context::releaseMultimodal() {
      if (mtmd_wrapper != nullptr) {
          delete mtmd_wrapper;
-@@ -1044,4 +1093,288 @@
+@@ -1044,4 +1093,338 @@
      }
  }
  
@@ -1127,6 +1136,26 @@ index 87e7ec86f981c08a0f9853b974cb075b2facab8e..2146a1ee379d15d1340250983ecc223c
 +    return std::chrono::duration_cast<std::chrono::microseconds>(
 +        std::chrono::steady_clock::now().time_since_epoch()).count();
 +}
++
++// The chat runs its one slot on sequence 0, so 1 is the id an utterance can be
++// given and taken back again without touching what the conversation holds.
++constexpr llama_seq_id SPEECH_SEQ_ID = 1;
++
++// Takes the utterance's own cells out of the memory on every exit path, so the
++// caller does not have to clear the whole cache to be safe after speaking.
++struct scoped_speech_seq {
++    llama_context * ctx = nullptr;
++    llama_seq_id seq = -1;
++    void hold(llama_context * c, llama_seq_id s) {
++        ctx = c;
++        seq = s;
++    }
++    ~scoped_speech_seq() {
++        if (ctx != nullptr && seq >= 0) {
++            llama_memory_seq_rm(llama_get_memory(ctx), seq, 0, -1);
++        }
++    }
++};
 +
 +// One speech call at a time holds the log sink (a ContextClaim serializes them),
 +// so a bare global is enough to route the engine's words into its result.
@@ -1197,6 +1226,9 @@ index 87e7ec86f981c08a0f9853b974cb075b2facab8e..2146a1ee379d15d1340250983ecc223c
 +    // buffer for a whole-clip caller, or handed out as it lands. `pending` is
 +    // the audio gathered since the last callback.
 +    std::vector<float> pending;
++    // Every single frame's own length, kept so the caller can tell a slow engine
++    // apart from one that stalls: the mean of these cannot tell them apart.
++    std::vector<int64_t> frame_times;
 +    auto emit = [&](const float * src, int64_t n) {
 +        if (n <= 0) {
 +            return;
@@ -1244,7 +1276,10 @@ index 87e7ec86f981c08a0f9853b974cb075b2facab8e..2146a1ee379d15d1340250983ecc223c
 +    mtmd_helper_gen_audio * gen = mtmd_helper_gen_audio_init(ctx, mtmd_wrapper->mtmd_ctx);
 +    mtmd_helper_gen_audio_inp inp = mtmd_helper_gen_audio_inp_default();
 +    inp.stream     = true;   // pull each frame as it lands, for the per-frame timing
-+    inp.seq_id     = 0;
++    // Sequence 0 keeps the old behavior: the utterance decodes over the
++    // positions the conversation owns. A caller that wants its prefix back asks
++    // for a sequence of its own and gets only that one removed again.
++    inp.seq_id     = opts.isolate_seq ? SPEECH_SEQ_ID : 0;
 +    inp.prompt     = res.prompt.data();
 +    inp.prompt_len = res.prompt.size();
 +    inp.n_past     = 0;      // a stand-alone utterance, not a continuation
@@ -1265,6 +1300,13 @@ index 87e7ec86f981c08a0f9853b974cb075b2facab8e..2146a1ee379d15d1340250983ecc223c
 +    scoped_speech_session session{this, gen};
 +    speech_interrupted.store(false);
 +    speech_active.store(true);
++    // Whatever ends this utterance — eos, an abort, a frame that failed — the
++    // cells it wrote on its own sequence go back the way they came.
++    scoped_speech_seq seq_guard;
++    if (opts.isolate_seq) {
++        seq_guard.hold(ctx, SPEECH_SEQ_ID);
++        res.seq_isolated = true;
++    }
 +    // The utterance decodes over the positions the chat's own prefix owns, so
 +    // the caller clears the cache once this returns.
 +    scoped_speech_embeddings embeddings(ctx);
@@ -1286,18 +1328,23 @@ index 87e7ec86f981c08a0f9853b974cb075b2facab8e..2146a1ee379d15d1340250983ecc223c
 +
 +    const int64_t prompt_start = speech_now_us();
 +    if (!prefill() && !res.aborted) {
-+        // The utterance is a stand-alone sequence, but it decodes over the
-+        // positions the chat's own prefix holds: a cache busy with the
-+        // conversation can refuse that. Retry once over an empty cache — the
-+        // caller clears it after this returns either way.
++        // The utterance is a stand-alone sequence, but on the shared sequence it
++        // decodes over the positions the chat's own prefix holds, and a cache
++        // busy with the conversation can refuse that. Retry once on empty
++        // memory: the conversation's cells when the utterance has a sequence of
++        // its own, everything else when it does not.
 +        std::string first = res.error.substr(0, 240);
 +        res.error.clear();
-+        llama_memory_clear(llama_get_memory(ctx), false);
++        if (res.seq_isolated) {
++            llama_memory_seq_rm(llama_get_memory(ctx), SPEECH_SEQ_ID, 0, -1);
++        } else {
++            llama_memory_clear(llama_get_memory(ctx), false);
++        }
 +        if (!(mtmd_helper_gen_audio_set_input(gen, &inp) == 0 && prefill())) {
-+            res.error = "prefill: " + first + " | after clear: " + res.error.substr(0, 240);
++            res.error = "prefill: " + first + " | after retry: " + res.error.substr(0, 240);
 +            return res;
 +        }
-+        res.error = "prefill retried on a cleared cache: " + first;
++        res.error = "prefill retried on empty memory: " + first;
 +    }
 +    res.prompt_us = speech_now_us() - prompt_start;
 +
@@ -1335,7 +1382,9 @@ index 87e7ec86f981c08a0f9853b974cb075b2facab8e..2146a1ee379d15d1340250983ecc223c
 +        res.sample_rate = sample_rate;
 +        const float * pcm = reinterpret_cast<const float *>(data);
 +        emit(pcm, n_samples);
-+        res.gen_us += speech_now_us() - frame_start;
++        const int64_t frame_us = speech_now_us() - frame_start;
++        res.gen_us += frame_us;
++        frame_times.push_back(frame_us);
 +        if (stop) {
 +            break;
 +        }
@@ -1380,12 +1429,22 @@ index 87e7ec86f981c08a0f9853b974cb075b2facab8e..2146a1ee379d15d1340250983ecc223c
 +        pending.clear();
 +        res.chunks++;
 +    }
++    if (!frame_times.empty()) {
++        // The frame the listener felt, not the average: a run of frames at the
++        // mean and one that stalls for a quarter second sound nothing like each
++        // other and cannot be told apart by `gen_us / frames`.
++        std::sort(frame_times.begin(), frame_times.end());
++        const size_t n = frame_times.size();
++        res.frame_p50_us = frame_times[n / 2];
++        res.frame_p95_us = frame_times[std::min(n - 1, (size_t) ((double) n * 0.95))];
++        res.frame_max_us = frame_times.back();
++    }
 +    return res;
 +}
 +
  }
 diff --git a/node_modules/llama.rn/cpp/rn-llama.h b/node_modules/llama.rn/cpp/rn-llama.h
-index 8236f1319fcf30beea88e1c2f6ac7a50d3845706..96505f9d3cbf6294d65e838705f7e64b48aaa469 100644
+index 8236f1319fcf30beea88e1c2f6ac7a50d3845706..4310691358f50f30270b117aa8942398f9b9f282 100644
 --- a/node_modules/llama.rn/cpp/rn-llama.h
 +++ b/node_modules/llama.rn/cpp/rn-llama.h
 --- a/node_modules/llama.rn/cpp/rn-llama.h
@@ -1398,7 +1457,7 @@ index 8236f1319fcf30beea88e1c2f6ac7a50d3845706..96505f9d3cbf6294d65e838705f7e64b
  #include <sstream>
  #include <iostream>
  #include <thread>
-@@ -101,6 +102,45 @@
+@@ -101,6 +102,58 @@
  
  struct llama_rn_slot_manager;
  
@@ -1418,6 +1477,10 @@ index 8236f1319fcf30beea88e1c2f6ac7a50d3845706..96505f9d3cbf6294d65e838705f7e64b
 +    // `pcm` in the result, because the samples it already has are the payload.
 +    bool stream = false;
 +    float chunk_seconds = 0.12f;
++    // Decode on a KV sequence of its own and remove that sequence again, so the
++    // conversation's prefix is still there for the next turn. Without it the
++    // utterance shares the chat's sequence and the caller must clear the cache.
++    bool isolate_seq = false;
 +};
 +
 +struct llama_rn_speech_result {
@@ -1429,6 +1492,15 @@ index 8236f1319fcf30beea88e1c2f6ac7a50d3845706..96505f9d3cbf6294d65e838705f7e64b
 +    int64_t prompt_us = 0;             // prefill of the tts prompt
 +    int64_t gen_us = 0;                // the frame loop, prompt excluded
 +    int64_t first_audio_us = 0;        // call start to the first sample produced
++    // The spread of the single-frame times: a slow engine and one that stalls
++    // have the same mean and sound nothing alike.
++    int64_t frame_p50_us = 0;
++    int64_t frame_p95_us = 0;
++    int64_t frame_max_us = 0;
++    // True when the utterance had its own sequence and only that was removed —
++    // i.e. the conversation's prefix survived. The caller reads this instead of
++    // assuming the build it compiled against is the one it is running.
++    bool seq_isolated = false;
 +    bool aborted = false;
 +    // eos | max | aborted | no-tts-template | unsupported | failed
 +    std::string stop_reason = "failed";
@@ -1444,7 +1516,7 @@ index 8236f1319fcf30beea88e1c2f6ac7a50d3845706..96505f9d3cbf6294d65e838705f7e64b
  struct llama_rn_tokenize_result {
    std::vector<llama_token> tokens;
    bool has_media = false;
-@@ -196,6 +236,9 @@
+@@ -196,6 +249,9 @@
      bool isMultimodalEnabled() const;
      bool isMultimodalSupportVision() const;
      bool isMultimodalSupportAudio() const;
@@ -1454,7 +1526,7 @@ index 8236f1319fcf30beea88e1c2f6ac7a50d3845706..96505f9d3cbf6294d65e838705f7e64b
      void releaseMultimodal();
      // Media identity hashes tracked by the multimodal wrapper (empty when
      // multimodal is disabled); persisted alongside session/state files
-@@ -222,6 +265,25 @@
+@@ -222,6 +278,25 @@
  
      // Cache management
      void clearCache(bool clear_data = false);
@@ -1528,7 +1600,7 @@ index 136232525cf9a0773c70b4235871a6711a043c81..1542d02ccb9b7bc08c0ac4ae2b18b496
        "#{llama_cpp}/common/**/*.{h,cpp}",
        "#{llama_cpp}/tools/mtmd/**/*.{h,cpp}",
 diff --git a/node_modules/llama.rn/src/index.ts b/node_modules/llama.rn/src/index.ts
-index 039933f442016a0c5d549c9fa1203266b2801313..00edd53ec6ef8a28a1a543a09f618aaeeb1ee388 100644
+index 039933f442016a0c5d549c9fa1203266b2801313..fddbc58fcb244294c148b1f53aba39f9de030040 100644
 --- a/node_modules/llama.rn/src/index.ts
 +++ b/node_modules/llama.rn/src/index.ts
 --- a/node_modules/llama.rn/src/index.ts
@@ -1588,16 +1660,19 @@ index 039933f442016a0c5d549c9fa1203266b2801313..00edd53ec6ef8a28a1a543a09f618aae
    }> {
      const { llamaGetMultimodalSupport } = getJsi()
      return await llamaGetMultimodalSupport(this.id)
-@@ -1407,6 +1420,59 @@
+@@ -1407,6 +1420,67 @@
    }
  
    /**
 +   * Speak `text` with the model's own voice, when its projector reports the
 +   * mtmd `audio_gen` capability (see `getMultimodalSupport().audioGen`).
 +   *
-+   * The utterance is decoded over the conversation's own positions, so clear
-+   * the cache (`clearCache()`) before the next turn — the reply text stays
-+   * correct either way, but a reused prefix would not be.
++   * By default the utterance is decoded over the conversation's own positions,
++   * so clear the cache (`clearCache()`) before the next turn — the reply text
++   * stays correct either way, but a reused prefix would not be. With
++   * `isolateSeq` it decodes on a KV sequence of its own and only that sequence
++   * is removed again, which is what lets the next turn keep its prefix; the
++   * result's `seqIsolated` says whether this build did that.
 +   *
 +   * `language` and `voice` are passed to the model's "tts" chat template,
 +   * which defines their defaults; a model without that template answers
@@ -1617,6 +1692,7 @@ index 039933f442016a0c5d549c9fa1203266b2801313..00edd53ec6ef8a28a1a543a09f618aae
 +      seed?: number
 +      stream?: boolean
 +      chunkSeconds?: number
++      isolateSeq?: boolean
 +    },
 +    onChunk?: (samples: Float32Array, sampleRate: number) => void,
 +  ): Promise<{
@@ -1628,6 +1704,10 @@ index 039933f442016a0c5d549c9fa1203266b2801313..00edd53ec6ef8a28a1a543a09f618aae
 +    promptMs: number
 +    genMs: number
 +    firstAudioMs: number
++    frameP50Ms: number
++    frameP95Ms: number
++    frameMaxMs: number
++    seqIsolated: boolean
 +    aborted: boolean
 +    stopReason: 'eos' | 'max' | 'aborted' | 'no-tts-template' | 'unsupported' | 'failed'
 +    stage: string
@@ -1677,7 +1757,7 @@ index 451f6529919ef611472f3a2abd85beea4686f011..54fb9ffb30ba9f3349a94de7c962e119
      NSString * path_resource = [[NSProcessInfo processInfo].environment objectForKey:@"GGML_METAL_PATH_RESOURCES"];
      if (path_resource) {
 diff --git a/node_modules/llama.rn/src/jsi.ts b/node_modules/llama.rn/src/jsi.ts
-index 5a83ed78dd2fabc97468c853f89fea9313b0358b..b6bcbceb65d03fe1df8ffcc0dccacddb93898683 100644
+index 5a83ed78dd2fabc97468c853f89fea9313b0358b..85a86bdc4fd5866420929529c9ddd0d388ad3a6f 100644
 --- a/node_modules/llama.rn/src/jsi.ts
 +++ b/node_modules/llama.rn/src/jsi.ts
 --- a/node_modules/llama.rn/src/jsi.ts
@@ -1691,7 +1771,7 @@ index 5a83ed78dd2fabc97468c853f89fea9313b0358b..b6bcbceb65d03fe1df8ffcc0dccacddb
    var llamaReleaseMultimodal: (contextId: number) => Promise<void>
    var llamaInitVocoder: (
      contextId: number,
-@@ -218,6 +218,40 @@
+@@ -218,6 +218,45 @@
    var llamaGetAudioSampleRate: (contextId: number) => Promise<number>
    var llamaReleaseVocoder: (contextId: number) => Promise<void>
    var llamaClearCache: (contextId: number, clearData: boolean) => Promise<void>
@@ -1705,6 +1785,7 @@ index 5a83ed78dd2fabc97468c853f89fea9313b0358b..b6bcbceb65d03fe1df8ffcc0dccacddb
 +      seed?: number
 +      stream?: boolean
 +      chunkSeconds?: number
++      isolateSeq?: boolean
 +    },
 +    onChunk?: (samples: Float32Array, sampleRate: number) => void,
 +  ) => Promise<{
@@ -1714,6 +1795,10 @@ index 5a83ed78dd2fabc97468c853f89fea9313b0358b..b6bcbceb65d03fe1df8ffcc0dccacddb
 +    seconds: number
 +    chunks: number
 +    firstAudioMs: number
++    frameP50Ms: number
++    frameP95Ms: number
++    frameMaxMs: number
++    seqIsolated: boolean
 +    promptMs: number
 +    genMs: number
 +    aborted: boolean
@@ -1733,7 +1818,7 @@ index 5a83ed78dd2fabc97468c853f89fea9313b0358b..b6bcbceb65d03fe1df8ffcc0dccacddb
    // Parallel decoding
    var llamaEnableParallelMode: (
 diff --git a/node_modules/llama.rn/lib/typescript/index.d.ts b/node_modules/llama.rn/lib/typescript/index.d.ts
-index aa0e7c336853a4c8c5a5c4c2ad7dc37c13a59482..1d31f66271bc592d22cdc8dac9eae21293f5c447 100644
+index aa0e7c336853a4c8c5a5c4c2ad7dc37c13a59482..a52a5ce0ee7486350db0d01c61ac62171754f10d 100644
 --- a/node_modules/llama.rn/lib/typescript/index.d.ts
 +++ b/node_modules/llama.rn/lib/typescript/index.d.ts
 --- a/node_modules/llama.rn/lib/typescript/index.d.ts
@@ -1746,7 +1831,7 @@ index aa0e7c336853a4c8c5a5c4c2ad7dc37c13a59482..1d31f66271bc592d22cdc8dac9eae212
      }>;
      releaseMultimodal(): Promise<void>;
      /**
-@@ -370,6 +371,48 @@
+@@ -370,6 +371,56 @@
      getAudioSampleRate(): Promise<number>;
      releaseVocoder(): Promise<void>;
      /**
@@ -1755,7 +1840,10 @@ index aa0e7c336853a4c8c5a5c4c2ad7dc37c13a59482..1d31f66271bc592d22cdc8dac9eae212
 +     *
 +     * The utterance is decoded over the conversation's own positions, so clear
 +     * the cache (`clearCache()`) before the next turn — the reply text stays
-+     * correct either way, but a reused prefix would not be.
++     * correct either way, but a reused prefix would not be. With `isolateSeq`
++     * the utterance decodes on a KV sequence of its own and only that sequence
++     * is removed again, so the next turn keeps its prefix; `seqIsolated` in the
++     * result says whether this build did that.
 +     *
 +     * `language` and `voice` are passed to the model's "tts" chat template,
 +     * which defines their defaults; a model without that template answers
@@ -1774,6 +1862,7 @@ index aa0e7c336853a4c8c5a5c4c2ad7dc37c13a59482..1d31f66271bc592d22cdc8dac9eae212
 +        seed?: number;
 +        stream?: boolean;
 +        chunkSeconds?: number;
++        isolateSeq?: boolean;
 +    }, onChunk?: (samples: Float32Array, sampleRate: number) => void): Promise<{
 +        pcm: Float32Array;
 +        sampleRate: number;
@@ -1781,6 +1870,10 @@ index aa0e7c336853a4c8c5a5c4c2ad7dc37c13a59482..1d31f66271bc592d22cdc8dac9eae212
 +        seconds: number;
 +        chunks: number;
 +        firstAudioMs: number;
++        frameP50Ms: number;
++        frameP95Ms: number;
++        frameMaxMs: number;
++        seqIsolated: boolean;
 +        promptMs: number;
 +        genMs: number;
 +        aborted: boolean;
@@ -1796,7 +1889,7 @@ index aa0e7c336853a4c8c5a5c4c2ad7dc37c13a59482..1d31f66271bc592d22cdc8dac9eae212
       * @param clearData If true, clears both metadata and tensor data buffers (slower). If false, only clears metadata (faster).
       * @returns Promise that resolves when cache is cleared
 diff --git a/node_modules/llama.rn/lib/typescript/jsi.d.ts b/node_modules/llama.rn/lib/typescript/jsi.d.ts
-index 1173e7998ddf63c15b54adfa23c320e747d7a90b..55e52921690a77c6d6fdcdeada472042147cf79b 100644
+index 1173e7998ddf63c15b54adfa23c320e747d7a90b..78b72fab66bd68ae3a29bc5a101928963c62f72c 100644
 --- a/node_modules/llama.rn/lib/typescript/jsi.d.ts
 +++ b/node_modules/llama.rn/lib/typescript/jsi.d.ts
 --- a/node_modules/llama.rn/lib/typescript/jsi.d.ts
@@ -1809,7 +1902,7 @@ index 1173e7998ddf63c15b54adfa23c320e747d7a90b..55e52921690a77c6d6fdcdeada472042
      }>;
      var llamaReleaseMultimodal: (contextId: number) => Promise<void>;
      var llamaInitVocoder: (contextId: number, params: {
-@@ -107,6 +108,30 @@
+@@ -107,6 +108,35 @@
      var llamaGetAudioSampleRate: (contextId: number) => Promise<number>;
      var llamaReleaseVocoder: (contextId: number) => Promise<void>;
      var llamaClearCache: (contextId: number, clearData: boolean) => Promise<void>;
@@ -1821,6 +1914,7 @@ index 1173e7998ddf63c15b54adfa23c320e747d7a90b..55e52921690a77c6d6fdcdeada472042
 +        seed?: number;
 +        stream?: boolean;
 +        chunkSeconds?: number;
++        isolateSeq?: boolean;
 +    }, onChunk?: (samples: Float32Array, sampleRate: number) => void) => Promise<{
 +        pcm: Float32Array;
 +        sampleRate: number;
@@ -1828,6 +1922,10 @@ index 1173e7998ddf63c15b54adfa23c320e747d7a90b..55e52921690a77c6d6fdcdeada472042
 +        seconds: number;
 +        chunks: number;
 +        firstAudioMs: number;
++        frameP50Ms: number;
++        frameP95Ms: number;
++        frameMaxMs: number;
++        seqIsolated: boolean;
 +        promptMs: number;
 +        genMs: number;
 +        aborted: boolean;
@@ -1841,12 +1939,12 @@ index 1173e7998ddf63c15b54adfa23c320e747d7a90b..55e52921690a77c6d6fdcdeada472042
          enabled: boolean;
          n_parallel?: number;
 diff --git a/node_modules/llama.rn/cpp/jsi/JSIParams.h b/node_modules/llama.rn/cpp/jsi/JSIParams.h
-index 35a9399668eb69031115a97fa4ff3430b9a26000..0a8e8d6c5f5742d322d23c1a785de39ef2d5cb53 100644
+index 35a9399668eb69031115a97fa4ff3430b9a26000..417c9b2ac1b5165339f4d394230941afc4ad06ed 100644
 --- a/node_modules/llama.rn/cpp/jsi/JSIParams.h
 +++ b/node_modules/llama.rn/cpp/jsi/JSIParams.h
 --- a/node_modules/llama.rn/cpp/jsi/JSIParams.h
 +++ b/node_modules/llama.rn/cpp/jsi/JSIParams.h
-@@ -102,4 +102,17 @@
+@@ -102,4 +102,18 @@
          o.top_k       = j.value("topK",        d.top_k);
          o.seed        = j.value("seed",        d.seed);
      }
@@ -1862,5 +1960,6 @@ index 35a9399668eb69031115a97fa4ff3430b9a26000..0a8e8d6c5f5742d322d23c1a785de39e
 +        o.seed        = j.value("seed",       d.seed);
 +        o.stream      = j.value("stream",     d.stream);
 +        o.chunk_seconds = j.value("chunkSeconds", d.chunk_seconds);
++        o.isolate_seq = j.value("isolateSeq", d.isolate_seq);
 +    }
  }

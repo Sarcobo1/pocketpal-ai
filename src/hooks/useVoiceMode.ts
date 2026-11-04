@@ -49,6 +49,7 @@ import {
 import {OmniVoiceEngine, isOmniVoiceModel} from '../services/voice/omniEngine';
 import {
   modelCanVoiceReplies,
+  prewarmSpeech,
   speakWithModel,
   stopModelSpeech,
 } from '../services/voice/omniSpeech';
@@ -375,6 +376,12 @@ class VoiceModeController {
     }
     this.setPhase('listening', 'ready');
     this.startCapture(session);
+    // The speech pipeline's one-time cost is paid here rather than inside the
+    // first answer: the mic is open and the speaker is still saying their
+    // sentence, which is the only gap a spoken turn has.
+    if (modelVoice && ttsStore.speechPrewarm) {
+      prewarmSpeech().catch(() => undefined);
+    }
   }
 
   /** The chat screen is mounted: sessions may start. */

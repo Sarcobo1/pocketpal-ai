@@ -128,14 +128,14 @@ export const resolveSpeechLanguage = (
 };
 
 /** A reply longer than this is not one sentence anyone wants to hear spoken. */
-const MAX_UTTERANCE_SECONDS = 30;
+export const MAX_UTTERANCE_SECONDS = 30;
 
 /**
  * Generating takes this long relative to the audio it makes and the wait is
  * the point of the exercise. Past it the TTS voice answers sooner in a voice
  * the user chose, so the model's own voice stops being the better offer.
  */
-const MAX_REALTIME_FACTOR = 4;
+export const MAX_REALTIME_FACTOR = 4;
 
 /**
  * Reasons the pipeline itself declined. They will not change with the next
@@ -146,8 +146,45 @@ const DEAD_ENDS = new Set(['no-tts-template', 'unsupported', 'failed']);
 /**
  * Reasons the utterance decoded over the conversation's own positions. A
  * refusal before the first batch touched the context is not one of them.
+ * Exported because the speech bench has to repeat this decision to measure what
+ * keeping the cache is worth — a probe that skipped it would not be measuring
+ * the path the app takes.
  */
-const TOUCHED_CACHE = new Set(['eos', 'max', 'aborted']);
+export const TOUCHED_CACHE = new Set(['eos', 'max', 'aborted']);
+
+/**
+ * Why the model's own voice was not kept for this reply, in the one word the
+ * log and the bench both read. The two safety limits the reply is judged
+ * against are invisible in the engine's own result — it says `eos` either way —
+ * so the answer has to be derived from the numbers rather than guessed at.
+ */
+export const speechDropReason = ({
+  rtf,
+  seconds,
+  stopReason,
+  stage,
+  hasAudio,
+}: {
+  rtf: number;
+  seconds: number;
+  stopReason: string;
+  stage: string;
+  hasAudio: boolean;
+}): 'none' | 'rtf' | 'time' | 'no-audio' | 'aborted' | 'stop' => {
+  if (stopReason === 'aborted') {
+    return 'aborted';
+  }
+  if (DEAD_ENDS.has(stopReason)) {
+    return 'stop';
+  }
+  if (rtf > MAX_REALTIME_FACTOR) {
+    return 'rtf';
+  }
+  if (stage === 'max-seconds' || seconds >= MAX_UTTERANCE_SECONDS) {
+    return 'time';
+  }
+  return hasAudio ? 'none' : 'no-audio';
+};
 
 export interface ModelSpeechReport {
   /** The audio reached the player and played out. */
@@ -155,6 +192,10 @@ export interface ModelSpeechReport {
   /** False when this model should not be asked again this session. */
   keepModelVoice: boolean;
   stopReason: string;
+  /** The safety limit that gave up on this reply, or `none`. */
+  drop: ReturnType<typeof speechDropReason>;
+  /** Whether the conversation's own prefix survived this utterance. */
+  cacheKept: boolean;
   /**
    * The part of the reply the model's voice gave up on, so the TTS voice can
    * finish the sentence rather than restart it or leave it hanging. Empty for
@@ -179,6 +220,8 @@ const report = (
 ): ModelSpeechReport => ({
   spoken: false,
   keepModelVoice: true,
+  drop: 'none',
+  cacheKept: false,
   resumeText: '',
   seconds: 0,
   frames: 0,
@@ -237,7 +280,14 @@ export const speakWithModel = async (
   // pause belongs, which is the only map from audio to sentence the engine gives.
   const handoff = ttsStore.slowSpeech === 'system';
   const feed = ttsStore.streamSpeech
-    ? openSpeechFeed({text, allowHandoff: handoff})
+    ? openSpeechFeed({
+        text,
+        jitterSeconds: ttsStore.speechJitterSeconds,
+        allowHandoff: handoff,
+        // The first piece out is the first sound, and it is the number the
+        // listener's wait is measured by — not the engine's first sample.
+        onFirstPiece: () => markTurn('firstSound'),
+      })
     : null;
   activeFeed = feed;
   let announced = false;
@@ -252,6 +302,10 @@ export const speakWithModel = async (
         text,
         ...(language ? {language} : {}),
         maxSeconds: MAX_UTTERANCE_SECONDS,
+        // Ask the engine to decode the utterance on a sequence of its own and
+        // drop that sequence again, so the conversation's prefix is left whole
+        // and the next turn re-uses it instead of paying a full prefill.
+        ...(ttsStore.speechKeepCache ? {isolateSeq: true} : {}),
         ...(feed ? {stream: true} : {}),
       },
       feed
@@ -299,6 +353,7 @@ export const speakWithModel = async (
       frames: 0,
       seconds: '0.00',
       rtf: '-',
+      drop: 'stop',
       lang: language || 'template',
       voice: 'template',
     });
@@ -307,12 +362,29 @@ export const speakWithModel = async (
       stage: 'js-bridge',
       error: thrown,
       keepModelVoice: false,
+      drop: 'stop',
       language: language || 'template',
     });
   }
   const audioMs = out.seconds * 1000;
   const rtf = audioMs > 0 ? out.genMs / audioMs : Infinity;
   const msPerFrame = out.frames > 0 ? out.genMs / out.frames : 0;
+  // A streamed reply carries no buffer on the result — the samples went
+  // somewhere else — so the pieces it made are what say there was audio.
+  const hasAudio = feed ? out.chunks > 0 : out.pcm.length > 0;
+  // The engine calls both a finished reply and a reply that outran a safety
+  // limit the same stop reason, so the reason the voice was given up on is
+  // derived from the numbers and written down while they are still on the page.
+  const drop = speechDropReason({
+    rtf,
+    seconds: out.seconds,
+    stopReason: out.stopReason,
+    stage: out.stage,
+    hasAudio,
+  });
+  // Asking for a sequence of its own is one thing; a build whose engine has no
+  // such option answers without the flag, and then the cache was touched.
+  const cacheKept = out.seqIsolated === true;
   logPerf('speech.reply', {
     stop: out.stopReason,
     stage: out.stage,
@@ -321,8 +393,13 @@ export const speakWithModel = async (
     frames: out.frames,
     seconds: out.seconds.toFixed(2),
     msPerFrame: msPerFrame.toFixed(1),
-    promptMs: out.promptMs,
-    genMs: out.genMs,
+    // The spread of the frame times, which is the difference between a slow
+    // engine and one that stutters: the mean cannot tell those two apart.
+    p50Frame: out.frameP50Ms,
+    p95Frame: out.frameP95Ms,
+    maxFrame: out.frameMaxMs,
+    promptMs: Math.round(out.promptMs),
+    genMs: Math.round(out.genMs),
     rtf: rtf.toFixed(2),
     lang: language || 'template',
     voice: 'template',
@@ -330,7 +407,17 @@ export const speakWithModel = async (
     // first sample, and how many pieces it had to make it in.
     stream: feed ? 'on' : 'off',
     chunks: out.chunks,
-    firstAudioMs: out.firstAudioMs,
+    firstAudioMs: Math.round(out.firstAudioMs),
+    drop,
+    cache: cacheKept ? 'kept' : 'shared',
+  });
+  // The same numbers on the turn's own line, so one grep gives the whole wait.
+  addTurnInfo({
+    promptMs: Math.round(out.promptMs),
+    firstAudioMs: Math.round(out.firstAudioMs),
+    rtf: Number(rtf.toFixed(2)),
+    drop,
+    cache: cacheKept ? 'kept' : 'shared',
   });
   // The template decides its own defaults, so the only faithful record of the
   // language and voice a reply was spoken with is the prompt it rendered.
@@ -341,8 +428,10 @@ export const speakWithModel = async (
   });
 
   // The frames decoded over the positions the conversation owns: whatever the
-  // next turn reuses from the cache is now part of this utterance's state.
-  if (TOUCHED_CACHE.has(out.stopReason)) {
+  // next turn reuses from the cache is now part of this utterance's state —
+  // unless the engine decoded them on a sequence of its own and took them back
+  // off again, which is the whole reason to ask for one.
+  if (!cacheKept && TOUCHED_CACHE.has(out.stopReason)) {
     const t0 = Date.now();
     await ctx.clearCache(true).catch(err => {
       console.warn('[voice] cache clear after speech failed:', err);
@@ -359,9 +448,6 @@ export const speakWithModel = async (
 
   const deadEnd = DEAD_ENDS.has(out.stopReason);
   const interrupted = out.stopReason === 'aborted';
-  // A streamed reply carries no buffer on the result — the samples went
-  // somewhere else — so the pieces it made are what say there was audio.
-  const hasAudio = feed ? out.chunks > 0 : out.pcm.length > 0;
   // Past the real-time factor the wait costs more than the voice is worth, so
   // the buffer is dropped and the TTS voice says this reply instead.
   const keepModelVoice = !deadEnd && rtf <= MAX_REALTIME_FACTOR && hasAudio;
@@ -370,6 +456,8 @@ export const speakWithModel = async (
     stage: out.stage,
     error: out.error,
     keepModelVoice,
+    drop,
+    cacheKept,
     /** Empty unless this reply was handed over partway through saying itself. */
     resumeText,
     seconds: out.seconds,
@@ -398,6 +486,9 @@ export const speakWithModel = async (
 
   if (!feed) {
     onPlaying?.();
+    // A whole clip reaches the player in one call, so the sample and the sound
+    // land on the same moment; the streamed reply marks it from its first piece.
+    markTurn('firstSound');
     spoken = await neuralAudioPlayer
       .play(
         {
@@ -430,6 +521,68 @@ export const speakWithModel = async (
       ? {...done, spoken}
       : {...done, spoken, stage: 'playback', error: playError},
   );
+};
+
+/** The context whose speech pipeline has already been paid for. */
+let prewarmedContext: number | null = null;
+
+/**
+ * Voice one throwaway syllable while nobody is waiting for it.
+ *
+ * The first utterance a context voices is slower than every one after it: the
+ * generator and its buffers are built before a sample exists. A voice session
+ * opens with exactly that gap — the speaker has not finished their sentence —
+ * and one syllable stopped as it lands spends the gap on the pipeline instead
+ * of the answer. The reply it warms up for is the first one that is fast.
+ */
+export const prewarmSpeech = async (): Promise<void> => {
+  const ctx = modelStore.context;
+  if (!ctx || typeof ctx.generateSpeech !== 'function') {
+    return;
+  }
+  if (prewarmedContext === ctx.id) {
+    return;
+  }
+  if (!(await modelCanVoiceReplies())) {
+    return;
+  }
+  prewarmedContext = ctx.id;
+  const t0 = Date.now();
+  const out = await ctx
+    .generateSpeech(
+      {
+        text: 'Aa.',
+        maxSeconds: 1,
+        stream: true,
+        ...(ttsStore.speechKeepCache ? {isolateSeq: true} : {}),
+      },
+      // One sample is the whole point: everything before it is the cost being
+      // paid in advance, so the utterance stops the moment it lands.
+      () => ctx.stopSpeech(),
+    )
+    .catch(err => {
+      console.warn('[voice] speech prewarm failed:', err);
+      return null;
+    });
+  if (!out) {
+    // Nothing was learned, so the next session asks again.
+    prewarmedContext = null;
+    return;
+  }
+  if (out.seqIsolated !== true && TOUCHED_CACHE.has(out.stopReason)) {
+    // The warm-up decoded over the conversation's own positions, so it owes the
+    // next turn the same clear a spoken reply would.
+    await ctx.clearCache(true).catch(() => undefined);
+  }
+  logPerf('speech.prewarm', {
+    ms: Date.now() - t0,
+    promptMs: Math.round(out.promptMs),
+    firstAudioMs: Math.round(out.firstAudioMs),
+    frames: out.frames,
+    stop: out.stopReason,
+    stage: out.stage,
+    cache: out.seqIsolated === true ? 'kept' : 'shared',
+  });
 };
 
 /**

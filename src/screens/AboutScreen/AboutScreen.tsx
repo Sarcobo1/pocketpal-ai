@@ -1,4 +1,4 @@
-import React, {useContext, useMemo, useState} from 'react';
+import React, {useContext, useMemo, useRef, useState} from 'react';
 import {
   View,
   ScrollView,
@@ -35,6 +35,11 @@ const ChevronRightButtonIcon = ({color}: {color: string}) => (
   <ChevronRightIcon stroke={color} />
 );
 
+// Taps on the version row that open Developer Tools, and how long a burst may
+// pause before it starts over.
+const DEV_TOOLS_TAPS = 7;
+const TAP_WINDOW_MS = 3000;
+
 export const AboutScreen: React.FC = () => {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -42,6 +47,8 @@ export const AboutScreen: React.FC = () => {
   const l10n = useContext(L10nContext);
   const [showFeedback, setShowFeedback] = useState(false);
   const [showNotices, setShowNotices] = useState(false);
+  const [versionTaps, setVersionTaps] = useState(0);
+  const tapWindow = useRef<ReturnType<typeof setTimeout> | null>(null);
   const noticeSections = useMemo(() => phononNotices.map(reflowNotice), []);
   const [legalItemTops, setLegalItemTops] = useState<Record<number, number>>(
     {},
@@ -95,13 +102,40 @@ export const AboutScreen: React.FC = () => {
     });
   }, []);
 
-  const copyVersionToClipboard = () => {
-    const versionString = `Version ${appInfo.version} (${appInfo.build})`;
-    Clipboard.setString(versionString);
-    Alert.alert(
-      l10n.about.versionCopiedTitle,
-      l10n.about.versionCopiedDescription,
-    );
+  // Seven taps on the version row is the Android convention for a hidden
+  // panel, and in a release build it is the only way into Developer Tools
+  // (`__DEV__` is false there, so the drawer row is otherwise never drawn).
+  //
+  // The copied dialog is what a tap has always answered with. It is modal, so
+  // once a count is under way the taps go silent and the line under the version
+  // carries the progress instead; the window closes on its own so a
+  // half-finished count never carries over into the next one.
+  const pressVersion = () => {
+    Clipboard.setString(`Version ${appInfo.version} (${appInfo.build})`);
+    const next = versionTaps + 1;
+    if (tapWindow.current) {
+      clearTimeout(tapWindow.current);
+    }
+    if (next >= DEV_TOOLS_TAPS) {
+      setVersionTaps(0);
+      const unlocked = !uiStore.devToolsUnlocked;
+      uiStore.setDevToolsUnlocked(unlocked);
+      Alert.alert(
+        'Developer Tools',
+        unlocked
+          ? 'Unlocked. Open the drawer to find the Dev Tools panel.'
+          : 'Hidden from the drawer again.',
+      );
+      return;
+    }
+    setVersionTaps(next);
+    if (next === 1) {
+      Alert.alert(
+        l10n.about.versionCopiedTitle,
+        l10n.about.versionCopiedDescription,
+      );
+    }
+    tapWindow.current = setTimeout(() => setVersionTaps(0), TAP_WINDOW_MS);
   };
 
   const handleSubmit = async () => {
@@ -134,6 +168,8 @@ export const AboutScreen: React.FC = () => {
     }
   };
 
+  const tapsLeft = DEV_TOOLS_TAPS - versionTaps;
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.container}>
@@ -149,7 +185,7 @@ export const AboutScreen: React.FC = () => {
               <View style={styles.versionContainer}>
                 <TouchableOpacity
                   style={styles.versionButton}
-                  onPress={copyVersionToClipboard}>
+                  onPress={pressVersion}>
                   <Text style={styles.versionText}>
                     v{appInfo.version} ({appInfo.build})
                   </Text>
@@ -160,6 +196,12 @@ export const AboutScreen: React.FC = () => {
                   />
                 </TouchableOpacity>
               </View>
+              {versionTaps > 0 && (
+                <Text style={styles.llamaBuildText}>
+                  {tapsLeft} {tapsLeft === 1 ? 'tap' : 'taps'} away from{' '}
+                  {uiStore.devToolsUnlocked ? 'hiding ' : ''}Developer Tools
+                </Text>
+              )}
               <Text style={styles.llamaBuildText}>
                 llama.cpp {BuildInfo.number} ({BuildInfo.commit.substring(0, 7)}
                 )

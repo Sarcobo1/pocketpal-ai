@@ -57,14 +57,12 @@ import {
   BenchmarkScreen,
   AboutScreen,
 
-  // Dev tools screen. Only available in debug mode.
+  // Dev tools screen. Always in a debug build; in a release build after the
+  // seven-tap unlock on the About screen.
   DevToolsScreen,
 } from './src/screens';
 import PalsScreen from './src/screens/PalsScreen';
 import {OnboardingStack} from './src/screens/OnboardingScreens';
-
-// Check if app is in debug mode
-const isDebugMode = __DEV__;
 
 if (__E2E__) {
   fakeStore.restore();
@@ -209,8 +207,12 @@ const App = observer(() => {
                               }}
                             />
 
-                            {/* Only show Dev Tools screen in debug mode */}
-                            {isDebugMode && (
+                            {/*
+                      Dev Tools: always in a debug build, and in a release
+                      build once About's version row has been tapped enough
+                      times (uiStore.devToolsUnlocked, persisted).
+                    */}
+                            {(__DEV__ || uiStore.devToolsUnlocked) && (
                               <Drawer.Screen
                                 name={ROUTES.DEV_TOOLS}
                                 component={gestureHandlerRootHOC(

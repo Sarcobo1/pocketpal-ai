@@ -65,9 +65,7 @@ describe('spoken-turn A/B prompt shapes', () => {
     const {messages} = build(id);
     // A second audio part is the replay bug, and a row before the user turn is
     // history poisoning — the two things the bench has to be able to rule out.
-    expect(
-      countMediaParts(messages as Parameters<typeof countMediaParts>[0]),
-    ).toEqual({images: 0, audio: 1});
+    expect(countMediaParts(messages as never)).toEqual({images: 0, audio: 1});
     expect(messages).toHaveLength(2);
     expect(lastTurn(messages).role).toBe('user');
   });

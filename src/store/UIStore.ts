@@ -79,6 +79,18 @@ export class UIStore {
   // state isn't pre-dismissed.
   dismissedDownloadIds: string[] = [];
 
+  // Developer Tools entry point in a release build. `__DEV__` is false there,
+  // so the drawer gate has to come from somewhere the user controls: seven
+  // taps on the version row in About flips this, and it persists so the next
+  // launch keeps the bench reachable.
+  devToolsUnlocked: boolean = false;
+
+  setDevToolsUnlocked(next: boolean) {
+    runInAction(() => {
+      this.devToolsUnlocked = next;
+    });
+  }
+
   hasWarnedToolCompat(modelId: string): boolean {
     return this.toolCompatWarnedModels.includes(modelId);
   }
@@ -122,6 +134,7 @@ export class UIStore {
         'toolCompatWarnedModels',
         'hasCompletedOnboarding',
         'onboardingTopicsSnapshot',
+        'devToolsUnlocked',
       ],
       storage: AsyncStorage,
     });

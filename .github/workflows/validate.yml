@@ -77,6 +77,7 @@ jobs:
             src/components/VoiceModeView/__tests__/VoiceModeView.test.tsx \
             src/components/VoiceSetupSheet/__tests__/VoiceSetupSheet.test.tsx \
             src/screens/ModelsScreen/HFModelSearch/DetailsView/ModelFileCard/__tests__/ModelFileCard.test.tsx \
+            src/screens/AboutScreen/__tests__/AboutScreen.test.tsx \
             src/hooks/__tests__/useChatSession.test.ts \
             src/hooks/__tests__/useChatSession.assistantTurn.test.ts \
             src/hooks/__tests__/useVoiceMode.test.ts

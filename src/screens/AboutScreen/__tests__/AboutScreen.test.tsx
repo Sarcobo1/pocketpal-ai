@@ -5,7 +5,10 @@ import {
   fireEvent,
   act,
 } from '../../../../jest/test-utils';
+import Clipboard from '@react-native-clipboard/clipboard';
+
 import {AboutScreen} from '../AboutScreen';
+import {uiStore} from '../../../store';
 import {submitFeedback} from '../../../api/feedback';
 import {l10n} from '../../../locales';
 
@@ -248,5 +251,38 @@ describe('AboutScreen', () => {
     });
 
     expect(Alert.alert).toHaveBeenCalledWith('Error', 'API Error');
+  });
+});
+
+describe('Developer Tools unlock', () => {
+  // A release build has no __DEV__, so the version row is the only route into
+  // Developer Tools and the bench. The count that opens it is the contract.
+  it('opens the panel on the seventh tap, not the sixth', () => {
+    const {getByText} = render(<AboutScreen />);
+    const pressVersion = () => fireEvent.press(getByText('v1.0.0 (100)'));
+
+    for (let tap = 1; tap <= 6; tap++) {
+      pressVersion();
+    }
+    expect(uiStore.setDevToolsUnlocked).not.toHaveBeenCalled();
+    // The count says where it is, since the copied dialog would swallow the
+    // taps it is still waiting for.
+    expect(getByText('1 tap away from Developer Tools')).toBeTruthy();
+
+    pressVersion();
+
+    expect(uiStore.setDevToolsUnlocked).toHaveBeenCalledWith(true);
+    expect(Alert.alert).toHaveBeenLastCalledWith(
+      'Developer Tools',
+      'Unlocked. Open the drawer to find the Dev Tools panel.',
+    );
+  });
+
+  it('keeps copying the version on the tap that starts a count', () => {
+    const {getByText} = render(<AboutScreen />);
+
+    fireEvent.press(getByText('v1.0.0 (100)'));
+
+    expect(Clipboard.setString).toHaveBeenCalledWith('Version 1.0.0 (100)');
   });
 });

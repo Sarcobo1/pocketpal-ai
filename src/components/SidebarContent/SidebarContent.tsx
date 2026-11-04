@@ -9,7 +9,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTheme} from '../../hooks';
 import {createStyles} from './styles';
 import {PlusDrawerItem} from './PlusDrawerItem/PlusDrawerItem';
-import {chatSessionStore, SessionMetaData} from '../../store';
+import {chatSessionStore, SessionMetaData, uiStore} from '../../store';
 import {Menu, RenameModal, Checkbox} from '..';
 import {
   BenchmarkIcon,
@@ -28,9 +28,6 @@ import {t} from '../../locales';
 import {ROUTES} from '../../utils/navigationConstants';
 import {exportChatSession} from '../../utils/exportUtils';
 import {openPlus} from '../../services/plus/gate';
-
-// Check if app is in debug mode
-const isDebugMode = __DEV__;
 
 // Session item props interface
 interface SessionItemProps {
@@ -607,8 +604,8 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
               onPress={() => navigateTo(ROUTES.APP_INFO)}
               style={styles.menuDrawerItem}
             />
-            {/* Only show Dev Tools in debug mode */}
-            {isDebugMode && (
+            {/* Dev Tools: debug builds always, release after the About unlock */}
+            {(__DEV__ || uiStore.devToolsUnlocked) && (
               <Drawer.Item
                 label="Dev Tools"
                 icon={() => (
@@ -626,7 +623,14 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
           <Divider style={styles.divider} />
         </View>
       ),
-      [l10n, theme, styles, navigateTo, props.navigation],
+      [
+        l10n,
+        theme,
+        styles,
+        navigateTo,
+        props.navigation,
+        uiStore.devToolsUnlocked,
+      ],
     );
 
     return (

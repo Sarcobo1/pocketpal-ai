@@ -23,8 +23,12 @@ import type {AbSummaryRow} from '../../../../services/voice/abBench';
 import {
   runSpeechBench,
   runSpeechCacheProbe,
+  runSpeechQuantBench,
+  speechQuantOptions,
   type SpeechCellSummary,
+  type SpeechFileOption,
 } from '../../../../services/voice/speechBench';
+import {modelStore} from '../../../../store';
 import {voiceAudioDir} from '../../../../services/voice/wav';
 
 /**
@@ -50,6 +54,13 @@ const VoiceAbScreen = () => {
   const [lines, setLines] = useState<string[]>([]);
   const [summary, setSummary] = useState<AbSummaryRow[]>([]);
   const [speechSummary, setSpeechSummary] = useState<SpeechCellSummary[]>([]);
+  const [quantFiles, setQuantFiles] = useState<{
+    texts: SpeechFileOption[];
+    projectors: SpeechFileOption[];
+  } | null>(null);
+  const [selTexts, setSelTexts] = useState<string[]>([]);
+  const [selProjectors, setSelProjectors] = useState<string[]>([]);
+  const [quantSummary, setQuantSummary] = useState<SpeechCellSummary[]>([]);
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<ScrollViewInstance>(null);
   const cancelRef = useRef(false);
@@ -144,6 +155,56 @@ const VoiceAbScreen = () => {
       const message = error instanceof Error ? error.message : String(error);
       Alert.alert('Probe failed', message);
       append(`probe failed: ${message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Which GGUF files this phone could compare, as the run needs them. */
+  const listQuantFiles = () => {
+    const options = speechQuantOptions(modelStore.models);
+    setQuantFiles(options);
+    append(
+      `on this phone: ${options.texts.length} model file(s), ${options.projectors.length} projector file(s)`,
+    );
+  };
+
+  const toggleIn =
+    (setter: React.Dispatch<React.SetStateAction<string[]>>) => (id: string) =>
+      setter(prev =>
+        prev.includes(id) ? prev.filter(value => value !== id) : [...prev, id],
+      );
+
+  /**
+   * The same words out of two sets of weights. Each pair is its own model load,
+   * so the run ends with the model unloaded like every other speech cell here.
+   */
+  const runQuant = async () => {
+    if (busy || !selTexts.length) {
+      return;
+    }
+    cancelRef.current = false;
+    setBusy(true);
+    setQuantSummary([]);
+    append(
+      `=== quant run ${runs}x — ${selTexts.length} model(s) × ${
+        selProjectors.length || 'their own paired projector'
+      } ===`,
+    );
+    try {
+      const result = await runSpeechQuantBench({
+        textIds: selTexts,
+        projectorIds: selProjectors,
+        runs: Math.max(1, Math.min(20, Number(runs) || 5)),
+        isCancelled: () => cancelRef.current,
+        onLine: append,
+      });
+      setQuantSummary(result.summary);
+      append('model unloaded — tap it again to resume chat or voice mode');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      Alert.alert('Quant run failed', message);
+      append(`quant failed: ${message}`);
     } finally {
       setBusy(false);
     }
@@ -341,6 +402,106 @@ const VoiceAbScreen = () => {
 
         <Card elevation={1} style={styles.card}>
           <Card.Title
+            title="Quantization run"
+            subtitle="same settings, different weights — and the audio it made"
+          />
+          <Card.Content>
+            <Text style={styles.note}>
+              Voices the same three texts from every file pair you pick, on the
+              engine settings this phone already uses, so the only thing that
+              moves is the weights. Which quant is faster is a table; whether
+              the cheaper one still sounds right is not, so one clip per pair is
+              written to {`${abDir}/speech-quant`} for a laptop to play.
+            </Text>
+            <Button mode="outlined" onPress={listQuantFiles} disabled={busy}>
+              List files on this phone
+            </Button>
+            {quantFiles && (
+              <View style={styles.group}>
+                <Text style={styles.rowHead}>Text models</Text>
+                {quantFiles.texts.map(file => (
+                  <Button
+                    key={file.id}
+                    mode={selTexts.includes(file.id) ? 'contained' : 'outlined'}
+                    style={styles.button}
+                    disabled={busy}
+                    onPress={() => toggleIn(setSelTexts)(file.id)}>
+                    {`${selTexts.includes(file.id) ? '[x]' : '[ ]'} ${
+                      file.label
+                    } · ${(file.bytes / 1e9).toFixed(1)} GB`}
+                  </Button>
+                ))}
+                <Text style={styles.rowHead}>
+                  Projectors — the speech decoder lives in these
+                </Text>
+                {quantFiles.projectors.map(file => (
+                  <Button
+                    key={file.id}
+                    mode={
+                      selProjectors.includes(file.id) ? 'contained' : 'outlined'
+                    }
+                    style={styles.button}
+                    disabled={busy}
+                    onPress={() => toggleIn(setSelProjectors)(file.id)}>
+                    {`${selProjectors.includes(file.id) ? '[x]' : '[ ]'} ${
+                      file.label
+                    } · ${(file.bytes / 1e9).toFixed(1)} GB`}
+                  </Button>
+                ))}
+                {quantFiles.projectors.length === 0 && (
+                  <Text style={styles.note}>
+                    Nothing is listed as a projector, so every model is voiced
+                    by the file already paired with it.
+                  </Text>
+                )}
+                <Button
+                  mode="contained"
+                  onPress={runQuant}
+                  disabled={busy || selTexts.length === 0}>
+                  {busy
+                    ? 'Running…'
+                    : `Run ${
+                        selTexts.length *
+                        Math.max(1, quantFiles.projectors.length)
+                      } pair(s)`}
+                </Button>
+              </View>
+            )}
+          </Card.Content>
+        </Card>
+
+        {quantSummary.length > 0 && (
+          <Card elevation={1} style={styles.card}>
+            <Card.Title
+              title="Quant table"
+              subtitle="one row per file pair, on this phone's own settings"
+            />
+            <Card.Content>
+              {quantSummary.map(row => (
+                <View key={row.cell} style={styles.row}>
+                  <Text style={styles.rowHead}>
+                    {row.cell} · rtf {row.medianRtf ?? '-'} · first{' '}
+                    {row.medianFirstAudioMs}ms
+                  </Text>
+                  <Text style={styles.rowMeta}>
+                    prefill {row.medianPromptMs}ms · p95 frame{' '}
+                    {row.worstP95Frame}ms · ok {row.runs - row.failed}/
+                    {row.runs} · audio {row.audioSeconds}s
+                  </Text>
+                  <Text style={styles.rowSample}>
+                    s1 {row.perLen[0].medianRtf ?? '-'} / s2{' '}
+                    {row.perLen[1].medianRtf ?? '-'} / s3{' '}
+                    {row.perLen[2].medianRtf ?? '-'} — wall{' '}
+                    {row.perLen.map(p => p.medianWallMs).join('/')}ms
+                  </Text>
+                </View>
+              ))}
+            </Card.Content>
+          </Card>
+        )}
+
+        <Card elevation={1} style={styles.card}>
+          <Card.Title
             title="Log"
             subtitle="also on logcat, as [voice-ab] and [speech-bench]"
           />
@@ -428,6 +589,10 @@ const styles = StyleSheet.create({
   buttonRow: {
     flexDirection: 'row',
     gap: 8,
+  },
+  group: {
+    marginTop: 8,
+    gap: 2,
   },
   row: {
     marginBottom: 10,

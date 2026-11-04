@@ -25,7 +25,7 @@ export const pullableDir =
 
 export const voiceAudioDir = `${pullableDir}/voice-audio`;
 
-const wavHeader = (dataBytes: number): Uint8Array => {
+const wavHeader = (dataBytes: number, sampleRate: number): Uint8Array => {
   const header = new Uint8Array(HEADER_BYTES);
   const view = new DataView(header.buffer);
   const tag = (offset: number, value: string) => {
@@ -33,7 +33,7 @@ const wavHeader = (dataBytes: number): Uint8Array => {
       view.setUint8(offset + i, value.charCodeAt(i));
     }
   };
-  const byteRate = (ASR_SAMPLE_RATE * ASR_BITS_PER_SAMPLE * ASR_CHANNELS) / 8;
+  const byteRate = (sampleRate * ASR_BITS_PER_SAMPLE * ASR_CHANNELS) / 8;
   tag(0, 'RIFF');
   view.setUint32(4, HEADER_BYTES - 8 + dataBytes, true);
   tag(8, 'WAVE');
@@ -41,7 +41,7 @@ const wavHeader = (dataBytes: number): Uint8Array => {
   view.setUint32(16, 16, true);
   view.setUint16(20, 1, true);
   view.setUint16(22, ASR_CHANNELS, true);
-  view.setUint32(24, ASR_SAMPLE_RATE, true);
+  view.setUint32(24, sampleRate, true);
   view.setUint32(28, byteRate, true);
   view.setUint16(32, (ASR_BITS_PER_SAMPLE / 8) * ASR_CHANNELS, true);
   view.setUint16(34, ASR_BITS_PER_SAMPLE, true);
@@ -52,10 +52,36 @@ const wavHeader = (dataBytes: number): Uint8Array => {
 
 /** The recorder's little-endian int16 PCM, wrapped as a RIFF/WAVE file. */
 export const int16PcmToWav = (pcm: Uint8Array): Uint8Array => {
-  const header = wavHeader(pcm.length);
+  const header = wavHeader(pcm.length, ASR_SAMPLE_RATE);
   const wav = new Uint8Array(header.length + pcm.length);
   wav.set(header);
   wav.set(pcm, header.length);
+  return wav;
+};
+
+/**
+ * Speech the model voiced itself — float samples at the decoder's own rate — as
+ * a 16-bit mono WAV.
+ *
+ * The quantization bench writes these: a table says how fast Q4 and Q8_0 spoke,
+ * and only a listener says whether Q4 still says it well. The clamp is the same
+ * one the playback sink uses — a sample that wraps around clicks far louder than
+ * one held at full scale.
+ */
+export const float32PcmToWav = (
+  samples: Float32Array,
+  sampleRate: number,
+): Uint8Array => {
+  const pcm = new Int16Array(samples.length);
+  for (let i = 0; i < samples.length; i++) {
+    const v = Math.max(-1, Math.min(1, samples[i] ?? 0));
+    pcm[i] = v < 0 ? v * 32768 : v * 32767;
+  }
+  const bytes = new Uint8Array(pcm.buffer);
+  const header = wavHeader(bytes.length, sampleRate);
+  const wav = new Uint8Array(header.length + bytes.length);
+  wav.set(header);
+  wav.set(bytes, header.length);
   return wav;
 };
 

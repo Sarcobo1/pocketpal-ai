@@ -2,7 +2,12 @@ import * as RNFS from '@dr.pogodin/react-native-fs';
 import {toByteArray} from 'base64-js';
 
 import {ASR_SAMPLE_RATE} from '../../asr/constants';
-import {int16PcmToWav, readWavHeader, writeUtteranceWav} from '../wav';
+import {
+  float32PcmToWav,
+  int16PcmToWav,
+  readWavHeader,
+  writeUtteranceWav,
+} from '../wav';
 
 /** `ms` of zeroed int16 PCM, long enough to hold a whole number of frames. */
 const pcmOf = (ms: number): Uint8Array =>
@@ -36,6 +41,34 @@ describe('int16PcmToWav', () => {
 
   it('says so when a buffer is not a RIFF/WAVE file', () => {
     expect(readWavHeader(new Uint8Array(44)).riff).toBe(false);
+  });
+});
+
+describe('float32PcmToWav', () => {
+  it('writes the decoder sample rate, not the recorder rate', () => {
+    const wav = float32PcmToWav(new Float32Array(4800), 24000);
+
+    // The speech bench dumps audio at whatever rate the voice came out at; a
+    // header naming 16 kHz would play it back slow and answer the wrong question.
+    expect(readWavHeader(wav)).toEqual({
+      riff: true,
+      format: 1,
+      channels: 1,
+      sampleRate: 24000,
+      bits: 16,
+      dataBytes: 9600,
+    });
+  });
+
+  it('scales the samples and holds an overshoot instead of wrapping it', () => {
+    const wav = float32PcmToWav(new Float32Array([0, 0.5, -0.5, 2]), 24000);
+    const view = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
+
+    expect(view.getInt16(44, true)).toBe(0);
+    expect(view.getInt16(46, true)).toBe(16383);
+    expect(view.getInt16(48, true)).toBe(-16384);
+    // A decoder transient above full scale is clamped: a wrapped sample clicks.
+    expect(view.getInt16(50, true)).toBe(32767);
   });
 });
 

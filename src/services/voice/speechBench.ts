@@ -1,12 +1,16 @@
 import * as RNFS from '@dr.pogodin/react-native-fs';
+import {fromByteArray} from 'base64-js';
 import {initLlama, type ContextParams, type LlamaContext} from 'llama.rn';
 
 import {modelStore} from '../../store';
+import {ModelType, type Model} from '../../utils/types';
 import {acquireKeepAwake} from '../../utils/keepAwake';
 import {logPerf} from '../../utils/mediaPerf';
 
 import {abDir} from './abBench';
 import {MAX_UTTERANCE_SECONDS, TOUCHED_CACHE} from './omniSpeech';
+import {speechRunMs} from './speechLevel';
+import {float32PcmToWav} from './wav';
 
 /**
  * A bench for the speech decoder alone.
@@ -57,7 +61,15 @@ interface CellSig {
 
 export interface SpeechCell {
   key: string;
-  axis: 'base' | 'mmproj' | 'threads' | 'batch' | 'flash' | 'stream' | 'cache';
+  axis:
+    | 'base'
+    | 'mmproj'
+    | 'threads'
+    | 'batch'
+    | 'flash'
+    | 'stream'
+    | 'cache'
+    | 'quant';
   label: string;
   sig: CellSig;
   /** Hand PCM out per chunk instead of one buffer at the end. */
@@ -180,7 +192,9 @@ export const buildSpeechCells = (base: SpeechBaseline): SpeechCell[] => {
       sig,
       stream,
       isolateSeq,
-      quick: opts.quick ?? true,
+      // Not quick by default: an axis joins the short run only when it is named
+      // as one, which is what keeps Full the longer scope rather than a synonym.
+      quick: opts.quick ?? false,
     });
   };
 
@@ -231,16 +245,12 @@ export const estimateSpeechBenchMs = (
 };
 
 /**
- * The projector for the active model, resolved the way the live load resolves
- * it: the file the model carries, else the projection model it names. No
- * vision preference is consulted — the speech decoder rides in this same file
- * whether or not the user lets the model look at pictures.
+ * The projector for one model, resolved the way the live load resolves it: the
+ * file the model carries, else the projection model it names. No vision
+ * preference is consulted — the speech decoder rides in this same file whether
+ * or not the user lets the model look at pictures.
  */
-const benchProjectorPath = async (): Promise<string | null> => {
-  const model = modelStore.activeModel;
-  if (!model) {
-    return null;
-  }
+const benchProjectorPath = async (model: Model): Promise<string | null> => {
   if (model.mmprojPath) {
     return model.mmprojPath;
   }
@@ -250,6 +260,21 @@ const benchProjectorPath = async (): Promise<string | null> => {
   }
   return await modelStore.getModelFullPath(projectionModel);
 };
+
+/**
+ * The engine settings a set of context params stands for, in the shape a cell
+ * sweeps. `mmprojGpu` comes from the store rather than the params because the
+ * projector's device is decided when it attaches, not when the context is built
+ * — and the cell has to measure the device the user has been hearing.
+ */
+const baselineOf = (
+  baseParams: Omit<ContextParams, 'model'>,
+): SpeechBaseline => ({
+  threads: baseParams.n_threads ?? 4,
+  batch: baseParams.n_batch ?? 512,
+  flash: (baseParams.flash_attn_type as FlashAttn) ?? 'off',
+  mmprojGpu: modelStore.multimodalDevice !== 'cpu',
+});
 
 /**
  * What is being measured: the loaded model's file, its projector, the settings
@@ -267,7 +292,7 @@ const resolveSpeechBenchSetup = async (): Promise<{
   if (!model) {
     throw new Error('no local model loaded — load the Omni model first');
   }
-  const projectorPath = await benchProjectorPath();
+  const projectorPath = await benchProjectorPath(model);
   if (!projectorPath) {
     throw new Error(
       'this model has no paired projector file — the speech decoder lives there',
@@ -280,14 +305,7 @@ const resolveSpeechBenchSetup = async (): Promise<{
     filePath,
     projectorPath,
     baseParams,
-    base: {
-      threads: baseParams.n_threads ?? 4,
-      batch: baseParams.n_batch ?? 512,
-      flash: (baseParams.flash_attn_type as FlashAttn) ?? 'off',
-      // The device the projector actually came up on, so the baseline cell is
-      // the audio the user has been hearing rather than a guess at it.
-      mmprojGpu: modelStore.multimodalDevice !== 'cpu',
-    },
+    base: baselineOf(baseParams),
   };
 };
 
@@ -370,12 +388,15 @@ const runSpeechOnce = async ({
   text,
   len,
   n,
+  onAudio,
 }: {
   ctx: LlamaContext;
   cell: SpeechCell;
   text: string;
   len: number;
   n: number;
+  /** Hands the whole buffer to the caller — only a non-streaming cell has one. */
+  onAudio?: (samples: Float32Array, sampleRate: number) => void;
 }): Promise<SpeechRunRow> => {
   const started = Date.now();
   let firstChunkMs: number | null = null;
@@ -402,6 +423,9 @@ const runSpeechOnce = async ({
     const wallMs = Date.now() - started;
     const audioMs = out.seconds * 1000;
     const rtf = audioMs > 0 ? out.genMs / audioMs : null;
+    if (onAudio && out.pcm.length > 0) {
+      onAudio(out.pcm, out.sampleRate);
+    }
     return {
       cell: cell.key,
       len,
@@ -874,4 +898,299 @@ export const runSpeechCacheProbe = async ({
     );
 
   return {rows, dump};
+};
+
+/** Where a quantization run leaves the audio it voiced, for a laptop to play. */
+const quantDir = `${abDir}/speech-quant`;
+
+/** A frame this quiet is not the decoder saying something. */
+const QUANT_VOICED_FLOOR = 0.05;
+
+export interface SpeechFileOption {
+  id: string;
+  /** The filename without its extension — the quant is the whole label. */
+  label: string;
+  bytes: number;
+}
+
+type HeldModel = Pick<
+  Model,
+  'id' | 'filename' | 'size' | 'modelType' | 'isDownloaded'
+>;
+
+/**
+ * What this phone already holds, split the way the run needs it.
+ *
+ * Downloading a second quant is not the bench's job: it compares the files that
+ * are on the device, because the only Q8_0 worth measuring against Q4 is the one
+ * the user can actually load here.
+ */
+export const speechQuantOptions = (
+  models: HeldModel[],
+): {texts: SpeechFileOption[]; projectors: SpeechFileOption[]} => {
+  const held = models.filter(model => model.isDownloaded);
+  const options = (list: HeldModel[]) =>
+    list
+      .map(model => ({
+        id: model.id,
+        label: model.filename.replace(/\.gguf$/i, ''),
+        bytes: model.size,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  return {
+    texts: options(
+      held.filter(
+        model =>
+          model.modelType !== ModelType.PROJECTION &&
+          model.modelType !== ModelType.DRAFT,
+      ),
+    ),
+    projectors: options(
+      held.filter(model => model.modelType === ModelType.PROJECTION),
+    ),
+  };
+};
+
+const fileTail = (path: string): string => path.split('/').pop() ?? path;
+
+const shortLabel = (name: string): string =>
+  fileTail(name).replace(/\.gguf$/i, '');
+
+/** A cell key is a filename here too, so it has to survive both. */
+const safeName = (value: string): string =>
+  value.replace(/[^A-Za-z0-9._-]/g, '_');
+
+/**
+ * The same words out of two different weights.
+ *
+ * Whether Q4 is worth it over Q8_0 is two questions with one answer each: how
+ * much faster the frame loop ran, and whether the voice still sounds like the
+ * model rather than the quant. Only the first is a number the phone can print,
+ * so the run writes the audio next to the table and the second question is
+ * answered by an ear.
+ *
+ * Nothing about the engine settings moves here: each file is measured on the
+ * device's own baseline, so the difference in the table is the difference in
+ * the weights.
+ */
+export const runSpeechQuantBench = async ({
+  textIds,
+  projectorIds = [],
+  runs = 5,
+  isCancelled,
+  onLine,
+}: {
+  textIds: string[];
+  projectorIds?: string[];
+  runs?: number;
+  isCancelled?: () => boolean;
+  onLine?: (line: string) => void;
+}): Promise<{
+  rows: SpeechRunRow[];
+  summary: SpeechCellSummary[];
+  wavs: string[];
+  dump: string;
+}> => {
+  const say = (line: string) => {
+    console.log(`[speech-bench] ${line}`);
+    onLine?.(line);
+  };
+  const cancelled = () => isCancelled?.() === true;
+
+  const pick = (id: string, what: string): Model => {
+    const model = modelStore.models.find(m => m.id === id);
+    if (!model) {
+      throw new Error(`the ${what} ${id} is not in the model list`);
+    }
+    return model;
+  };
+  if (!textIds.length) {
+    throw new Error('pick at least one text model to compare');
+  }
+  const texts = textIds.map(id => pick(id, 'model'));
+  const projectors = projectorIds.map(id => pick(id, 'projector'));
+  const combos: Array<{text: Model; projector: Model | null}> = texts.flatMap(
+    text =>
+      projectors.length
+        ? projectors.map(projector => ({text, projector}))
+        : [{text, projector: null}],
+  );
+
+  say(
+    `quant run: ${combos.length} file pair(s) × ${SPEECH_TEXTS.length} texts × ${runs} runs, every pair on the device's own engine settings`,
+  );
+
+  await modelStore.enterBenchmarkMode();
+  const releaseWake = acquireKeepAwake();
+  const rows: SpeechRunRow[] = [];
+  const summary: SpeechCellSummary[] = [];
+  const wavs: string[] = [];
+
+  try {
+    for (const combo of combos) {
+      if (cancelled()) {
+        say('stopped before a pair');
+        break;
+      }
+      const filePath = await modelStore.getModelFullPath(combo.text);
+      const projectorPath = combo.projector
+        ? await modelStore.getModelFullPath(combo.projector)
+        : await benchProjectorPath(combo.text);
+      if (!projectorPath) {
+        say(
+          `${shortLabel(combo.text.filename)} skipped — nothing is paired with it to decode audio`,
+        );
+        continue;
+      }
+      const label = `${shortLabel(combo.text.filename)}+${shortLabel(
+        projectorPath,
+      )}`;
+      const baseParams =
+        await modelStore.getEffectiveContextInitParams(filePath);
+      const sig = baselineOf(baseParams);
+      // Not streamed: the buffer this run hands back is the thing that gets
+      // listened to, and the frame loop does the same work either way.
+      const cell: SpeechCell = {
+        key: label,
+        axis: 'quant',
+        label,
+        sig,
+        stream: false,
+        isolateSeq: true,
+        quick: true,
+      };
+      let target: BenchTarget | null = null;
+      const opened = Date.now();
+      const captured: Array<{pcm: Float32Array; rate: number}> = [];
+      try {
+        target = await openSpeechTarget({
+          filePath,
+          baseParams,
+          sig,
+          projectorPath,
+          imageMaxTokens: modelStore.contextInitParams.image_max_tokens ?? 512,
+        });
+        say(
+          `${label} loaded in ${Date.now() - opened}ms sig=${sigKey(sig)} audioGen=${
+            target.support?.audioGen === true ? 'yes' : 'NO'
+          }`,
+        );
+        for (const item of SPEECH_TEXTS) {
+          for (let n = 1; n <= runs; n++) {
+            if (cancelled()) {
+              break;
+            }
+            const row = await runSpeechOnce({
+              ctx: target.ctx,
+              cell,
+              text: item.text,
+              len: item.len,
+              n,
+              onAudio:
+                item.len === 2 && n === 1
+                  ? (pcm, rate) => {
+                      captured.push({pcm, rate});
+                    }
+                  : undefined,
+            });
+            rows.push(row);
+            say(
+              `${label} s${item.len}#${n} rtf=${row.rtf ?? '-'} first=${
+                row.firstAudioMs
+              }ms prefill=${row.promptMs}ms frames=${row.frames} p95f=${
+                row.p95Frame
+              }ms stop=${row.stop}${row.error ? ` ERR ${row.error}` : ''}`,
+            );
+          }
+        }
+      } catch (error) {
+        // A pair that will not load is the answer to a question too: this phone
+        // cannot run that file, and saying which one failed is the evidence.
+        say(
+          `${label} stopped ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      } finally {
+        if (target) {
+          await closeSpeechTarget(target);
+        }
+      }
+
+      const clip = captured[0];
+      if (clip) {
+        await RNFS.mkdir(quantDir).catch(() => undefined);
+        const wavPath = `${quantDir}/${safeName(label)}.wav`;
+        const voicedMs = speechRunMs(clip.pcm, QUANT_VOICED_FLOOR);
+        logPerf('speech.quant.audio', {
+          cell: label,
+          rate: clip.rate,
+          samples: clip.pcm.length,
+          ms: Math.round((clip.pcm.length / clip.rate) * 1000),
+          voicedMs,
+        });
+        await RNFS.writeFile(
+          wavPath,
+          fromByteArray(float32PcmToWav(clip.pcm, clip.rate)),
+          'base64',
+        )
+          .then(() => {
+            wavs.push(wavPath);
+            say(`${label} audio → ${wavPath} (voiced ${voicedMs}ms)`);
+          })
+          .catch(err =>
+            console.warn(
+              `[speech-bench] ${label} audio dump failed: ${String(err)}`,
+            ),
+          );
+      }
+      const of = summarizeCell(cell, rows);
+      summary.push(of);
+      say(`pair done ${tableLine(of)}`);
+      logPerf('speech.quant.cell', {
+        cell: label,
+        rtf: of.medianRtf ?? -1,
+        firstAudio: of.medianFirstAudioMs,
+        prefill: of.medianPromptMs,
+        p95Frame: of.worstP95Frame,
+        failed: of.failed,
+        audio: of.audioSeconds,
+      });
+    }
+  } finally {
+    releaseWake();
+    modelStore.exitBenchmarkMode();
+  }
+
+  say('---- quant table (median of every length, fastest first) ----');
+  [...summary]
+    .sort((a, b) => (a.medianRtf ?? 99) - (b.medianRtf ?? 99))
+    .forEach(row => say(tableLine(row)));
+  if (wavs.length) {
+    say(`listen to them: ${wavs.map(fileTail).join(', ')} in ${quantDir}`);
+  }
+
+  const dump = `${abDir}/speech-quant-${Date.now()}.json`;
+  await RNFS.mkdir(abDir).catch(() => undefined);
+  await RNFS.writeFile(
+    dump,
+    JSON.stringify(
+      {
+        scope: 'quant',
+        runs,
+        pairs: summary.map(row => row.cell),
+        wavs,
+        rows,
+        summary,
+      },
+      null,
+      1,
+    ),
+  )
+    .then(() => say(`saved ${dump}`))
+    .catch(err =>
+      console.warn('[speech-bench] quant dump failed:', String(err)),
+    );
+
+  return {rows, summary, wavs, dump};
 };

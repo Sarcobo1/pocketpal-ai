@@ -1,7 +1,9 @@
+import {ModelType} from '../../../utils/types';
 import {
   SPEECH_TEXTS,
   buildSpeechCells,
   estimateSpeechBenchMs,
+  speechQuantOptions,
   type SpeechBaseline,
   type SpeechCell,
 } from '../speechBench';
@@ -147,5 +149,54 @@ describe('estimateSpeechBenchMs', () => {
       estimateSpeechBenchMs(quick, 1, 1000, 100000) -
         estimateSpeechBenchMs(quick, 1, 1000, 0),
     ).toBe(contexts * 100000);
+  });
+});
+
+/** One entry of the model list, with only the fields the run reads. */
+const file = (
+  id: string,
+  filename: string,
+  over: Partial<Parameters<typeof speechQuantOptions>[0][number]> = {},
+) => ({
+  id,
+  filename,
+  size: 1_000_000_000,
+  isDownloaded: true,
+  modelType: ModelType.LLM as ModelType | undefined,
+  ...over,
+});
+
+describe('speechQuantOptions', () => {
+  it('splits what the phone holds into the two lists a pair is picked from', () => {
+    const options = speechQuantOptions([
+      file('q4', 'lfm3-omni-2b-Q4_K_M.gguf'),
+      file('q8', 'lfm3-omni-2b-Q8_0.gguf'),
+      file('plain', 'untyped-model.gguf', {modelType: undefined}),
+      file('proj', 'lfm3-mmproj-F16.gguf', {modelType: ModelType.PROJECTION}),
+      file('draft', 'draft-1.5b.gguf', {modelType: ModelType.DRAFT}),
+    ]);
+
+    // The quant is the whole label, the extension is noise, and a draft model
+    // is not something a reply can be voiced with.
+    expect(options.texts.map(option => option.label)).toEqual([
+      'lfm3-omni-2b-Q4_K_M',
+      'lfm3-omni-2b-Q8_0',
+      'untyped-model',
+    ]);
+    expect(options.projectors.map(option => option.label)).toEqual([
+      'lfm3-mmproj-F16',
+    ]);
+  });
+
+  it('leaves a file that is not on the device out of both lists', () => {
+    const options = speechQuantOptions([
+      file('gone', 'not-downloaded.gguf', {isDownloaded: false}),
+      file('here', 'mmproj-here.gguf', {modelType: ModelType.PROJECTION}),
+    ]);
+
+    // The run compares what can actually be loaded here; a file that would have
+    // to be downloaded first is not a comparison.
+    expect(options.texts).toEqual([]);
+    expect(options.projectors.map(option => option.id)).toEqual(['here']);
   });
 });

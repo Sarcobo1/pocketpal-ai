@@ -67,6 +67,24 @@ export function markTurn(stage: string): void {
 }
 
 /**
+ * Note a stage that is defined by its last occurrence rather than its first —
+ * the last chunk of a reply, where a lap counter would say nothing. It keeps the
+ * same origin, so it lines up with the marks around it.
+ */
+export function markTurnLast(stage: string): void {
+  if (!turn) {
+    return;
+  }
+  const at = Date.now() - turn.t0;
+  const existing = turn.marks.findIndex(mark => mark[0] === stage);
+  if (existing < 0) {
+    turn.marks.push([stage, at]);
+  } else {
+    turn.marks[existing] = [stage, at];
+  }
+}
+
+/**
  * Put a number measured elsewhere — an engine timing that arrives in a result
  * rather than as a moment — on the turn's line, so one logcat grep holds the
  * whole turn instead of three lines that have to be matched up by hand.
@@ -77,23 +95,41 @@ export function addTurnInfo(data: Record<string, PerfValue>): void {
   }
 }
 
+/** A stage of a turn and the numbers measured elsewhere about it. */
+export interface TurnRecord {
+  /** Each stage as ms since the turn opened. */
+  marks: Record<string, number>;
+  /** The numbers the turn carried, including `toFirstAudio`. */
+  info: Record<string, PerfValue>;
+}
+
 /**
  * Print the turn as one line: each stage as the ms since the stage before it,
  * in the order they actually landed, so the numbers add up to the wait.
  *
  * `toFirstAudio` is the number the whole optimization is judged by, and the
  * stages overlap on purpose — speech starts before the text has finished — so
- * it is taken from the two marks themselves rather than from the sum.
+ * it is measured from the two marks themselves rather than from the sum.
+ *
+ * The stages and the numbers come back as well: a bench that runs the same turn
+ * on purpose needs one reply as data, not as a line to read back off logcat.
  */
-export function closeTurnTimeline(extra?: Record<string, PerfValue>): void {
+export function closeTurnTimeline(
+  extra?: Record<string, PerfValue>,
+): TurnRecord {
   const done = turn;
   turn = null;
+  const empty: TurnRecord = {marks: {}, info: {}};
   if (!done) {
-    return;
+    return empty;
   }
   const marks = [...done.marks].sort((a, b) => a[1] - b[1]);
   const at = (stage: string): number | undefined =>
     marks.find(mark => mark[0] === stage)?.[1];
+  const offsets: Record<string, number> = {};
+  for (const [stage, offset] of marks) {
+    offsets[stage] = offset;
+  }
   const data: Record<string, PerfValue> = {};
   let prev = 0;
   for (const [stage, offset] of marks) {
@@ -105,13 +141,13 @@ export function closeTurnTimeline(extra?: Record<string, PerfValue>): void {
   // sample, which reaches the ear a jitter buffer later, and the buffer is
   // exactly the wait being measured.
   const firstSound = at('firstSound') ?? at('firstAudio');
+  const toFirstAudio =
+    firstSound === undefined ? undefined : firstSound - (endpoint ?? 0);
+  const info = {...done.info, ...extra, toFirstAudio};
   logPerf('turn.timeline', {
-    ...done.info,
+    ...info,
     ...data,
-    ...extra,
-    // From the end of the speaker's sentence to the first sound of the answer.
-    toFirstAudio:
-      firstSound === undefined ? undefined : firstSound - (endpoint ?? 0),
     span: Date.now() - done.t0,
   });
+  return {marks: offsets, info};
 }

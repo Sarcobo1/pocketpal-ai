@@ -1,4 +1,5 @@
 import {Alert, AppState} from 'react-native';
+import {autorun} from 'mobx';
 import DeviceInfo from 'react-native-device-info';
 
 // Mock persistence BEFORE importing the store
@@ -1471,7 +1472,15 @@ describe('TTSStore', () => {
         store.setSpeechFastStart(true);
 
         store.onAssistantMessageStart('msg-1');
+        // Every value the gate takes from the moment the reply opens. A write
+        // re-runs this even when the answer is the same, so a momentary opening
+        // between the two hands is recorded even where no assertion looks.
+        const heard: boolean[] = [];
+        const stopHearing = autorun(() => {
+          heard.push(store.audioIsSettled);
+        });
         store.onAssistantMessageChunk('msg-1', `${FIRST} `);
+        store.onAssistantMessageChunk('msg-1', SECOND);
         store.onAssistantMessageComplete('msg-1', `${FIRST} ${SECOND}`);
         await flush();
 
@@ -1480,6 +1489,7 @@ describe('TTSStore', () => {
         expect(mockSystemPlay).toHaveBeenCalledWith(FIRST, SYSTEM_VOICE);
         expect(sink.speak).not.toHaveBeenCalled();
         expect(store.pendingAudio).toBe(1);
+        expect(heard).not.toContain(true);
         const outcome = waitOutcome(store);
         await flush();
         expect(outcome()).toBeUndefined();
@@ -1490,15 +1500,18 @@ describe('TTSStore', () => {
         // The sentence has been heard and the model's audio is in the air: the
         // count changed hands instead of dropping to zero between them.
         expect(sink.speak).toHaveBeenCalledTimes(1);
+        expect(sink.speak.mock.calls[0]![0]).toBe(SECOND);
         expect(store.pendingAudio).toBe(1);
-        expect(store.audioIsSettled).toBe(false);
         expect(outcome()).toBeUndefined();
+        expect(heard).not.toContain(true);
 
         finish();
         await flush();
+        stopHearing();
 
         expect(store.audioIsSettled).toBe(true);
         expect(outcome()).toBe('settled');
+        expect(heard[heard.length - 1]).toBe(true);
       });
 
       it('keeps a model utterance owed until its sink reports back', async () => {

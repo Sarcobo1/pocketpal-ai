@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useState} from 'react';
-import {AppState, type AppStateStatus} from 'react-native';
+import {AppState, Platform, type AppStateStatus} from 'react-native';
 
 import {toByteArray} from 'base64-js';
 import {comparer, reaction} from 'mobx';
@@ -23,6 +23,7 @@ import {hasVoiceFile} from '../services/tts/voiceFiles';
 import {
   Endpointer,
   VOICE_CAPTURE_SETTLE_MS,
+  VOICE_MIC_AUDIO_SOURCE,
   VOICE_MIC_WATCHDOG_MS,
   VOICE_START_TIMEOUT_MS,
   isMicGranted,
@@ -81,6 +82,17 @@ export interface VoiceEntryActions {
 }
 
 const noop = () => {};
+
+/**
+ * The capture source, asked only where the recorder takes one.
+ *
+ * `VOICE_COMMUNICATION` is the Android path that cancels echo, which is the whole
+ * difference between a microphone that hears the user and one that hears the
+ * loudspeaker they are talking over. iOS picks its own input, and a number it
+ * does not understand is a failed microphone rather than a quieter one.
+ */
+const micSource = (): {audioSource?: number} =>
+  Platform.OS === 'android' ? {audioSource: VOICE_MIC_AUDIO_SOURCE} : {};
 
 const FAILURES: Partial<Record<VoiceTurnOutcome, VoiceError>> = {
   transcribe_failed: 'transcribe_failed',
@@ -142,6 +154,15 @@ class VoiceModeController {
   private micWatchdog: ReturnType<typeof setTimeout> | null = null;
   private micRetried = false;
   private pausedByInterruption = false;
+  /**
+   * Why the capture window that is open now cannot be sent: the phone was still
+   * sounding when the mic opened, or it started sounding while the mic was open.
+   * Whatever a microphone in that window picks up is as likely to be this
+   * session's own reply as the user's next turn.
+   */
+  private micTainted: 'open' | 'playback' | null = null;
+  /** The reason of the phase change that opened the ear, for the mic log. */
+  private listenReason = 'entry';
   private actions: VoiceEntryActions = {
     openModelPicker: noop,
     focusInput: noop,
@@ -404,7 +425,7 @@ class VoiceModeController {
     this.micRetried = false;
     this.pausedByInterruption = false;
     this.setPhase('closed', reason);
-    this.stopCapture();
+    this.stopCapture(reason);
     const turn = this.turn;
     this.turn = null;
     this.exiting = (async () => {
@@ -458,7 +479,7 @@ class VoiceModeController {
       return;
     }
     if (muted) {
-      this.stopCapture();
+      this.stopCapture('mute');
     } else {
       this.micRetried = false;
       this.startCapture(this.session);
@@ -482,7 +503,7 @@ class VoiceModeController {
       voiceModeStore.phase === 'listening'
     ) {
       vtrace('mic.restart', {why: 'foreground'});
-      this.stopCapture();
+      this.stopCapture('foreground');
       this.startCapture(this.session);
     }
   }
@@ -500,7 +521,7 @@ class VoiceModeController {
       return;
     }
     if (type === 'began') {
-      this.stopCapture();
+      this.stopCapture('audio_interruption');
       if (this.turn) {
         vtrace('interrupt', {src: 'audio_interruption'});
         this.turn.interrupt();
@@ -520,7 +541,7 @@ class VoiceModeController {
       this.resumeAfterInterruption('interruption_ended');
     } else if (voiceModeStore.phase === 'listening') {
       vtrace('mic.restart', {why: 'interruption_ended'});
-      this.stopCapture();
+      this.stopCapture('interruption_ended');
       this.startCapture(this.session);
     }
   }
@@ -530,12 +551,17 @@ class VoiceModeController {
     this.pausedByInterruption = false;
     this.micRetried = false;
     voiceModeStore.setMicMuted(false);
-    this.stopCapture();
+    this.stopCapture(why);
     this.startCapture(this.session);
   }
 
   private setPhase(phase: VoicePhase, reason: string): void {
     vtrace('phase', {to: phase, from: voiceModeStore.phase, r: reason});
+    if (phase === 'listening') {
+      // The ear opening is attributed to the change that allowed it: the call
+      // that got here has returned by the time the microphone actually starts.
+      this.listenReason = reason;
+    }
     voiceModeStore.setPhase(phase);
   }
 
@@ -564,7 +590,7 @@ class VoiceModeController {
         return;
       }
       this.micRetried = true;
-      this.stopCapture();
+      this.stopCapture('no_audio');
       this.startCapture(session);
     }, VOICE_MIC_WATCHDOG_MS);
   }
@@ -592,13 +618,28 @@ class VoiceModeController {
     if (!this.isListening(session) || this.listener) {
       return;
     }
+    // Whatever asked for the ear, an open one does not hear over a loudspeaker:
+    // a reply still owed to a player holds the microphone shut until it has been
+    // sounded. Bounded by the same wait a turn uses, so a hand-off that never
+    // came back costs one dropped clip rather than the rest of the session.
+    if (!ttsStore.audioIsSettled) {
+      const waited = await ttsStore.waitReplyAudio();
+      if (waited === 'timeout') {
+        logPerf('mic.wait', {outcome: waited});
+      }
+      if (!this.isListening(session) || this.listener) {
+        return;
+      }
+    }
     try {
+      const source = micSource();
       await AudioRecord.init({
         sampleRate: ASR_SAMPLE_RATE,
         channels: ASR_CHANNELS,
         bitsPerSample: ASR_BITS_PER_SAMPLE,
         bufferSize: ASR_CHUNK_BYTES,
         wavFile: '',
+        ...source,
       });
       if (!this.isListening(session) || this.listener) {
         return;
@@ -612,12 +653,32 @@ class VoiceModeController {
         }
         this.clearMicWatchdog();
         this.micRetried = false;
+        if (!this.micTainted && !ttsStore.audioIsSettled) {
+          // The reply started sounding while the ear was already open: what this
+          // window holds from now on is the loudspeaker.
+          this.micTainted = 'playback';
+          logPerf('mic.playback', {
+            mode: ttsStore.playbackState.mode,
+            pending: ttsStore.pendingAudio,
+          });
+        }
         if (this.endpointer.push(toByteArray(chunk)) === 'endpoint') {
           this.endUtterance(session, 'auto');
         }
       });
+      // Decided as the ear actually opens, not when the turn said it could: any
+      // audio still owed to a player makes this window a recording of the
+      // loudspeaker rather than of the user.
+      const settled = ttsStore.audioIsSettled;
+      this.micTainted = settled ? null : 'open';
       AudioRecord.start();
-      vtrace('mic.open');
+      logPerf('mic.open', {
+        why: this.listenReason,
+        settled,
+        mode: ttsStore.playbackState.mode,
+        pending: ttsStore.pendingAudio,
+        src: source.audioSource ?? 'default',
+      });
       this.watchMic(session);
     } catch (err) {
       console.warn('[voiceMode] microphone failed:', err);
@@ -637,7 +698,8 @@ class VoiceModeController {
     }
   }
 
-  private stopCapture(): void {
+  /** Why the ear closed, with the playback state at that moment. */
+  private stopCapture(why = 'other'): void {
     this.clearMicWatchdog();
     this.endpointer.reset();
     if (!this.listener) {
@@ -645,7 +707,12 @@ class VoiceModeController {
     }
     this.listener.remove();
     this.listener = null;
-    vtrace('mic.close');
+    this.micTainted = null;
+    logPerf('mic.close', {
+      why,
+      mode: ttsStore.playbackState.mode,
+      pending: ttsStore.pendingAudio,
+    });
     Promise.resolve(AudioRecord.stop()).catch(() => {});
     this.holdMic(VOICE_CAPTURE_SETTLE_MS);
   }
@@ -666,7 +733,25 @@ class VoiceModeController {
     const hang = this.endpointer.hang;
     vtrace('utt.end', {by, voicedMs: spoke});
     const utterance = this.endpointer.take();
-    this.stopCapture();
+    const tainted = this.micTainted;
+    this.stopCapture('endpoint');
+    if (tainted) {
+      // The window this clip was recorded in held the loudspeaker, so what is in
+      // it is this session's own voice as much as the user's next turn. It costs
+      // no model run and no history row; the ear reopens on the settle the stop
+      // above already started counting.
+      logPerf('utt.drop', {
+        reason: `overlap:${tainted}`,
+        by,
+        spoke,
+        hang,
+        bytes: utterance.length,
+      });
+      if (session === this.session) {
+        this.startCapture(session);
+      }
+      return;
+    }
     openTurnTimeline();
     addTurnInfo({by, spoke, hang});
     markTurn('endpoint');
@@ -699,6 +784,10 @@ class VoiceModeController {
         if (error) {
           voiceModeStore.setLastError(error);
         }
+        // The turn waited for the last sample to be heard, not for the last one
+        // to be handed over; the settle is the tail of that sample leaving the
+        // room, and without it the first chunk of the next turn is reverb.
+        this.holdMic(VOICE_CAPTURE_SETTLE_MS);
         this.startCapture(session);
       });
   }

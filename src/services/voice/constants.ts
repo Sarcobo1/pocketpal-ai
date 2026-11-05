@@ -17,6 +17,34 @@ export const VOICE_ENDPOINT_HANG_MS = 600;
 export const VOICE_CAPTURE_SETTLE_MS = 400;
 
 /**
+ * How long a voice turn waits (ms) for a reply to finish sounding before it
+ * listens again. A reply is one or two sentences and its player reports the last
+ * sample it heard, so anything still unsaid after this is a hand-off that never
+ * came back — and a session that never hears the user is the worse failure.
+ */
+export const VOICE_REPLY_AUDIO_WAIT_MS = 30_000;
+
+/**
+ * A transcript this soon after the phone started saying a reply (ms) is judged
+ * against the words it just said: close enough to one of its sentences means the
+ * microphone heard the loudspeaker, not the user. Generous on purpose — it covers
+ * a long reply and the wait for its audio — because a real turn that happens to
+ * repeat a word or two arrives well outside it.
+ */
+export const VOICE_ECHO_GUARD_MS = 30_000;
+
+/**
+ * `MediaRecorder.AudioSource.VOICE_COMMUNICATION`, the one Android source that
+ * runs echo cancellation while the loudspeaker is going. The recorder's default
+ * is `VOICE_RECOGNITION` (6), which is tuned for accuracy and cancels nothing.
+ *
+ * Android-only, and one number to move back if a device shows the cost: on some
+ * phones this source takes the call route, which changes what the speaker does
+ * with the reply. The mic open line prints which source it asked for.
+ */
+export const VOICE_MIC_AUDIO_SOURCE = 7;
+
+/**
  * Contiguous speech an utterance needs before it is sent. Shorter than this is
  * a cough, a key, or the tail of the model's own voice.
  */

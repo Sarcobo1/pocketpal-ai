@@ -1,6 +1,12 @@
 import {AppState, AppStateStatus} from 'react-native';
 
-import {makeAutoObservable, observable, reaction, runInAction} from 'mobx';
+import {
+  makeAutoObservable,
+  observable,
+  reaction,
+  runInAction,
+  when,
+} from 'mobx';
 import {makePersistable} from 'mobx-persist-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DeviceInfo from 'react-native-device-info';
@@ -40,6 +46,7 @@ import {
   SPEECH_PRESETS,
   VOICE_ENDPOINT_HANG_MS,
   VOICE_FIRST_CHUNK_HOLD_MS,
+  VOICE_REPLY_AUDIO_WAIT_MS,
 } from '../services/voice/constants';
 import type {SpeechPresetId} from '../services/voice/constants';
 import {firstSpokenSentence} from '../services/voice/speechStream';
@@ -152,6 +159,35 @@ export class TTSStore {
 
   // Runtime playback state (discriminated union)
   playbackState: TTSPlaybackState = {mode: 'idle'};
+
+  /**
+   * Utterances handed to a player that have not finished sounding.
+   *
+   * `playbackState` cannot be the only thing a hands-free session waits on:
+   * `play()` publishes idle from its own `stop()` before the audio it is about to
+   * say exists, and one reply is often said by two voices in a row. The count is
+   * raised over the whole hand-off, so the gap between two pieces, a rebuffer, a
+   * handoff to the device voice and an underrun all still read as speaking.
+   *
+   * Read `audioIsSettled` rather than this; the number is public only so a log
+   * line can say how much audio is still owed.
+   */
+  pendingAudio = 0;
+  /**
+   * What the phone last started saying out loud, and when it started. A voice
+   * session reads these to tell the user's next turn apart from its own reply
+   * coming back through the microphone.
+   */
+  lastSpokenText = '';
+  lastSpokenAt = 0;
+
+  /**
+   * Whether a hands-free session may listen: no stream open, nothing playing, and
+   * no utterance still owed to a player.
+   */
+  get audioIsSettled(): boolean {
+    return this.playbackState.mode === 'idle' && this.pendingAudio === 0;
+  }
 
   /** True while a voice-mode session is open; it speaks every reply. */
   voiceOutputActive: boolean = false;
@@ -833,6 +869,70 @@ export class TTSStore {
   }
 
   /**
+   * The half-duplex gate a voice turn waits on before it listens again: the
+   * whole reply has to have sounded, not merely the last piece the player was
+   * told about. `stop()` publishing idle is not enough, and neither is the last
+   * chunk handed over — the answer is what `pendingAudio` covers.
+   *
+   * Bounded, because a hand-off whose player never reports back would otherwise
+   * leave the session deaf for the rest of it: after `VOICE_REPLY_AUDIO_WAIT_MS`
+   * this gives up and says so, and the caller still holds the mic shut for the
+   * capture settle on top of whatever it waited.
+   */
+  async waitReplyAudio(): Promise<'settled' | 'timeout'> {
+    if (this.audioIsSettled) {
+      return 'settled';
+    }
+    const started = Date.now();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<'timeout'>(resolve => {
+      timer = setTimeout(() => resolve('timeout'), VOICE_REPLY_AUDIO_WAIT_MS);
+    });
+    const outcome = await Promise.race([
+      when(() => this.audioIsSettled).then(() => 'settled' as const),
+      timeout,
+    ]);
+    clearTimeout(timer);
+    vtrace('tts.audioWait', {
+      outcome,
+      ms: Date.now() - started,
+      mode: this.playbackState.mode,
+      pending: this.pendingAudio,
+    });
+    return outcome;
+  }
+
+  /**
+   * Run one hand-off to a player with `pendingAudio` raised over it, so the
+   * session reads as still speaking from the first sample of it to the callback
+   * that says the last one has been heard — including the window after a `stop()`
+   * has published idle and before the audio that replaces it has sounded.
+   */
+  private async countedAudio<T>(say: () => Promise<T>): Promise<T> {
+    runInAction(() => {
+      this.pendingAudio += 1;
+    });
+    try {
+      return await say();
+    } finally {
+      runInAction(() => {
+        this.pendingAudio = Math.max(0, this.pendingAudio - 1);
+      });
+    }
+  }
+
+  /**
+   * Remember what is about to be said out loud, so a voice session can tell its
+   * own reply coming back through the microphone apart from a new turn.
+   */
+  private noteSpoken(text: string): void {
+    runInAction(() => {
+      this.lastSpokenText = text;
+      this.lastSpokenAt = Date.now();
+    });
+  }
+
+  /**
    * What a finished reply is said as: its text with the reasoning taken out,
    * and a spoken marker in place of what was hidden.
    */
@@ -862,33 +962,37 @@ export class TTSStore {
       return;
     }
 
-    await this.stop();
-
     const spokenText = this.spokenReplyText(text, opts?.hadReasoning);
+    // Counted from before the stop: `stop()` publishes idle, and between that and
+    // the first sample of this utterance a voice session is not allowed to listen.
+    await this.countedAudio(async () => {
+      this.noteSpoken(spokenText);
+      await this.stop();
 
-    const playing = runInAction(() => {
-      this.playbackState = {mode: 'playing', messageId};
-      return this.playbackState;
-    });
-
-    try {
-      await ensureVoiceFile(voice);
-      if (this.playbackState !== playing) {
-        return;
-      }
-      await this.engineUtterance(voice, spokenText);
-    } catch (err) {
-      console.warn('[TTSStore] play failed:', err);
-      if (voice.engine === 'phonon') {
-        this.refreshAfterPhononFailure();
-      }
-    } finally {
-      runInAction(() => {
-        if (this.playbackState === playing) {
-          this.playbackState = {mode: 'idle'};
-        }
+      const playing = runInAction(() => {
+        this.playbackState = {mode: 'playing', messageId};
+        return this.playbackState;
       });
-    }
+
+      try {
+        await ensureVoiceFile(voice);
+        if (this.playbackState !== playing) {
+          return;
+        }
+        await this.engineUtterance(voice, spokenText);
+      } catch (err) {
+        console.warn('[TTSStore] play failed:', err);
+        if (voice.engine === 'phonon') {
+          this.refreshAfterPhononFailure();
+        }
+      } finally {
+        runInAction(() => {
+          if (this.playbackState === playing) {
+            this.playbackState = {mode: 'idle'};
+          }
+        });
+      }
+    });
   }
 
   /**
@@ -927,37 +1031,39 @@ export class TTSStore {
       return;
     }
     const messageId = previewMessageId(voice);
-    await this.stop();
-    const playing = runInAction(() => {
-      this.playbackState = {mode: 'playing', messageId};
-      return this.playbackState;
-    });
-    try {
-      await ensureVoiceFile(voice);
-      if (this.playbackState !== playing) {
-        return;
-      }
-      const engine = getEngine(voice.engine);
-      if (voice.engine === 'supertonic') {
-        await (engine as SupertonicEngine).play(TTS_PREVIEW_SAMPLE, voice, {
-          language: this.supertonicLanguage,
-          inferenceSteps: this.supertonicSteps,
-        });
-      } else {
-        await engine.play(TTS_PREVIEW_SAMPLE, voice);
-      }
-    } catch (err) {
-      console.warn('[TTSStore] preview failed:', err);
-      if (voice.engine === 'phonon') {
-        this.refreshAfterPhononFailure();
-      }
-    } finally {
-      runInAction(() => {
-        if (this.playbackState === playing) {
-          this.playbackState = {mode: 'idle'};
-        }
+    await this.countedAudio(async () => {
+      await this.stop();
+      const playing = runInAction(() => {
+        this.playbackState = {mode: 'playing', messageId};
+        return this.playbackState;
       });
-    }
+      try {
+        await ensureVoiceFile(voice);
+        if (this.playbackState !== playing) {
+          return;
+        }
+        const engine = getEngine(voice.engine);
+        if (voice.engine === 'supertonic') {
+          await (engine as SupertonicEngine).play(TTS_PREVIEW_SAMPLE, voice, {
+            language: this.supertonicLanguage,
+            inferenceSteps: this.supertonicSteps,
+          });
+        } else {
+          await engine.play(TTS_PREVIEW_SAMPLE, voice);
+        }
+      } catch (err) {
+        console.warn('[TTSStore] preview failed:', err);
+        if (voice.engine === 'phonon') {
+          this.refreshAfterPhononFailure();
+        }
+      } finally {
+        runInAction(() => {
+          if (this.playbackState === playing) {
+            this.playbackState = {mode: 'idle'};
+          }
+        });
+      }
+    });
   }
 
   /**
@@ -1108,7 +1214,12 @@ export class TTSStore {
     // engine's own few tens of milliseconds.
     markTurn('firstSound');
     const started = Date.now();
-    const ok = await this.engineUtterance(voice, sentence)
+    this.noteSpoken(sentence);
+    // Counted on its own: this sentence belongs to a reply the store is still
+    // streaming, and the model's own audio may not start before it is heard.
+    const ok = await this.countedAudio(() =>
+      this.engineUtterance(voice, sentence),
+    )
       .then(() => true)
       .catch(err => {
         console.warn('[TTSStore] fast start failed:', err);
@@ -1164,6 +1275,7 @@ export class TTSStore {
         if (cancelled || text.trim().length === 0) {
           return;
         }
+        this.noteSpoken(text);
         if (aheadPlaying) {
           // One voice at a time: the device sentence has to be heard before the
           // model's own audio starts, or the reply is heard twice at once.
@@ -1177,13 +1289,17 @@ export class TTSStore {
           // The fast start said the whole reply. The model has nothing left.
           return;
         }
-        const report = await sink.speak(rest, () => {
-          if (this.voiceStream?.messageId === messageId) {
-            runInAction(() => {
-              this.voiceSpeechStarted = messageId;
-            });
-          }
-        });
+        // Counted, because the stream's own state is released the moment this
+        // resolves while the last piece of audio it played is still in the air.
+        const report = await this.countedAudio(() =>
+          sink.speak(rest, () => {
+            if (this.voiceStream?.messageId === messageId) {
+              runInAction(() => {
+                this.voiceSpeechStarted = messageId;
+              });
+            }
+          }),
+        );
         if (cancelled) {
           return;
         }
@@ -1359,6 +1475,9 @@ export class TTSStore {
   ) {
     const state = this.playbackState;
     if (state.mode === 'streaming' && state.messageId === messageId) {
+      // Recorded here rather than where the sink is opened: the text the ear will
+      // hear is only finished now, and the flush below can still add to it.
+      this.noteSpoken(this.spokenReplyText(text, opts?.hadReasoning));
       const stripper = this.streamStripper;
       if (stripper != null) {
         const leftover = stripper.flush();

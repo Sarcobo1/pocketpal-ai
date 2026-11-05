@@ -151,7 +151,10 @@ export class OmniVoiceEngine implements VoiceEngine {
         sendFailed = true;
       }
       lap('turn.reply', {turnId, failed: sendFailed});
-      await when(() => ttsStore.playbackState.mode === 'idle');
+      // The model hears its own reply through the microphone if the ear opens
+      // while the loudspeaker is still going, so the turn waits for the whole
+      // reply to have sounded — not for the last piece the player was handed.
+      await ttsStore.waitReplyAudio();
       vtrace('turn.idle');
       stopWatching();
       vtrace('turn.sent', {turnId, failed: sendFailed});

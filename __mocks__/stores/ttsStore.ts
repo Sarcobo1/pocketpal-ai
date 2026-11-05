@@ -1,9 +1,10 @@
-import {makeAutoObservable, observable, runInAction} from 'mobx';
+import {makeAutoObservable, observable, runInAction, when} from 'mobx';
 
 import {
   DEFAULT_SPEECH_PRESET,
   SPEECH_PRESETS,
   VOICE_ENDPOINT_HANG_MS,
+  VOICE_REPLY_AUDIO_WAIT_MS,
   type SpeechPresetId,
 } from '../../src/services/voice/constants';
 
@@ -27,6 +28,14 @@ class MockTTSStore {
     | {mode: 'idle'}
     | {mode: 'streaming'; messageId: string}
     | {mode: 'playing'; messageId: string} = {mode: 'idle'};
+  // Mirrors the real store's half-duplex gate: consumers read `audioIsSettled`,
+  // and a test that wants the phone to still be speaking sets `pendingAudio`.
+  pendingAudio = 0;
+  get audioIsSettled(): boolean {
+    return this.playbackState.mode === 'idle' && this.pendingAudio === 0;
+  }
+  lastSpokenText = '';
+  lastSpokenAt = 0;
   autoSpeakEnabled = false;
   voiceOutputActive = false;
   voiceSpeechStarted: string | null = null;
@@ -150,8 +159,30 @@ class MockTTSStore {
     return id !== 'phonon' || this.phononSupported;
   }
 
+  /**
+   * Mirrors the real gate rather than stubbing it: a test that leaves the phone
+   * speaking has to watch the turn wait, or the suite would prove nothing about
+   * the half-duplex window it is there to cover.
+   */
+  async waitReplyAudio(): Promise<'settled' | 'timeout'> {
+    if (this.audioIsSettled) {
+      return 'settled';
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<'timeout'>(resolve => {
+      timer = setTimeout(() => resolve('timeout'), VOICE_REPLY_AUDIO_WAIT_MS);
+    });
+    const outcome = await Promise.race([
+      when(() => this.audioIsSettled).then(() => 'settled' as const),
+      timeout,
+    ]);
+    clearTimeout(timer);
+    return outcome;
+  }
+
   constructor() {
     makeAutoObservable(this, {
+      waitReplyAudio: false,
       init: false,
       refreshPhononSupport: false,
       play: false,

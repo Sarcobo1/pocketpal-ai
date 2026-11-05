@@ -72,6 +72,7 @@ jobs:
             src/services/voice/__tests__/streamSink.test.ts \
             src/services/voice/__tests__/speechLevel.test.ts \
             src/services/voice/__tests__/wav.test.ts \
+            src/services/tts/engines/system/__tests__/SystemEngine.test.ts \
             src/store/__tests__/ModelStore.localMultimodal.test.ts \
             src/store/__tests__/ModelStore.autoProjector.test.ts \
             src/store/__tests__/ModelStore.projectorMedia.test.ts \

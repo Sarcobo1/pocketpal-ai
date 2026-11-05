@@ -12,6 +12,24 @@ export const TTS_PREVIEW_SAMPLE =
 /** Minimum total RAM required to enable the TTS feature (4 GiB). */
 export const TTS_MIN_RAM_BYTES = 4 * 1024 * 1024 * 1024;
 
+/**
+ * How long the OS voice is given to say one utterance, per character of it.
+ *
+ * `Speech.speak()` answers as soon as the sentence is handed over, not when it
+ * has been heard, so nothing tells the caller how long the phone is still
+ * talking. A voice session that trusts the dispatch opens its microphone over
+ * its own reply. The estimate is a slow voice on purpose: the call is only ever
+ * a safety net for a device that reports nothing, and the OS's own start/finish
+ * events end an utterance the moment it really stops.
+ */
+export const OS_SPEECH_MS_PER_CHAR = 70;
+
+/** ...plus this much, for the engine's own start-up and trailing silence. */
+export const OS_SPEECH_HEADROOM_MS = 1500;
+
+/** ...and never longer than this, so a lost event cannot close the ear for good. */
+export const OS_SPEECH_MAX_MS = 30_000;
+
 /** Peak runtime memory of each neural engine once loaded. */
 export const TTS_ENGINE_RUNTIME_BYTES: Record<NeuralEngineId, number> = {
   supertonic: 500_000_000,

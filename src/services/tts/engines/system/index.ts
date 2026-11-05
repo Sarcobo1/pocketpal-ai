@@ -1,9 +1,70 @@
 import Speech, {TTSEngine} from '@pocketpalai/react-native-speech';
 
+import {
+  OS_SPEECH_HEADROOM_MS,
+  OS_SPEECH_MAX_MS,
+  OS_SPEECH_MS_PER_CHAR,
+} from '../../constants';
 import {ttsRuntime} from '../../runtime';
 import {createEngineStreamingHandle} from '../../streamingHandle';
 import type {Engine, StreamingHandle, Voice} from '../../types';
 import {getSystemVoices} from './voices';
+
+/**
+ * Say `text` with the OS voice and answer only once it has been said.
+ *
+ * `Speech.speak()` resolves on dispatch: the phone is still talking when the
+ * promise is. A voice session waits on that promise as the last sound of its
+ * reply, so answering on the dispatch opens the microphone under the sentence
+ * the model just said — which is both the reply nobody heard finish and the
+ * echo that comes back as the next question. The device itself says when an
+ * utterance starts, stops and fails, and those are what this waits for; the
+ * character estimate behind them is only for a device that says nothing.
+ */
+const speakUntilHeard = (text: string, voiceId: string): Promise<void> =>
+  new Promise<void>(resolve => {
+    let heard = false;
+    /** True once this utterance is the one the OS is working through. */
+    let open = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const finish = () => {
+      if (heard) {
+        return;
+      }
+      heard = true;
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
+      subs.forEach(sub => sub.remove());
+      resolve();
+    };
+    /** An event about this utterance, not one still travelling from the last. */
+    const heardEvent = () => {
+      if (open) {
+        finish();
+      }
+    };
+    const subs = [
+      Speech.onStart(() => {
+        open = true;
+      }),
+      Speech.onFinish(heardEvent),
+      Speech.onStopped(heardEvent),
+      Speech.onError(heardEvent),
+    ];
+    timer = setTimeout(
+      finish,
+      Math.min(
+        OS_SPEECH_MAX_MS,
+        text.length * OS_SPEECH_MS_PER_CHAR + OS_SPEECH_HEADROOM_MS,
+      ),
+    );
+    Speech.speak(text, voiceId)
+      .then(() => {
+        open = true;
+      })
+      .catch(finish);
+  });
 
 /**
  * Thin wrapper around the OS native TTS path exposed by
@@ -32,7 +93,7 @@ export class SystemEngine implements Engine {
   }
 
   async play(text: string, voice: Voice): Promise<void> {
-    await ttsRuntime.acquire(this, () => Speech.speak(text, voice.id));
+    await ttsRuntime.acquire(this, () => speakUntilHeard(text, voice.id));
   }
 
   /**

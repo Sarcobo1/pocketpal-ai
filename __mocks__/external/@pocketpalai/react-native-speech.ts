@@ -66,6 +66,52 @@ export const __resetFinishListeners = () => {
   finishListeners.clear();
 };
 
+type StopListener = (event: {utteranceId?: string}) => void;
+const stopListeners = new Set<StopListener>();
+
+const onStopped = jest.fn((listener: StopListener) => {
+  stopListeners.add(listener);
+  return {
+    remove: jest.fn(() => {
+      stopListeners.delete(listener);
+    }),
+  };
+});
+
+/** Test helper: emit an `onStopped` event, the one a barge-in answers with. */
+export const __emitStopped = (utteranceId?: string) => {
+  for (const l of Array.from(stopListeners)) {
+    l({utteranceId});
+  }
+};
+
+type ErrorListener = (event: {utteranceId?: string}) => void;
+const errorListeners = new Set<ErrorListener>();
+
+const onError = jest.fn((listener: ErrorListener) => {
+  errorListeners.add(listener);
+  return {
+    remove: jest.fn(() => {
+      errorListeners.delete(listener);
+    }),
+  };
+});
+
+/** Test helper: emit an `onError` event, the one a refused utterance answers with. */
+export const __emitError = (utteranceId?: string) => {
+  for (const l of Array.from(errorListeners)) {
+    l({utteranceId});
+  }
+};
+
+/** Test helper: clear the stop/error listeners between tests. */
+export const __resetSpeechEvents = () => {
+  startListeners.clear();
+  finishListeners.clear();
+  stopListeners.clear();
+  errorListeners.clear();
+};
+
 export interface MockSpeechStream {
   voiceId?: string;
   options?: Record<string, unknown>;
@@ -116,6 +162,8 @@ const Speech = {
   createSpeechStream,
   onStart,
   onFinish,
+  onStopped,
+  onError,
   registerEngine: jest.fn(),
   getEngineSupport: jest
     .fn()

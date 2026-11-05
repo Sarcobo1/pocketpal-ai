@@ -16,6 +16,7 @@ import {abDir} from './abBench';
 import {VOICE_ANSWER_INSTRUCTION} from './constants';
 import {
   MAX_UTTERANCE_SECONDS,
+  canIsolateSpeechSeq,
   modelCanVoiceReplies,
   speakWithModel,
   stopModelSpeech,
@@ -1067,7 +1068,10 @@ export const runSpeechQuantBench = async ({
         label,
         sig,
         stream: false,
-        isolateSeq: true,
+        // The context this row builds spreads `baseParams`, so it has the slots
+        // the setting gives it and no more: asking a one-slot context for a
+        // second is a failed prefill, not a slower speech decoder.
+        isolateSeq: canIsolateSpeechSeq(baseParams.n_parallel),
         quick: true,
       };
       let target: BenchTarget | null = null;

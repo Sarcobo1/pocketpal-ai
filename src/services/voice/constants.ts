@@ -46,9 +46,19 @@ export const VOICE_MIC_AUDIO_SOURCE = 7;
 
 /**
  * Contiguous speech an utterance needs before it is sent. Shorter than this is
- * a cough, a key, or the tail of the model's own voice.
+ * a cough, a key, or the tail of the model's own voice. A dip of up to
+ * `VOICE_VAD_RUN_GAP_MS` inside it is the speaker's own, not a break.
  */
 export const VOICE_VAD_MIN_SPEECH_MS = 400;
+
+/**
+ * A pause this short (ms) does not end a run of speech. Quiet and whispered
+ * speech crosses its own threshold in and out — a stop consonant, a breath
+ * between two words — and a run that restarts on every one of those never
+ * reaches `VOICE_VAD_MIN_SPEECH_MS`, which is how a whole sentence reads as a
+ * cough. The gap is not added to the run: only the voiced chunks count.
+ */
+export const VOICE_VAD_RUN_GAP_MS = 150;
 
 /**
  * Speech has to stand this many times above the room tone to open an
@@ -65,8 +75,17 @@ export const VOICE_VAD_HOLD_FACTOR = 1.8;
  */
 export const VOICE_VAD_SENSITIVITY = 1;
 
-/** The quietest onset the floor will ever trust (~-36 dBFS). */
-export const VOICE_VAD_FLOOR_MIN_RMS = 0.015;
+/**
+ * The quietest onset the floor will ever trust (~-44 dBFS).
+ *
+ * Three times `VOICE_VAD_TRACK_MIN_RMS`, so a room measured as digital silence
+ * still has to be beaten by the same multiple as any other: the clamp only
+ * stops the estimate from chasing itself down, it is not a second threshold
+ * above the speech. At the old `-36 dBFS` a whisper — which is what a phone in
+ * a hand at a desk actually gets, AGC or not — never opened an utterance, and
+ * the session reported the person's whole sentence as a key or a cough.
+ */
+export const VOICE_VAD_FLOOR_MIN_RMS = 0.006;
 
 /** ...the loudest (~-24 dBFS), so loud room tone cannot make the mic deaf. */
 export const VOICE_VAD_FLOOR_MAX_RMS = 0.06;

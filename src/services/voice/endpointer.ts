@@ -13,6 +13,7 @@ import {
   VOICE_VAD_MIN_SPEECH_MS,
   VOICE_VAD_NOISE_LEAK,
   VOICE_VAD_NOISE_RISE,
+  VOICE_VAD_RUN_GAP_MS,
   VOICE_VAD_TAIL_MS,
   VOICE_VAD_TRACK_MIN_RMS,
 } from './constants';
@@ -21,6 +22,7 @@ import type {VadFloors} from './speechLevel';
 
 const BYTES_PER_MS = (ASR_SAMPLE_RATE * 2) / 1000;
 const CALIBRATE_BYTES = VOICE_VAD_CALIBRATE_MS * BYTES_PER_MS;
+const GAP_BYTES = VOICE_VAD_RUN_GAP_MS * BYTES_PER_MS;
 
 /** One captured chunk, with the loudness that decided what to do with it. */
 type Entry = {pcm: Uint8Array; rms: number};
@@ -30,11 +32,13 @@ type Entry = {pcm: Uint8Array; rms: number};
  *
  * A chunk counts as speech when its RMS stands a multiple of the room tone
  * above it, and an utterance only opens after that speech runs
- * `VOICE_VAD_MIN_SPEECH_MS` without a break. The room tone is measured, not
- * assumed: the first `VOICE_VAD_CALIBRATE_MS` of every capture is read as the
- * room, because the recorder that feeds this has automatic gain, and a fixed
- * threshold is what used to sell silence as speech. Speech has to beat the
- * onset level to open an utterance and only the lower `hold` level to stay in
+ * `VOICE_VAD_MIN_SPEECH_MS`. The run is not required to be unbroken: quiet
+ * speech crosses its own threshold in and out, and only a dip longer than
+ * `VOICE_VAD_RUN_GAP_MS` counts as the speaker having stopped. The room tone is
+ * measured, not assumed: the first `VOICE_VAD_CALIBRATE_MS` of every capture is
+ * read as the room, because the recorder that feeds this has automatic gain, and
+ * a fixed threshold is what used to sell silence as speech. Speech has to beat
+ * the onset level to open an utterance and only the lower `hold` level to stay in
  * one, so a soft final syllable does not read as the pause that closes it.
  *
  * Audio that is too short or too quiet to be speech is thrown away instead of
@@ -46,6 +50,7 @@ export class Endpointer {
   private bytes = 0;
   private silentBytes = 0;
   private runBytes = 0;
+  private gapBytes = 0;
   private speechBytes = 0;
   private started = false;
 
@@ -90,6 +95,7 @@ export class Endpointer {
     const voiced = rms >= (this.started ? hold : onset);
     if (voiced) {
       this.silentBytes = 0;
+      this.gapBytes = 0;
       if (!this.started) {
         this.runBytes += chunk.length;
         this.speechBytes = Math.max(this.speechBytes, this.runBytes);
@@ -99,8 +105,13 @@ export class Endpointer {
         }
       }
     } else {
-      this.runBytes = 0;
       this.silentBytes += chunk.length;
+      if (!this.started) {
+        this.gapBytes += chunk.length;
+        if (this.gapBytes >= GAP_BYTES) {
+          this.runBytes = 0;
+        }
+      }
     }
 
     if (!this.started) {
@@ -208,6 +219,7 @@ export class Endpointer {
     this.entries = [];
     this.bytes = 0;
     this.runBytes = 0;
+    this.gapBytes = 0;
     this.speechBytes = 0;
     this.silentBytes = 0;
     this.started = false;

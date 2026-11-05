@@ -4,6 +4,7 @@ import {
   VOICE_VAD_FLOOR_MAX_RMS,
   VOICE_VAD_FLOOR_MIN_RMS,
   VOICE_VAD_ONSET_FACTOR,
+  VOICE_VAD_TRACK_MIN_RMS,
 } from '../constants';
 import {gateUtterance, pcmLevel, speechRunMs, vadFloors} from '../speechLevel';
 import {int16PcmToFloat32} from '../../asr/energyVad';
@@ -52,6 +53,19 @@ describe('vadFloors', () => {
   it('keeps a quiet room on the floor and a loud one under the ceiling', () => {
     expect(vadFloors(0).onset).toBe(VOICE_VAD_FLOOR_MIN_RMS);
     expect(vadFloors(1).onset).toBe(VOICE_VAD_FLOOR_MAX_RMS);
+  });
+
+  it('puts the quietest onset where the room tone already reaches it', () => {
+    // The floor is the multiple applied to the digital floor, not a level of its
+    // own: a room the mic reads as silence still has to be beaten three times,
+    // and a voice the mic reads at that level is speech and not nothing.
+    expect(VOICE_VAD_FLOOR_MIN_RMS).toBeCloseTo(
+      VOICE_VAD_TRACK_MIN_RMS * VOICE_VAD_ONSET_FACTOR,
+      6,
+    );
+    expect(vadFloors(VOICE_VAD_TRACK_MIN_RMS).onset).toBe(
+      VOICE_VAD_FLOOR_MIN_RMS,
+    );
   });
 });
 

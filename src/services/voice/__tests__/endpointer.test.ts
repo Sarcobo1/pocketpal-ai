@@ -4,6 +4,7 @@ import {
   VOICE_VAD_CALIBRATE_MS,
   VOICE_VAD_FLOOR_MAX_RMS,
   VOICE_VAD_MIN_SPEECH_MS,
+  VOICE_VAD_RUN_GAP_MS,
 } from '../constants';
 
 const CHUNK_MS = 50;
@@ -24,6 +25,9 @@ const chunk = (amplitude: number, wobble = 0): Uint8Array => {
 const voiced = () => chunk(0.1, 0.02);
 const silent = () => chunk(0);
 const hiss = () => chunk(0.02, 0.004);
+/** A quiet voice in a room the mic reads as nearly nothing. */
+const whisper = () => chunk(0.011, 0.002);
+const room = () => chunk(0.002, 0.0005);
 
 const msOf = (pcm: Uint8Array) => (pcm.length / ASR_CHUNK_BYTES) * CHUNK_MS;
 
@@ -135,6 +139,46 @@ describe('Endpointer', () => {
     const ms = msOf(endpointer.take());
     expect(ms).toBeGreaterThanOrEqual(800);
     expect(ms).toBeLessThanOrEqual(1300);
+  });
+
+  it('takes a whisper in a quiet room', () => {
+    // The levels the phone actually reported: a spoken sentence at ~0.011 RMS
+    // with the room at the digital floor. The old floor of its own accord would
+    // not come under 0.015, so nothing the speaker said was ever speech.
+    const endpointer = new Endpointer();
+    pushFor(endpointer, silent, VOICE_VAD_CALIBRATE_MS);
+    pushFor(endpointer, whisper, 600);
+    const results = pushFor(endpointer, silent, 700);
+
+    expect(endpointer.floors.onset).toBeLessThan(0.011);
+    expect(results).toContain('endpoint');
+    expect(endpointer.voicedMs).toBeGreaterThanOrEqual(VOICE_VAD_MIN_SPEECH_MS);
+  });
+
+  it('keeps a whispered run through the dips inside it', () => {
+    const endpointer = new Endpointer();
+    pushFor(endpointer, silent, VOICE_VAD_CALIBRATE_MS);
+    // 100 ms of room between every 100 ms of speech: under the gap, so this is
+    // one sentence and not six of the things a run is meant to reject.
+    for (let i = 0; i < 5; i++) {
+      pushFor(endpointer, whisper, 100);
+      pushFor(endpointer, room, 100);
+    }
+
+    expect(endpointer.hasSpeech).toBe(true);
+    expect(endpointer.voicedMs).toBeGreaterThanOrEqual(VOICE_VAD_MIN_SPEECH_MS);
+  });
+
+  it('drops a whispered run the speaker did stop for', () => {
+    const endpointer = new Endpointer();
+    pushFor(endpointer, silent, VOICE_VAD_CALIBRATE_MS);
+    pushFor(endpointer, whisper, 300);
+    // Past the gap, so the next stretch of speech starts counting again from
+    // nothing: neither half on its own is an utterance.
+    pushFor(endpointer, room, VOICE_VAD_RUN_GAP_MS + 100);
+    pushFor(endpointer, whisper, 300);
+
+    expect(endpointer.hasSpeech).toBe(false);
   });
 
   it('trims the pause that ended the utterance', () => {

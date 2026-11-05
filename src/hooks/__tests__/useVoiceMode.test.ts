@@ -1132,6 +1132,9 @@ describe('useVoiceMode', () => {
 
     it('gives Android the source that cancels its own echo', async () => {
       Platform.OS = 'android';
+      // On Android the memory the ear needs is read from the device, not from
+      // the iOS ceiling, so a session that cannot fit never opens the mic.
+      (DeviceInfo.getTotalMemory as jest.Mock).mockResolvedValue(16e9);
       const {enter} = renderVoiceMode();
 
       await enter();

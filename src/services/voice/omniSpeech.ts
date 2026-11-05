@@ -136,6 +136,18 @@ export const resolveSpeechLanguage = (
 export const MAX_UTTERANCE_SECONDS = 30;
 
 /**
+ * What one codec frame of this model's audio is worth out loud: `wav_frame_stack`
+ * (6) STFT frames at a hop of 320 samples, at the 24 kHz the LFM3-Audio projector
+ * is built for — 6 × 320 / 24000.
+ *
+ * The frame count and the seconds are both reported by the engine, so one divided
+ * by the other against this says whether the clip was decoded at the geometry it
+ * was shipped for. A reply whose seconds are not its frames times this is the
+ * model's own audio running long, which no player setting can explain.
+ */
+export const SPEECH_CODEC_FRAME_SECONDS = 0.08;
+
+/**
  * Generating takes this long relative to the audio it makes and the wait is
  * the point of the exercise. Past it the TTS voice answers sooner in a voice
  * the user chose, so the model's own voice stops being the better offer.
@@ -415,6 +427,15 @@ export const speakWithModel = async (
   // Asking for a sequence of its own is one thing; a build whose engine has no
   // such option answers without the flag, and then the cache was touched.
   const cacheKept = out.seqIsolated === true;
+  // The length the frame count says this clip is, against the seconds the engine
+  // says it lasts: 1.0 is a decode at the geometry the codec was shipped for, and
+  // anything else is the model's own audio running long before a player sees it.
+  const codecSeconds = out.frames * SPEECH_CODEC_FRAME_SECONDS;
+  const stretch = codecSeconds > 0 ? out.seconds / codecSeconds : 0;
+  // The spoken length of the reply per character, read against the ~15 chars/s the
+  // feed plans segments with. A clip of the right length that still sounds slow is
+  // the difference between stretched audio and a voice that speaks slowly.
+  const secPerChar = out.seconds / Math.max(1, text.length);
   logPerf('speech.reply', {
     stop: out.stopReason,
     stage: out.stage,
@@ -423,6 +444,9 @@ export const speakWithModel = async (
     frames: out.frames,
     seconds: out.seconds.toFixed(2),
     msPerFrame: msPerFrame.toFixed(1),
+    codecSec: codecSeconds.toFixed(2),
+    stretch: stretch.toFixed(2),
+    secPerChar: secPerChar.toFixed(3),
     // The spread of the frame times, which is the difference between a slow
     // engine and one that stutters: the mean cannot tell those two apart.
     p50Frame: out.frameP50Ms,
@@ -448,6 +472,8 @@ export const speakWithModel = async (
     genMs: Math.round(out.genMs),
     firstAudioMs: Math.round(out.firstAudioMs),
     rtf: Number(rtf.toFixed(2)),
+    stretch: Number(stretch.toFixed(2)),
+    secPerChar: Number(secPerChar.toFixed(3)),
     drop,
     chunks: out.chunks,
     stream: feed ? 'on' : 'off',
@@ -520,6 +546,11 @@ export const speakWithModel = async (
     spoken = stats.played;
     playError = stats.playError;
     activeFeed = null;
+    addTurnInfo({
+      playRatio: Number(stats.playRatio.toFixed(2)),
+      playRate: stats.playRate,
+      mismatch: stats.rateMismatch,
+    });
   }
   if (deadEnd || interrupted || !keepModelVoice) {
     // A whole-clip reply stops here, before a sample is heard. A streamed one
@@ -533,13 +564,22 @@ export const speakWithModel = async (
     // A whole clip reaches the player in one call, so the sample and the sound
     // land on the same moment; the streamed reply marks it from its first piece.
     markTurn('firstSound');
+    // The length told to the player is the length of the audio it is handed.
+    // The engine's own `seconds` can disagree with its samples — a codec that
+    // rounds to a frame, a buffer cut at a limit — and a player told the longer
+    // of the two plays the same samples slow.
+    const clipSeconds = Math.max(
+      0.001,
+      out.pcm.length / Math.max(1, out.sampleRate),
+    );
+    const playT0 = Date.now();
     spoken = await neuralAudioPlayer
       .play(
         {
           samples: out.pcm,
           sampleRate: out.sampleRate,
           channels: 1,
-          duration: out.seconds,
+          duration: clipSeconds,
         },
         {ducking: true},
       )
@@ -549,6 +589,11 @@ export const speakWithModel = async (
         console.warn('[voice] speech playback failed:', err);
         return false;
       });
+    // The call resolves when the clip has been heard, so its wall time against
+    // the seconds the samples carry is the playback ratio of the whole reply:
+    // ~1.0 says the player opened at the rate it was given and lost nothing.
+    const playMs = Date.now() - playT0;
+    const playRatio = playMs / 1000 / clipSeconds;
     logPerf('speech.playback', {
       ok: spoken,
       err: playError.slice(0, 200),
@@ -556,7 +601,12 @@ export const speakWithModel = async (
       sampleRate: out.sampleRate,
       channels: 1,
       seconds: out.seconds.toFixed(2),
+      clip: clipSeconds.toFixed(2),
+      drift: out.seconds > 0 ? (clipSeconds / out.seconds).toFixed(2) : 'n/a',
+      wall: Math.round(playMs),
+      ratio: playRatio.toFixed(2),
     });
+    addTurnInfo({playRatio: Number(playRatio.toFixed(2))});
   }
   // Audio the player refused is still the model's own voice working, so only
   // the stage moves: the next reply should keep asking the model.

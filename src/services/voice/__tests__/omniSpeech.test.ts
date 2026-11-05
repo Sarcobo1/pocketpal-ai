@@ -253,6 +253,20 @@ describe('speakWithModel', () => {
     expect(report.msPerFrame).toBeCloseTo(1000 / 60);
   });
 
+  it('plays the samples it was handed, not the seconds it was told', async () => {
+    // A codec that rounds its own clock, or a buffer cut at a limit, can leave
+    // the two disagreeing. Told the longer length, the player takes the same
+    // audio slow — which is what a listener hears as a drawn-out voice.
+    withSpeaker(speechResult({pcm: new Float32Array(28800).fill(0.25)}));
+
+    await speakWithModel('Salom');
+
+    const [clip] = (neuralAudioPlayer.play as jest.Mock).mock.calls[0];
+    expect(clip.samples).toHaveLength(28800);
+    expect(clip.sampleRate).toBe(24000);
+    expect(clip.duration).toBeCloseTo(1.2, 3);
+  });
+
   it('marks the reply spoken only once the audio is on its way', async () => {
     withSpeaker(speechResult());
     const onPlaying = jest.fn();

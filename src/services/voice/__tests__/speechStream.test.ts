@@ -48,6 +48,11 @@ const sinkStats = (over: Partial<VoiceSinkStats> = {}): VoiceSinkStats => ({
   gapMaxMs: 0,
   bridgeMs: 0,
   error: '',
+  audioMs: 0,
+  playedMs: 0,
+  writtenMs: 0,
+  sampleRate: RATE,
+  rateMismatch: 0,
   ...over,
 });
 

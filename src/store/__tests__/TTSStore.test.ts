@@ -1350,6 +1350,9 @@ describe('TTSStore', () => {
     // not the same fact as "the player has been told to stop", so the store
     // counts the hands it has audio outstanding with.
     describe('the ear is still busy', () => {
+      const FIRST = 'Paris is the capital of France.';
+      const SECOND = 'It sits on the Seine.';
+
       /** Start a wait without letting it settle into the test's own await. */
       const waitOutcome = (store: TTSStore) => {
         let outcome: 'settled' | 'timeout' | undefined;

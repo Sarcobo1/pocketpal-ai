@@ -115,6 +115,18 @@ export interface SpeechFeedStats {
   playError: string;
   /** Whether the whole reply was heard. */
   played: boolean;
+  /** The rate the output was opened at — 24000 for this model, and the log says which. */
+  playRate: number;
+  /** Milliseconds of speech handed to the output: what the ear is owed. */
+  audioMs: number;
+  /** Wall milliseconds the output spent sounding it. */
+  playedMs: number;
+  /** Milliseconds the output took in, as the device counted them. */
+  writtenMs: number;
+  /** `playedMs` over `audioMs`: 1 is a clip that sounded as long as it was made. */
+  playRatio: number;
+  /** Chunks that arrived at another rate than the output was opened at. */
+  rateMismatch: number;
 }
 
 export interface SpeechFeed {
@@ -171,6 +183,12 @@ const emptyStats = (): SpeechFeedStats => ({
   slow: false,
   playError: '',
   played: false,
+  playRate: 0,
+  audioMs: 0,
+  playedMs: 0,
+  writtenMs: 0,
+  playRatio: 0,
+  rateMismatch: 0,
 });
 
 /**
@@ -656,6 +674,16 @@ export const openSpeechFeed = (options?: SpeechFeedOptions): SpeechFeed => {
         stats.bridgeMs = out.bridgeMs;
         stats.underruns += out.underruns;
         stats.playError = out.error;
+        stats.playRate = out.sampleRate;
+        stats.audioMs = out.audioMs;
+        stats.playedMs = out.playedMs;
+        stats.writtenMs = out.writtenMs;
+        stats.rateMismatch = out.rateMismatch;
+        // The one number that separates "this clip was made too long" from "the
+        // output played it too slow": samples over rate, against the device's own
+        // wall clock. Anything but ~1 says the ear got a different clip than the
+        // engine made.
+        stats.playRatio = out.audioMs > 0 ? out.playedMs / out.audioMs : 0;
       }
       stats.totalMs = Date.now() - t0;
       stats.slow = stats.rtf > SLOW_SPEECH_RTF;
@@ -671,7 +699,12 @@ export const openSpeechFeed = (options?: SpeechFeedOptions): SpeechFeed => {
         ms: stats.totalMs,
         played: stats.played,
         slow: stats.slow,
-        rate,
+        rate: stats.playRate || rate,
+        audio: Math.round(stats.audioMs),
+        wall: Math.round(stats.playedMs),
+        ratio: Number(stats.playRatio.toFixed(2)),
+        wrote: Math.round(stats.writtenMs),
+        mismatch: stats.rateMismatch,
       });
       return stats;
     },

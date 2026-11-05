@@ -113,6 +113,7 @@ class SpeechStreamModule(reactContext: ReactApplicationContext) :
     putDouble("framesWritten", 0.0)
     putDouble("framesPlayed", 0.0)
     putDouble("leadMs", 0.0)
+    putDouble("wallMs", 0.0)
   }
 
   /**
@@ -455,6 +456,17 @@ class SpeechStreamModule(reactContext: ReactApplicationContext) :
     private fun leadMs(): Double =
       if (playedAtMs == 0L || openedAtMs == 0L) 0.0 else (playedAtMs - openedAtMs).toDouble()
 
+    /**
+     * Wall time the device spent playing, from its first `play()` to here.
+     *
+     * Against the frames it was handed and the rate it opened at, this is the
+     * playback ratio: the number that separates a clip that really sounded as
+     * long as its samples say from one the output path stretched or truncated.
+     * The clock is the device's own, so it holds without any JS thread.
+     */
+    private fun wallMs(): Double =
+      if (playedAtMs == 0L) 0.0 else (SystemClock.elapsedRealtime() - playedAtMs).toDouble()
+
     private fun buildStats(underruns: Int, framesPlayed: Double): WritableMap =
       statsOf(underruns, dryMs, framesWritten, framesPlayed, leadMs())
 
@@ -470,6 +482,7 @@ class SpeechStreamModule(reactContext: ReactApplicationContext) :
       putDouble("framesWritten", framesWritten.toDouble())
       putDouble("framesPlayed", framesPlayed)
       putDouble("leadMs", leadMs)
+      putDouble("wallMs", wallMs())
     }
 
     private fun requestFocus() {

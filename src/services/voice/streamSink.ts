@@ -3,6 +3,7 @@ import {neuralAudioPlayer} from '@pocketpalai/react-native-speech/engine-sdk';
 import {Platform} from 'react-native';
 
 import NativeSpeechStream from '../../specs/NativeSpeechStream';
+import type {SpeechStreamStats} from '../../specs/NativeSpeechStream';
 
 /**
  * How the samples of one spoken reply reach the ear.
@@ -46,6 +47,25 @@ export interface VoiceSinkStats {
   bridgeMs: number;
   /** The output's own refusal, when it said one. */
   error: string;
+  /**
+   * Milliseconds of speech this sink was handed, at the rate it was handed at:
+   * samples over rate, which is all the ear is owed.
+   */
+  audioMs: number;
+  /**
+   * Wall milliseconds the output spent sounding it. Against `audioMs` this is
+   * the playback ratio — the number that says a 24 kHz clip really took the
+   * 24 kHz it was written for, rather than being stretched or cut short on the
+   * way out. For a stream it is the device's own clock; for pieces it is the
+   * player calls, so it includes the time each call took to open and close.
+   */
+  playedMs: number;
+  /** Milliseconds the output took in, for a stream: `audioMs` minus this is loss. */
+  writtenMs: number;
+  /** The rate the output was opened at. */
+  sampleRate: number;
+  /** Chunks that came at another rate than the one the output was opened at. */
+  rateMismatch: number;
 }
 
 export interface VoiceSink {
@@ -67,7 +87,16 @@ const emptyStats = (mode: SinkMode): VoiceSinkStats => ({
   gapMaxMs: 0,
   bridgeMs: 0,
   error: '',
+  audioMs: 0,
+  playedMs: 0,
+  writtenMs: 0,
+  sampleRate: 0,
+  rateMismatch: 0,
 });
+
+/** Milliseconds of speech `samples` carries at `sampleRate`. */
+const audioMs = (samples: number, sampleRate: number): number =>
+  (samples / Math.max(1, sampleRate)) * 1000;
 
 /**
  * Float32 speech as the 16-bit bytes an output stream wants.
@@ -158,8 +187,15 @@ class PieceSink implements VoiceSink {
         continue;
       }
       this.started = true;
-      const pieceMs =
-        (piece.samples.length / Math.max(1, piece.sampleRate)) * 1000;
+      const pieceMs = audioMs(piece.samples.length, piece.sampleRate);
+      if (!this.stats.sampleRate) {
+        this.stats.sampleRate = piece.sampleRate;
+      } else if (piece.sampleRate !== this.stats.sampleRate) {
+        // This path opens a player per piece, so a second rate is a second pitch
+        // rather than a broken reply — but a reply that changes rate mid-clip is
+        // exactly what the slow-voice report has to rule out, so it is counted.
+        this.stats.rateMismatch++;
+      }
       const t0 = Date.now();
       if (this.lastEnd) {
         this.hole(t0 - this.lastEnd);
@@ -181,6 +217,8 @@ class PieceSink implements VoiceSink {
       }
       const end = Date.now();
       this.stats.segments++;
+      this.stats.audioMs += pieceMs;
+      this.stats.playedMs += end - t0;
       this.lastEnd = end;
       // The call returns when the clip is over, so whatever it took beyond the
       // audio it carried was spent opening and closing that clip — which is the
@@ -201,11 +239,30 @@ class StreamSink implements VoiceSink {
 
   /** A barge-in: queued audio is stale, so the chunks still on the chain drop. */
   private abandoned = false;
-  private native: {underruns: number; dryMs: number} | null = null;
+  private native: {
+    underruns: number;
+    dryMs: number;
+    wallMs: number;
+    framesWritten: number;
+  } | null = null;
 
-  write(samples: Float32Array): void {
+  /**
+   * Opened at the rate of the chunk that arrived first: the stream takes one rate
+   * for the whole reply, so every later chunk is measured against it.
+   */
+  constructor(sampleRate: number) {
+    this.stats.sampleRate = sampleRate;
+  }
+
+  write(samples: Float32Array, sampleRate: number): void {
     if (this.closed || samples.length === 0) {
       return;
+    }
+    this.stats.audioMs += audioMs(samples.length, this.stats.sampleRate);
+    if (sampleRate !== this.stats.sampleRate) {
+      // The track was built for one rate and plays everything at it, so a chunk
+      // made at another is heard at the wrong pitch for its whole length.
+      this.stats.rateMismatch++;
     }
     const base64 = fromByteArray(toInt16Bytes(samples));
     // Ordered, and never waiting on the device: the stream keeps its own buffer,
@@ -238,10 +295,7 @@ class StreamSink implements VoiceSink {
         if (!native) {
           return;
         }
-        const stats = await native.end().catch(() => null);
-        if (stats) {
-          this.native = {underruns: stats.underruns, dryMs: stats.dryMs};
-        }
+        this.native = toStats(await native.end().catch(() => null));
       });
     }
     this.closed = true;
@@ -263,10 +317,7 @@ class StreamSink implements VoiceSink {
         return;
       }
       await native.abort().catch(() => false);
-      const stats = await native.end().catch(() => null);
-      if (stats) {
-        this.native = {underruns: stats.underruns, dryMs: stats.dryMs};
-      }
+      this.native = toStats(await native.end().catch(() => null));
       this.applyNative();
     });
   }
@@ -278,11 +329,34 @@ class StreamSink implements VoiceSink {
     this.stats.dryMs = this.native.dryMs;
     this.stats.gapMs = this.native.dryMs;
     this.stats.nativeUnderruns = this.native.underruns;
+    this.stats.playedMs = this.native.wallMs;
+    this.stats.writtenMs = audioMs(
+      this.native.framesWritten,
+      this.stats.sampleRate,
+    );
     if (this.native.underruns >= 0) {
       this.stats.underruns = this.native.underruns;
     }
   }
 }
+
+/** The device's answer, or nothing when it did not give one. */
+const toStats = (
+  stats: SpeechStreamStats | null,
+): {
+  underruns: number;
+  dryMs: number;
+  wallMs: number;
+  framesWritten: number;
+} | null =>
+  stats && {
+    underruns: stats.underruns,
+    dryMs: stats.dryMs,
+    // A track built before these two were reported answers without them: the
+    // ratio then reads as "the device would not say", not as a clip of no length.
+    wallMs: stats.wallMs || 0,
+    framesWritten: stats.framesWritten || 0,
+  };
 
 /**
  * The output a streamed reply is heard through.
@@ -329,7 +403,9 @@ class SpeechSink implements VoiceSink {
         .then(ok => ok === true)
         .catch(() => false);
     }
-    const inner: VoiceSink = stream ? new StreamSink() : new PieceSink();
+    const inner: VoiceSink = stream
+      ? new StreamSink(sampleRate)
+      : new PieceSink();
     this.inner = inner;
     const held = this.held;
     this.held = [];

@@ -252,6 +252,93 @@ describe('a device that will not take one', () => {
   });
 });
 
+describe('what the reply cost to sound', () => {
+  it('reads the device clock against the samples it was handed', async () => {
+    // The device says it played 1500 ms of frames and spent 1500 ms doing it:
+    // the clip sounded exactly as long as it was made, which is ratio 1.
+    native.end.mockResolvedValue(
+      nativeStats({wallMs: 1500, framesWritten: SAMPLES(1500)}),
+    );
+    const sink = openVoiceSink({allowStream: true});
+    sink.write(voiced(500), RATE);
+    sink.write(voiced(600), RATE);
+    sink.write(voiced(400), RATE);
+    const stats = await sink.end();
+    expect(stats.sampleRate).toBe(RATE);
+    expect(stats.audioMs).toBe(1500);
+    expect(stats.writtenMs).toBe(1500);
+    expect(stats.playedMs).toBe(1500);
+    expect(stats.rateMismatch).toBe(0);
+  });
+
+  it('counts audio the track never took as a loss', async () => {
+    // 1500 ms handed over, 1400 ms accepted: the last piece was torn, and the
+    // ratio alone would not say which side of the bridge lost it.
+    native.end.mockResolvedValue(
+      nativeStats({wallMs: 1400, framesWritten: SAMPLES(1400)}),
+    );
+    const sink = openVoiceSink({allowStream: true});
+    sink.write(voiced(500), RATE);
+    sink.write(voiced(600), RATE);
+    sink.write(voiced(400), RATE);
+    const stats = await sink.end();
+    expect(stats.audioMs).toBe(1500);
+    expect(stats.writtenMs).toBe(1400);
+  });
+
+  it('plays a stretch of wall time for the audio it was given', async () => {
+    // The device's own clock says 1800 ms for 1500 ms of samples: the reply was
+    // heard slow. Whether the clip was made that long or the output played it
+    // that way is what `writtenMs` and the engine's frame count then settle.
+    native.end.mockResolvedValue(
+      nativeStats({wallMs: 1800, framesWritten: SAMPLES(1500)}),
+    );
+    const sink = openVoiceSink({allowStream: true});
+    sink.write(voiced(500), RATE);
+    sink.write(voiced(600), RATE);
+    sink.write(voiced(400), RATE);
+    const stats = await sink.end();
+    expect(stats.playedMs / stats.audioMs).toBeCloseTo(1.2, 5);
+  });
+
+  it('counts a chunk that arrived at another rate than the stream opened at', async () => {
+    const sink = openVoiceSink({allowStream: true});
+    sink.write(voiced(500), RATE);
+    await settle();
+    sink.write(new Float32Array(SAMPLES(500)).fill(0.3), 16000);
+    const stats = await sink.end();
+    // One stream, one rate: the second chunk is heard at the first one, which is
+    // the pitch change this number exists to catch.
+    expect(stats.sampleRate).toBe(RATE);
+    expect(stats.rateMismatch).toBe(1);
+  });
+
+  it('measures the player calls of a piece-by-piece reply', async () => {
+    native.begin.mockResolvedValue(false);
+    play.mockImplementation(async (request: {samples: Float32Array}) => {
+      advance(seconds(request.samples) * 1000 + 300);
+    });
+    const sink = openVoiceSink({allowStream: true});
+    sink.write(voiced(500), RATE);
+    sink.write(voiced(600), RATE);
+    const stats = await sink.end();
+    expect(stats.audioMs).toBe(1100);
+    // Each call is its own clip plus the 300 ms it took to rebuild the output.
+    expect(stats.playedMs).toBe(1700);
+    expect(stats.sampleRate).toBe(RATE);
+  });
+
+  it('counts a piece made at another rate on the path that opens a player per piece', async () => {
+    native.begin.mockResolvedValue(false);
+    const sink = openVoiceSink({allowStream: true});
+    sink.write(voiced(500), RATE);
+    sink.write(new Float32Array(SAMPLES(500)).fill(0.3), 16000);
+    const stats = await sink.end();
+    expect(stats.sampleRate).toBe(RATE);
+    expect(stats.rateMismatch).toBe(1);
+  });
+});
+
 describe('a platform that was not built with the stream module', () => {
   it('does not ask for one', async () => {
     native.begin.mockResolvedValue(true);

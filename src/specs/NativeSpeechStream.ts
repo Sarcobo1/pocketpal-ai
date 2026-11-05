@@ -19,6 +19,14 @@ export interface SpeechStreamStats {
   framesPlayed: number;
   /** Milliseconds the open track waited for its first chunk before starting. */
   leadMs: number;
+  /**
+   * Wall milliseconds the device spent playing, on its own clock, from its first
+   * `play()` to the moment it let go. Against `framesWritten` and the rate the
+   * stream opened at this is the playback ratio, and it is read without any help
+   * from the JS thread — which is the point: a reply that sounds stretched has
+   * either been written at the wrong rate or played back slower than it was made.
+   */
+  wallMs: number;
 }
 
 /**

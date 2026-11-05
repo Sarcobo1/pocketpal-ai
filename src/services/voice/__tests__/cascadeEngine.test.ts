@@ -6,6 +6,7 @@ import {ttsRuntime} from '../../tts';
 import {asrStore, chatSessionStore, ttsStore} from '../../../store';
 
 import {CascadeVoiceEngine} from '../cascadeEngine';
+import {VOICE_ECHO_GUARD_MS} from '../constants';
 import type {VoiceTurnEvents, VoiceTurnPayload} from '../types';
 
 const transcribe = jest.spyOn(whisperAsrEngine, 'transcribe');
@@ -219,6 +220,74 @@ describe('CascadeVoiceEngine', () => {
       port.settle();
 
       await expect(turn.done).resolves.toBe('speech_failed');
+    });
+  });
+
+  // The loudspeaker sits in front of the microphone, so a clip can be the
+  // reply the phone has just said. Answering that is the loop the user hears.
+  describe('the words the phone heard itself say', () => {
+    const REPLY = 'The capital of France is Paris.';
+
+    /** Have `REPLY` finish `agoMs` ago, then hand the mic back `heard`. */
+    const said = (heard: string, agoMs: number) => {
+      runInAction(() => {
+        tts.lastSpokenText = REPLY;
+        tts.lastSpokenAt = Date.now() - agoMs;
+      });
+      transcribe.mockResolvedValueOnce({text: heard, language: 'en'});
+    };
+
+    beforeEach(() => {
+      runInAction(() => {
+        tts.lastSpokenText = '';
+        tts.lastSpokenAt = 0;
+      });
+    });
+
+    it('drops a clip that is the reply said back', async () => {
+      said(REPLY, 200);
+      const port = makePort();
+      const on = events();
+
+      const turn = engine.runTurn(speech(500), port, on);
+
+      await expect(turn.done).resolves.toBe('empty');
+      // The words were heard, and nothing was asked of the model with them.
+      expect(transcribe).toHaveBeenCalledTimes(1);
+      expect(on.transcribed).not.toHaveBeenCalled();
+      expect(port.send).not.toHaveBeenCalled();
+    });
+
+    it('lets a question that only borrows a few words through', async () => {
+      // "the capital of" shared with the reply is normal English. A score over
+      // a bag of words would call every answer an echo of its own question.
+      said('What is the capital of Germany?', 200);
+      const port = makePort();
+
+      const turn = engine.runTurn(speech(500), port, events());
+      await flush();
+
+      expect(port.send).toHaveBeenCalledWith(
+        {text: 'What is the capital of Germany?'},
+        expect.any(Function),
+      );
+      turn.interrupt();
+    });
+
+    it('lets the same words through once the reply is long over', async () => {
+      // Reading a line back a minute later is the user repeating it, not the
+      // loudspeaker still ringing.
+      said(REPLY, VOICE_ECHO_GUARD_MS + 5000);
+      const port = makePort();
+
+      const turn = engine.runTurn(speech(500), port, events());
+      await flush();
+
+      expect(port.send).toHaveBeenCalledWith(
+        {text: REPLY},
+        expect.any(Function),
+      );
+      turn.interrupt();
     });
   });
 

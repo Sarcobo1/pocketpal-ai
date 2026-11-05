@@ -1345,6 +1345,192 @@ describe('TTSStore', () => {
         expect(sink.speak).not.toHaveBeenCalled();
       });
     });
+
+    // The gate a voice session listens through: "the reply has been heard" is
+    // not the same fact as "the player has been told to stop", so the store
+    // counts the hands it has audio outstanding with.
+    describe('the ear is still busy', () => {
+      /** Start a wait without letting it settle into the test's own await. */
+      const waitOutcome = (store: TTSStore) => {
+        let outcome: 'settled' | 'timeout' | undefined;
+        store.waitReplyAudio().then(ready => {
+          outcome = ready;
+        });
+        return () => outcome;
+      };
+
+      it('counts an utterance from before the stop that opens it', async () => {
+        const store = await makeStore();
+        store.setCurrentVoice(SYSTEM_VOICE);
+        const seen: Array<{mode: string; pending: number}> = [];
+        mockSystemStop.mockImplementationOnce(async () => {
+          seen.push({
+            mode: store.playbackState.mode,
+            pending: store.pendingAudio,
+          });
+        });
+
+        await store.play('msg-1', 'hello');
+
+        // The stop publishes idle, which is exactly the window a voice session
+        // used to open its mic into. The count is what keeps it shut until the
+        // utterance's audio exists.
+        expect(seen).toEqual([{mode: 'idle', pending: 1}]);
+        expect(store.audioIsSettled).toBe(true);
+      });
+
+      it('waits for the player, not for the last chunk handed to it', async () => {
+        let release: () => void = () => {};
+        mockSystemPlay.mockImplementationOnce(
+          () =>
+            new Promise<void>(resolve => {
+              release = resolve;
+            }),
+        );
+        const store = await makeStore();
+        store.setCurrentVoice(SYSTEM_VOICE);
+
+        const playing = store.play('msg-1', 'hello');
+        await flush();
+        const outcome = waitOutcome(store);
+        await flush();
+
+        expect(store.audioIsSettled).toBe(false);
+        expect(outcome()).toBeUndefined();
+
+        release();
+        await playing;
+        await flush();
+
+        expect(store.pendingAudio).toBe(0);
+        expect(store.audioIsSettled).toBe(true);
+        expect(outcome()).toBe('settled');
+      });
+
+      it('settles at once when nothing is owed', async () => {
+        const store = await makeStore();
+
+        await expect(store.waitReplyAudio()).resolves.toBe('settled');
+      });
+
+      it('gives the count back when a stopped reply never plays', async () => {
+        let release: () => void = () => {};
+        mockSystemPlay.mockImplementationOnce(
+          () =>
+            new Promise<void>(resolve => {
+              release = resolve;
+            }),
+        );
+        const store = await makeStore();
+        store.setCurrentVoice(SYSTEM_VOICE);
+
+        const playing = store.play('msg-1', 'hello');
+        await flush();
+        await store.stop('barge_in');
+        release();
+        await playing;
+        await flush();
+
+        // A count left raised by a cancelled utterance would keep the session
+        // deaf until the wait gave up on it.
+        expect(store.pendingAudio).toBe(0);
+        expect(store.audioIsSettled).toBe(true);
+      });
+
+      it('remembers the words the phone just said', async () => {
+        const store = await makeStore();
+        store.setCurrentVoice(SYSTEM_VOICE);
+
+        await store.play('msg-1', 'Paris is the capital of France.');
+
+        expect(store.lastSpokenText).toBe('Paris is the capital of France.');
+        expect(store.lastSpokenAt).toBeGreaterThan(0);
+      });
+
+      it('does not treat an audition as something the reply said', async () => {
+        const store = await makeStore();
+
+        await store.preview(SYSTEM_VOICE);
+
+        expect(store.lastSpokenText).toBe('');
+      });
+
+      it('hands the count from the device voice to the model without a gap', async () => {
+        let settleSentence: () => void = () => {};
+        mockSystemPlay.mockImplementationOnce(
+          () =>
+            new Promise<void>(resolve => {
+              settleSentence = resolve;
+            }),
+        );
+        const {sink, finish} = makePendingSink();
+        const store = await makeModelStore(sink, SYSTEM_VOICE);
+        store.setSpeechFastStart(true);
+
+        store.onAssistantMessageStart('msg-1');
+        store.onAssistantMessageChunk('msg-1', `${FIRST} `);
+        store.onAssistantMessageComplete('msg-1', `${FIRST} ${SECOND}`);
+        await flush();
+
+        // The device voice has the sentence and the model is waiting for it to
+        // be heard, so the sink has nothing yet — the reply is still being said.
+        expect(mockSystemPlay).toHaveBeenCalledWith(FIRST, SYSTEM_VOICE);
+        expect(sink.speak).not.toHaveBeenCalled();
+        expect(store.pendingAudio).toBe(1);
+        const outcome = waitOutcome(store);
+        await flush();
+        expect(outcome()).toBeUndefined();
+
+        settleSentence();
+        await flush();
+
+        // The sentence has been heard and the model's audio is in the air: the
+        // count changed hands instead of dropping to zero between them.
+        expect(sink.speak).toHaveBeenCalledTimes(1);
+        expect(store.pendingAudio).toBe(1);
+        expect(store.audioIsSettled).toBe(false);
+        expect(outcome()).toBeUndefined();
+
+        finish();
+        await flush();
+
+        expect(store.audioIsSettled).toBe(true);
+        expect(outcome()).toBe('settled');
+      });
+
+      it('keeps a model utterance owed until its sink reports back', async () => {
+        const {sink, finish} = makePendingSink();
+        const store = await makeModelStore(sink);
+
+        store.onAssistantMessageStart('msg-1');
+        store.onAssistantMessageChunk('msg-1', 'Paris is the capital.');
+        store.onAssistantMessageComplete('msg-1', 'Paris is the capital.');
+        await flush();
+
+        expect(sink.speak).toHaveBeenCalledTimes(1);
+        const outcome = waitOutcome(store);
+        await flush();
+        expect(store.audioIsSettled).toBe(false);
+        expect(outcome()).toBeUndefined();
+
+        finish();
+        await flush();
+        expect(outcome()).toBe('settled');
+      });
+
+      it('reads the whole reply as what the ear will hear', async () => {
+        const sink = makeSink();
+        const store = await makeModelStore(sink);
+
+        await speakReply(store, 'Paris is the <think>hmm</think>capital.');
+        await flush();
+
+        // The echo guard compares against text, so the reasoning that never
+        // reached the speaker must not be in what it is compared with.
+        expect(store.lastSpokenText).not.toContain('<think>');
+        expect(store.lastSpokenText).toContain('capital.');
+      });
+    });
   });
 
   describe('thinking-tag stripping', () => {

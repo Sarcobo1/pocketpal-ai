@@ -28,6 +28,7 @@ import {acquireKeepAwake} from '../../utils/keepAwake';
 import {ModelOrigin} from '../../utils/types';
 import {
   VOICE_CAPTURE_SETTLE_MS,
+  VOICE_MIC_AUDIO_SOURCE,
   VOICE_MIC_WATCHDOG_MS,
   VOICE_START_TIMEOUT_MS,
 } from '../../services/voice';
@@ -1069,6 +1070,108 @@ describe('useVoiceMode', () => {
 
       expect(AudioRecord.init).not.toHaveBeenCalled();
       expect(AudioRecord.start).not.toHaveBeenCalled();
+    });
+  });
+
+  // One ear and one mouth. The reply is not over when its tokens stop, and a
+  // window that held the loudspeaker holds this session's own voice.
+  describe('the ear and the loudspeaker', () => {
+    it('opens the mic only once the reply has finished sounding', async () => {
+      act(() =>
+        runInAction(() => {
+          tts.pendingAudio = 1;
+        }),
+      );
+      const {enter} = renderVoiceMode();
+
+      await enter();
+      await settleMic();
+      await flush();
+
+      // Asked for the ear, and told to wait: an answer owed to a player is
+      // still the phone's own voice until it has been heard.
+      expect(voiceModeStore.phase).toBe('listening');
+      expect(AudioRecord.init).not.toHaveBeenCalled();
+
+      act(() =>
+        runInAction(() => {
+          tts.pendingAudio = 0;
+        }),
+      );
+      await flush();
+
+      expect(AudioRecord.init).toHaveBeenCalledTimes(1);
+      expect(AudioRecord.start).toHaveBeenCalledTimes(1);
+    });
+
+    it('throws away a window the loudspeaker spoke into', async () => {
+      const {enter, engine} = renderVoiceMode();
+      await enter();
+
+      // The reply starts sounding while the ear is already open.
+      act(() =>
+        runInAction(() => {
+          tts.pendingAudio = 1;
+        }),
+      );
+      speak(500);
+      speak(600, SILENT);
+
+      expect(engine.runTurn).not.toHaveBeenCalled();
+      expect(voiceModeStore.phase).toBe('listening');
+      expect(AudioRecord.init).toHaveBeenCalledTimes(1);
+
+      act(() =>
+        runInAction(() => {
+          tts.pendingAudio = 0;
+        }),
+      );
+      await settleMic();
+      expect(AudioRecord.init).toHaveBeenCalledTimes(2);
+    });
+
+    it('gives Android the source that cancels its own echo', async () => {
+      Platform.OS = 'android';
+      const {enter} = renderVoiceMode();
+
+      await enter();
+      await settleMic();
+
+      expect(AudioRecord.init).toHaveBeenCalledWith(
+        expect.objectContaining({audioSource: VOICE_MIC_AUDIO_SOURCE}),
+      );
+    });
+
+    it('asks for no source where there is no such thing', async () => {
+      const {enter} = renderVoiceMode();
+
+      await enter();
+      await settleMic();
+
+      expect(Platform.OS).toBe('ios');
+      expect(
+        (AudioRecord.init as jest.Mock).mock.calls[0][0],
+      ).not.toHaveProperty('audioSource');
+    });
+
+    it('holds the ear over the room tail after a reply', async () => {
+      const {enter, turns} = renderVoiceMode();
+      await enter();
+
+      speak(500);
+      speak(600, SILENT);
+      turns[0].finish('answered');
+      await flush();
+      expect(voiceModeStore.phase).toBe('listening');
+
+      // The wait is counted from the last sample leaving the player, not from
+      // the turn resolving: the room is still ringing.
+      expect(AudioRecord.init).toHaveBeenCalledTimes(1);
+      expect(AudioRecord.start).toHaveBeenCalledTimes(1);
+
+      await settleMic();
+      expect(AudioRecord.init).toHaveBeenCalledTimes(2);
+      expect(AudioRecord.start).toHaveBeenCalledTimes(2);
     });
   });
 

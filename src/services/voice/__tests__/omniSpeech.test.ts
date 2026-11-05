@@ -8,6 +8,7 @@ import {ModelOrigin} from '../../../utils/types';
 import {
   MAX_REALTIME_FACTOR,
   MAX_UTTERANCE_SECONDS,
+  canIsolateSpeechSeq,
   modelCanVoiceReplies,
   prewarmSpeech,
   speakWithModel,
@@ -230,6 +231,10 @@ describe('speakWithModel', () => {
       // This suite is the whole-buffer path: one clip, one play call. What the
       // engine hands over piece by piece is the suite below.
       tts.streamSpeech = false;
+      tts.speechKeepCache = true;
+      // The context these replies are asked of has the second slot that asking
+      // needs; the suite that has only one is below.
+      store.contextInitParams = {...store.contextInitParams, n_parallel: 2};
     });
   });
 
@@ -658,6 +663,18 @@ describe('speakWithModel, piece by piece', () => {
 });
 
 /**
+ * The slot an utterance is asked to sit on. Asking for a second one is what
+ * `speechKeepCache` means; a context built with one has nowhere to put it.
+ */
+describe('canIsolateSpeechSeq', () => {
+  it('needs the slot it is asking for', () => {
+    expect(canIsolateSpeechSeq(undefined)).toBe(false);
+    expect(canIsolateSpeechSeq(1)).toBe(false);
+    expect(canIsolateSpeechSeq(2)).toBe(true);
+  });
+});
+
+/**
  * The conversation cache. Asking for a sequence of its own is one thing; a
  * bridge that has no such option answers without saying it isolated anything,
  * and then the cache was touched all the same — so the clear is decided by what
@@ -697,6 +714,7 @@ describe('the cache a spoken reply leaves behind', () => {
       tts.speechLanguage = '';
       tts.forceTTSFallback = false;
       tts.speechKeepCache = true;
+      store.contextInitParams = {...store.contextInitParams, n_parallel: 2};
     });
   });
 
@@ -720,6 +738,32 @@ describe('the cache a spoken reply leaves behind', () => {
     await speakWithModel('Salom');
 
     expect(generateSpeech.mock.calls[0][0]).not.toHaveProperty('isolateSeq');
+  });
+
+  it('asks for the shared positions when the context has one slot', async () => {
+    // The phone that started this: `n_seq_max = 1`. Asking is not a preference
+    // the engine can decline here — the prefill fails, no sample is made, and
+    // the dead end takes the model's voice away from every later reply.
+    runInAction(() => {
+      store.contextInitParams = {...store.contextInitParams, n_parallel: 1};
+    });
+    speaker(speechResult());
+
+    await speakWithModel('Salom');
+
+    expect(generateSpeech.mock.calls[0][0]).not.toHaveProperty('isolateSeq');
+  });
+
+  it('pays the cache back from the conversation when it had to sit on it', async () => {
+    runInAction(() => {
+      store.contextInitParams = {...store.contextInitParams, n_parallel: 1};
+    });
+    speaker(speechResult());
+
+    const report = await speakWithModel('Salom');
+
+    expect(clearCache).toHaveBeenCalledWith(true);
+    expect(report.cacheKept).toBe(false);
   });
 
   it('leaves the cache standing when the engine says it took the utterance back', async () => {
@@ -873,6 +917,7 @@ describe('prewarmSpeech', () => {
     runInAction(() => {
       tts.speechKeepCache = true;
       tts.forceTTSFallback = false;
+      store.contextInitParams = {...store.contextInitParams, n_parallel: 2};
     });
   });
 
@@ -891,6 +936,24 @@ describe('prewarmSpeech', () => {
       expect.objectContaining({text: 'Aa.', maxSeconds: 1, isolateSeq: true}),
     );
     expect(stopSpeech).toHaveBeenCalledTimes(1);
+  });
+
+  it('warms the pipeline it can actually use on a one-slot context', async () => {
+    // The syllable that failed on the phone is the one the session opens with:
+    // asked for a sequence the context does not have, it never built the
+    // speech generator, and the first real reply paid for it and failed too.
+    runInAction(() => {
+      store.contextInitParams = {...store.contextInitParams, n_parallel: 1};
+    });
+    warmable();
+    generateSpeech.mockImplementation(async (_opts, onChunk) => {
+      onChunk(new Float32Array(2400), 24000);
+      return speechResult({stopReason: 'aborted', aborted: true});
+    });
+
+    await prewarmSpeech();
+
+    expect(generateSpeech.mock.calls[0][0]).not.toHaveProperty('isolateSeq');
   });
 
   it('owes the next turn a clear when it decoded over their positions', async () => {

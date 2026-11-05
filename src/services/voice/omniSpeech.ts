@@ -30,6 +30,24 @@ let probe: {contextId: number; audioGen: boolean} | null = null;
 let activeFeed: SpeechFeed | null = null;
 
 /**
+ * Whether the running context can be asked for a sequence of its own.
+ *
+ * `n_parallel` is how many slots llama.cpp built the context with, and a second
+ * one is exactly what `isolateSeq` asks for. On a single-slot context — the app's
+ * default, since it only uses blocking completion — the prefill answers
+ * `init: invalid seq_id[0][0] = 1 >= 1`, no sample is ever made, and the refusal
+ * is a dead end: the model loses its voice for every reply after the first. The
+ * setting is a wish, the slot count is a fact, and the fact wins.
+ */
+export const canIsolateSpeechSeq = (nParallel: number | undefined): boolean =>
+  (nParallel ?? 1) >= 2;
+
+/** What this context's speech calls will ask for. */
+const speechIsolation = (): boolean =>
+  ttsStore.speechKeepCache &&
+  canIsolateSpeechSeq(modelStore.contextInitParams.n_parallel);
+
+/**
  * True when the active model can voice its own reply.
  *
  * Two files answer that question, and they do not always agree: the projector's
@@ -71,6 +89,10 @@ export const modelCanVoiceReplies = async (): Promise<boolean> => {
       reason: runtime ? 'runtime' : 'header',
       declared,
       runtime,
+      // What the speech calls of this session will ask for, and the slot count
+      // that decided it — the line that separates "no voice" from "one slot".
+      seq: speechIsolation() ? 'isolated' : 'shared',
+      slots: modelStore.contextInitParams.n_parallel ?? 1,
     });
     return true;
   }
@@ -327,8 +349,9 @@ export const speakWithModel = async (
         maxSeconds: MAX_UTTERANCE_SECONDS,
         // Ask the engine to decode the utterance on a sequence of its own and
         // drop that sequence again, so the conversation's prefix is left whole
-        // and the next turn re-uses it instead of paying a full prefill.
-        ...(ttsStore.speechKeepCache ? {isolateSeq: true} : {}),
+        // and the next turn re-uses it instead of paying a full prefill. Only
+        // when the context actually has a second slot to put it on.
+        ...(speechIsolation() ? {isolateSeq: true} : {}),
         ...(feed ? {stream: true} : {}),
       },
       feed
@@ -648,7 +671,7 @@ export const prewarmSpeech = async (): Promise<void> => {
         text: 'Aa.',
         maxSeconds: 1,
         stream: true,
-        ...(ttsStore.speechKeepCache ? {isolateSeq: true} : {}),
+        ...(speechIsolation() ? {isolateSeq: true} : {}),
       },
       // One sample is the whole point: everything before it is the cost being
       // paid in advance, so the utterance stops the moment it lands.

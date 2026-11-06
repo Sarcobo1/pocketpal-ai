@@ -1139,6 +1139,47 @@ describe('excludeEchoedAssistantTurns', () => {
     ]);
   });
 
+  it('drops a notice the app wrote in the assistant name', () => {
+    // `Completion failed: …` is a system row authored by the assistant, so the
+    // prompt conversion hands it back as one of the model's own answers. Read
+    // three of those, and the next question gets whatever else it can find.
+    const notice = {
+      ...makeUserText(
+        'Completion failed: Exception in HostFunction: Context is busy',
+      ),
+      author: assistant,
+      metadata: {system: true},
+    } as MessageType.Text;
+    expect(excludeEchoedAssistantTurns([said, notice, answered])).toEqual([
+      said,
+      answered,
+    ]);
+  });
+
+  it('drops a reported answer stored as a plain text row', () => {
+    // Older sessions, and every reply a plain completion wrote before turn
+    // rows existed, hold the same "The user said …" shape.
+    const reported = {
+      ...makeUserText('The user said, "Hey, what is up, dude?"'),
+      author: assistant,
+    } as MessageType.Text;
+    const answeredText = {
+      ...makeUserText('Not much — what would you like to do?'),
+      author: assistant,
+    } as MessageType.Text;
+    expect(excludeEchoedAssistantTurns([said, reported, answeredText])).toEqual(
+      [said, answeredText],
+    );
+  });
+
+  it('never rewrites the user side of the conversation', () => {
+    const quoted = makeUserText('The user said I should ask you this.');
+    expect(excludeEchoedAssistantTurns([quoted, answered])).toEqual([
+      quoted,
+      answered,
+    ]);
+  });
+
   it('returns an empty history as empty', () => {
     expect(excludeEchoedAssistantTurns([])).toEqual([]);
   });

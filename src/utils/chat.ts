@@ -679,7 +679,8 @@ export function classifyReply(
 
 /**
  * The history as the next prompt should see it: an assistant row the app has
- * already judged to be a repeat of its own question is left out.
+ * already judged to be a repeat of its own question is left out, and so is a
+ * row the app wrote rather than the model.
  *
  * The row stays in the chat — the user heard it, and quietly replacing what a
  * model said would rewrite the conversation they were part of. It is the
@@ -694,11 +695,26 @@ export function excludeEchoedAssistantTurns(
   messages: MessageType.Any[],
 ): MessageType.Any[] {
   return messages.filter(message => {
-    if (message.type !== 'assistant_turn') {
-      return true;
+    // A notice the app put in the chat — a failed completion, a network error,
+    // a reset — is written by the app and authored by the assistant, so the
+    // conversion hands it to the model as one of its own turns. A context that
+    // reads three of those in its own past answers the next question with
+    // whatever else it can find, which is how an off-topic reply gets in.
+    if ((message.metadata as {system?: boolean} | undefined)?.system) {
+      return false;
     }
-    return (
-      !message.metadata?.echoExcluded && !isReportedSpeech(derivedText(message))
-    );
+    if (message.type === 'assistant_turn') {
+      return (
+        !message.metadata?.echoExcluded &&
+        !isReportedSpeech(derivedText(message))
+      );
+    }
+    // The same shape in the other row type an answer can be stored as: older
+    // sessions, and every reply a plain text completion wrote before the turn
+    // rows existed.
+    if (message.type === 'text' && message.author.id === assistant.id) {
+      return !isReportedSpeech(derivedText(message));
+    }
+    return true;
   });
 }

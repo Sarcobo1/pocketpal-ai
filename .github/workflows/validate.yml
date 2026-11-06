@@ -77,6 +77,8 @@ jobs:
             src/store/__tests__/ModelStore.autoProjector.test.ts \
             src/store/__tests__/ModelStore.projectorMedia.test.ts \
             src/store/__tests__/TTSStore.test.ts \
+            src/store/__tests__/generationLease.test.ts \
+            src/store/__tests__/ModelStore.generationLease.test.ts \
             src/components/VoiceModeView/__tests__/VoiceModeView.test.tsx \
             src/components/VoiceSetupSheet/__tests__/VoiceSetupSheet.test.tsx \
             src/screens/ModelsScreen/HFModelSearch/DetailsView/ModelFileCard/__tests__/ModelFileCard.test.tsx \

@@ -1839,3 +1839,113 @@ describe('useChatSession', () => {
     });
   });
 });
+
+/**
+ * The one right the context has.
+ *
+ * The bridge holds a native `ContextClaim` per operation and throws
+ * `Context is busy` at a second taker instead of queueing, so a turn that
+ * arrives while the model is still voicing its last reply never begins. That
+ * is not an answer to keep: it is a question to ask again once the right is
+ * back, with nothing left in the history.
+ */
+describe('a turn the context refused as busy', () => {
+  const addedRows = () =>
+    (chatSessionStore.addMessageToCurrentSession as jest.Mock).mock.calls.map(
+      ([row]) => row,
+    );
+  const completion = () => modelStore.engine!.completion as jest.Mock;
+  const busy = () => new Error('Exception in HostFunction: Context is busy');
+
+  it('runs the turn only after the model has stopped speaking', async () => {
+    // A previous reply still being voiced when this question arrives.
+    const speaking = await modelStore.acquireGeneration('speech');
+    setTimeout(() => speaking!.end(), 10);
+
+    let holderWhenSent = 'speech';
+    const delegate = completion();
+    delegate.mockImplementationOnce(async (params, onData) => {
+      holderWhenSent = String(modelStore.generationHolder);
+      return delegate(params, onData);
+    });
+
+    const {result} = renderHook(() =>
+      useChatSession({current: null}, textMessage.author, mockAssistant),
+    );
+    await act(async () => {
+      await result.current.handleSendPress(textMessage, {spoken: true});
+    });
+
+    expect(holderWhenSent).toBe('completion');
+    expect(modelStore.generationHolder).toBeNull();
+  });
+
+  it('keeps nothing of a refused turn and asks it once more', async () => {
+    completion().mockRejectedValueOnce(busy());
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const {result} = renderHook(() =>
+      useChatSession({current: null}, textMessage.author, mockAssistant),
+    );
+    let undone: any;
+    await act(async () => {
+      undone = await result.current.handleSendPress(textMessage, {
+        spoken: true,
+      });
+    });
+
+    // The retry, not a second refusal: the question was answered on the retry.
+    expect(completion()).toHaveBeenCalledTimes(2);
+    // Neither half of the failed attempt is left in the chat.
+    expect(chatSessionStore.deleteMessageFromSession).toHaveBeenCalledTimes(2);
+    for (const row of addedRows()) {
+      expect(String(row.text ?? '')).not.toMatch(/Completion failed/i);
+      expect(row.metadata?.system).toBeUndefined();
+    }
+    expect(undone).toBeUndefined();
+    error.mockRestore();
+  });
+
+  it('calls a second refusal a real failure, and stops retrying', async () => {
+    completion().mockRejectedValue(busy());
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const {result} = renderHook(() =>
+      useChatSession({current: null}, textMessage.author, mockAssistant),
+    );
+    let undone: any;
+    await act(async () => {
+      undone = await result.current.handleSendPress(textMessage, {
+        spoken: true,
+      });
+    });
+
+    expect(completion()).toHaveBeenCalledTimes(2);
+    expect(undone).toEqual(expect.objectContaining({reason: 'claim_busy'}));
+    error.mockRestore();
+  });
+
+  it('holds the right for the whole turn and gives it back after', async () => {
+    let holderWhileRunning: string = 'none';
+    let busyWhileRunning = false;
+    completion().mockImplementationOnce(async () => {
+      holderWhileRunning = String(modelStore.generationHolder);
+      busyWhileRunning = modelStore.isGenerationBusy;
+      throw busy();
+    });
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const {result} = renderHook(() =>
+      useChatSession({current: null}, textMessage.author, mockAssistant),
+    );
+    await act(async () => {
+      await result.current.handleSendPress(textMessage);
+    });
+
+    expect(holderWhileRunning).toBe('completion');
+    expect(busyWhileRunning).toBe(true);
+    expect(modelStore.generationHolder).toBeNull();
+    expect(modelStore.isGenerationBusy).toBe(false);
+    error.mockRestore();
+  });
+});

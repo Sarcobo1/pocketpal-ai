@@ -1886,11 +1886,18 @@ describe('a turn the context refused as busy', () => {
     // Read the moment the retry asks: this is the refused attempt's rollback,
     // counted before anything a later attempt might clean up of its own.
     let deletedBeforeRetry = -1;
-    delegate.mockImplementationOnce(async (params: any, onData: any) => {
+    delegate.mockImplementationOnce(async (_params: any, onData: any) => {
       deletedBeforeRetry = (
         chatSessionStore.deleteMessageFromSession as jest.Mock
       ).mock.calls.length;
-      return delegate(params, onData);
+      onData?.({token: 'tok', content: 'Salom'});
+      return {
+        timings: {total: 10},
+        usage: {},
+        text: 'Salom',
+        content: 'Salom',
+        reasoning_content: '',
+      };
     });
     const error = jest.spyOn(console, 'error').mockImplementation(() => {});
 

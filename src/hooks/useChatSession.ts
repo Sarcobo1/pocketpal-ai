@@ -59,6 +59,7 @@ import {
 import {
   VOICE_ANSWER_INSTRUCTION,
   VOICE_AUDIO_INSTRUCTION,
+  VOICE_CLAIM_WAIT_MS,
 } from '../services/voice/constants';
 import {toLocalMediaPath} from '../utils/multimodalPatterns';
 import {LLAMARN_ERROR_PATTERNS} from '../utils/llamaRnErrors';
@@ -975,6 +976,12 @@ function yieldToTouches(signal: AbortSignal): Promise<void> {
 export type UndoneSend = {
   message: MessageType.PartialText;
   sessionId: string;
+  /**
+   * Why the send came back undone. `claim_busy` is the transient one: the
+   * context was still voicing the previous reply, so nothing of this turn was
+   * kept and it is worth asking again.
+   */
+  reason?: 'claim_busy';
 };
 
 export type SendOptions = {
@@ -1025,9 +1032,27 @@ export const useChatSession = (
   const handleSendPress = async (
     message: MessageType.PartialText,
     opts: SendOptions = {},
+    /** Second attempt only, after a context that was still speaking let go. */
+    attempt = 1,
   ): Promise<UndoneSend | undefined> => {
     const sentFrom = chatSessionStore.activeSessionId;
     const stopsAtSend = stopsBeforeLease.current;
+    // The claim's owner and how long it has been held, printed when a turn is
+    // about to wait for someone else: the difference between a slow model and
+    // a reply that was still being voiced when this question arrived.
+    const holder = modelStore.generationHolder;
+    if (holder !== null) {
+      logPerf('chat.claim', {
+        holder,
+        heldMs: modelStore.generationHeldMs,
+        spoken: !!opts.spoken,
+        attempt,
+      });
+    }
+    // An utterance the listener has walked away from is cut rather than waited
+    // out; a turn ahead of this one keeps its queue, which is what it was
+    // asked for.
+    await modelStore.yieldSpeechClaim(VOICE_CLAIM_WAIT_MS);
     if (modelStore.isGenerationBusy) {
       chatSessionStore.setIsStopping(true);
     }
@@ -1070,8 +1095,9 @@ export const useChatSession = (
       lease.signal.addEventListener('abort', uiStop);
     }
 
+    let undone: UndoneSend | undefined;
     try {
-      return await sendUnderLease(message, lease, opts, {
+      undone = await sendUnderLease(message, lease, opts, {
         stop: uiStop,
         isStopped: () => uiStopped,
         holdAwake: () => {
@@ -1088,6 +1114,16 @@ export const useChatSession = (
       }
       lease.end();
     }
+    // A turn the context refused because it was still speaking is not a turn
+    // that failed: it was never started, and it is not in the history. Ask it
+    // once more now that the right is on its way back — the alternative is a
+    // listener hearing "Couldn't get an answer" for a question that costs one
+    // retry. One retry, because the second refusal would be a real one.
+    if (undone?.reason === 'claim_busy' && attempt === 1) {
+      logPerf('chat.retry', {by: 'claim_busy'});
+      return handleSendPress(message, opts, 2);
+    }
+    return undone;
   };
 
   const sendUnderLease = async (
@@ -1381,6 +1417,10 @@ export const useChatSession = (
       // first completion (the load-time memory check has no term for it).
       const isSpeculativeInitError =
         LLAMARN_ERROR_PATTERNS.speculativeInit.test(errorMessage);
+      // One claim per context, and the bridge throws rather than queueing, so
+      // this one says the turn was attempted on top of something still running.
+      const isClaimBusyError =
+        LLAMARN_ERROR_PATTERNS.contextBusy.test(errorMessage);
 
       // Error rollback path. The empty/in-flight AssistantTurn row
       // already exists; preserve any partial steps and tag with
@@ -1504,6 +1544,30 @@ export const useChatSession = (
           contextFull: true,
           isRemote: modelStore.activeModel?.origin === ModelOrigin.REMOTE,
         });
+      } else if (isClaimBusyError) {
+        // The turn never began: the context was still voicing the reply before
+        // this question, and the bridge answers a second taker by throwing.
+        // Nothing of it is kept — neither the error, which a later prompt
+        // would read back as one of this model's own answers, nor the question
+        // it failed to answer, which would sit there asking for nothing. The
+        // send comes back undone and `handleSendPress` asks it once more.
+        if (!hasPartialContent) {
+          await chatSessionStore.deleteMessageFromSession(
+            messageInfo.sessionId,
+            textMessage.id,
+          );
+          if (wasUntitled) {
+            await chatSessionStore.updateSessionTitleBySessionId(
+              messageInfo.sessionId,
+              NEW_SESSION_TITLE,
+            );
+          }
+          undone = {
+            message,
+            sessionId: messageInfo.sessionId,
+            reason: 'claim_busy',
+          };
+        }
       } else {
         await addSystemMessage(`${l10n.chat.completionFailed}${errorMessage}`);
       }

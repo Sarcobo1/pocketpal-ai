@@ -139,7 +139,6 @@ class MockModelStore {
   acquireGeneration: jest.Mock;
   tryAcquireGeneration: jest.Mock;
   abortActiveGeneration: jest.Mock;
-  yieldSpeechClaim: (waitMs: number) => Promise<YieldOutcome>;
   // A real slot, so lease ordering behaves as in the store.
   generationSlot = new GenerationSlot();
   benchmarkActive: boolean = false;

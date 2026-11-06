@@ -1881,7 +1881,17 @@ describe('a turn the context refused as busy', () => {
   });
 
   it('keeps nothing of a refused turn and asks it once more', async () => {
-    completion().mockRejectedValueOnce(busy());
+    const delegate = completion();
+    delegate.mockRejectedValueOnce(busy());
+    // Read the moment the retry asks: this is the refused attempt's rollback,
+    // counted before anything a later attempt might clean up of its own.
+    let deletedBeforeRetry = -1;
+    delegate.mockImplementationOnce(async (params: any, onData: any) => {
+      deletedBeforeRetry = (
+        chatSessionStore.deleteMessageFromSession as jest.Mock
+      ).mock.calls.length;
+      return delegate(params, onData);
+    });
     const error = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     const {result} = renderHook(() =>
@@ -1895,9 +1905,10 @@ describe('a turn the context refused as busy', () => {
     });
 
     // The retry, not a second refusal: the question was answered on the retry.
-    expect(completion()).toHaveBeenCalledTimes(2);
-    // Neither half of the failed attempt is left in the chat.
-    expect(chatSessionStore.deleteMessageFromSession).toHaveBeenCalledTimes(2);
+    expect(delegate).toHaveBeenCalledTimes(2);
+    // Neither half of the failed attempt is left in the chat — the empty
+    // answer the prompt never filled, and the question it failed to answer.
+    expect(deletedBeforeRetry).toBe(2);
     for (const row of addedRows()) {
       expect(String(row.text ?? '')).not.toMatch(/Completion failed/i);
       expect(row.metadata?.system).toBeUndefined();

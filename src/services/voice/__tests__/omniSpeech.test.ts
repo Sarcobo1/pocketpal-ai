@@ -1236,6 +1236,12 @@ describe('the claim a spoken reply holds', () => {
     );
     expect(generateSpeech).not.toHaveBeenCalled();
     expect(store.isGenerationBusy).toBe(false);
+
+    // The context back, and the next taker is granted: the refusal handed the
+    // right back rather than holding a turn nobody could start.
+    runInAction(() => {
+      store.engine = speechEngine;
+    });
     await expect(store.acquireGeneration()).resolves.not.toBeNull();
   });
 });

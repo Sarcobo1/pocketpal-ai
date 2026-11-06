@@ -173,11 +173,6 @@ describe('GenerationSlot', () => {
  * be testing the mock.
  */
 describe('GenerationSlot claim ownership', () => {
-  const sleep = (ms: number) =>
-    new Promise<void>(resolve => {
-      setTimeout(resolve, ms);
-    });
-
   it('names the holder, and says free when nobody holds it', async () => {
     const slot = new GenerationSlot();
     expect(slot.holder).toBeNull();

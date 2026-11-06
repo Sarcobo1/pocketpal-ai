@@ -25,6 +25,16 @@ export const VOICE_CAPTURE_SETTLE_MS = 400;
 export const VOICE_REPLY_AUDIO_WAIT_MS = 30_000;
 
 /**
+ * How long a turn waits (ms) for the context's one claim to come back from the
+ * reply that is being voiced before it stops that voice instead. The bridge
+ * throws rather than queueing, so the choice is a pause or a lost turn; three
+ * seconds is about the length of the sentence a listener has already stopped
+ * paying attention to, and past it the utterance is worth less than the answer
+ * waiting behind it.
+ */
+export const VOICE_CLAIM_WAIT_MS = 3000;
+
+/**
  * A transcript this soon after the phone started saying a reply (ms) is judged
  * against the words it just said: close enough to one of its sentences means the
  * microphone heard the loudspeaker, not the user. Generous on purpose — it covers

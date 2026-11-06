@@ -95,6 +95,43 @@ describe('OmniVoiceEngine', () => {
     await expect(turn.done).resolves.toBe('answered');
   });
 
+  it('waits for the model to stop voicing before it submits the clip', async () => {
+    // One claim per context, and the bridge throws at a second taker: a clip
+    // put in front of a speech decode is a turn that never started, and the
+    // listener hears "Couldn't get an answer" for a question the model saw.
+    runInAction(() => {
+      (modelStore as any).engine = {name: 'omni'};
+    });
+    const speaking = await modelStore.acquireGeneration('speech');
+    const port = makePort();
+    const events2 = events();
+    const turn = engine.runTurn(speech(500), port, events2);
+
+    await flush();
+    expect(port.send).not.toHaveBeenCalled();
+    expect(modelStore.generationHolder).toBe('speech');
+
+    speaking!.end();
+    await flush();
+    expect(port.send).toHaveBeenCalledTimes(1);
+
+    chat.sessions = [
+      {
+        id: 'session-1',
+        messages: [
+          {id: 'turn-1', type: 'assistant_turn', steps: [], metadata: {}},
+        ],
+      },
+    ];
+    port.onTurn!('turn-1');
+    port.settle();
+    await expect(turn.done).resolves.toBe('answered');
+
+    runInAction(() => {
+      (modelStore as any).engine = undefined;
+    });
+  });
+
   it('sends what the camera saw along with the audio', async () => {
     const frame = '/path/to/caches/voice-frames/frame-1.jpg';
     runInAction(() => {

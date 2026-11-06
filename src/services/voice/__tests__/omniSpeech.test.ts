@@ -18,6 +18,19 @@ import {
 const store = modelStore as any;
 const tts = ttsStore as any;
 
+/**
+ * An utterance is made under the same exclusive right a completion is, so the
+ * engine that grants it has to be there for these fixtures — a store with no
+ * engine is the busy context, tested as itself below.
+ */
+const speechEngine = {name: 'omni'};
+const withEngine = () => {
+  runInAction(() => {
+    store.engine = speechEngine;
+  });
+};
+withEngine();
+
 /** A context the model's own voice could be asked of. */
 let nextId = 1;
 const withContext = (support: {
@@ -1009,5 +1022,220 @@ describe('prewarmSpeech', () => {
 
     expect(generateSpeech).toHaveBeenCalledTimes(2);
     warn.mockRestore();
+  });
+});
+
+/**
+ * The context's right to run one generation.
+ *
+ * The patched bridge holds its native `ContextClaim` for the whole speech
+ * decode and answers a second taker by throwing `Context is busy` — so the
+ * utterance has to own the app's lease, and every way an utterance ends owes
+ * that lease back. A reply that fails to release it is a session that cannot
+ * answer again.
+ */
+describe('the claim a spoken reply holds', () => {
+  let generateSpeech: jest.Mock;
+  let clearCache: jest.Mock;
+  let stopSpeech: jest.Mock;
+  /** Lets a test decide when the decode is allowed to land. */
+  let release: () => void = () => {};
+
+  const sleep = (ms: number) =>
+    new Promise<void>(resolve => {
+      setTimeout(resolve, ms);
+    });
+
+  /** A context whose utterance does not finish until `release()` runs. */
+  const pendingSpeaker = (result: Record<string, unknown>) => {
+    runInAction(() => {
+      store.activeModelId = 'model-1';
+      store.engine = speechEngine;
+      store.context = {
+        id: nextId++,
+        generateSpeech,
+        clearCache,
+        stopSpeech,
+        getMultimodalSupport: jest
+          .fn()
+          .mockResolvedValue({audioGen: true, audio: true}),
+      };
+    });
+    generateSpeech.mockImplementation(async () => {
+      await new Promise<void>(resolve => {
+        release = resolve;
+      });
+      return result;
+    });
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    withEngine();
+    generateSpeech = jest.fn();
+    clearCache = jest.fn().mockResolvedValue(undefined);
+    stopSpeech = jest.fn();
+    (neuralAudioPlayer.play as jest.Mock).mockResolvedValue(undefined);
+    runInAction(() => {
+      tts.streamSpeech = false;
+      tts.speechLanguage = '';
+      tts.forceTTSFallback = false;
+      tts.speechKeepCache = true;
+      store.contextInitParams = {...store.contextInitParams, n_parallel: 2};
+    });
+  });
+
+  /**
+   * A decode that lands when the bridge is told to stop — which is what an
+   * interrupt does: the flag is read between frames and the utterance returns.
+   */
+  const interruptibleSpeaker = (result: Record<string, unknown>) => {
+    runInAction(() => {
+      store.activeModelId = 'model-1';
+      store.engine = speechEngine;
+      store.context = {
+        id: nextId++,
+        generateSpeech,
+        clearCache,
+        stopSpeech,
+        getMultimodalSupport: jest
+          .fn()
+          .mockResolvedValue({audioGen: true, audio: true}),
+      };
+    });
+    generateSpeech.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          stopSpeech.mockImplementation(() => {
+            resolve(result);
+          });
+        }),
+    );
+  };
+
+  it('is taken as the speaker and held for the whole decode', async () => {
+    pendingSpeaker(speechResult());
+
+    const pending = speakWithModel('Salom');
+    await sleep(10);
+
+    expect(store.acquireGeneration).toHaveBeenCalledWith('speech');
+    expect(store.generationHolder).toBe('speech');
+    expect(store.isGenerationBusy).toBe(true);
+
+    release();
+    const report = await pending;
+
+    expect(report.spoken).toBe(true);
+    expect(store.generationHolder).toBeNull();
+    expect(store.isGenerationBusy).toBe(false);
+  });
+
+  it('gives the context back after a decode that threw', async () => {
+    runInAction(() => {
+      store.activeModelId = 'model-1';
+      store.engine = speechEngine;
+      store.context = {
+        id: nextId++,
+        generateSpeech,
+        clearCache,
+        stopSpeech,
+        getMultimodalSupport: jest
+          .fn()
+          .mockResolvedValue({audioGen: true, audio: true}),
+      };
+    });
+    generateSpeech.mockRejectedValue(
+      new Error('[RNLlama] Missing JSI bindings'),
+    );
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const report = await speakWithModel('Salom');
+
+    expect(report.spoken).toBe(false);
+    expect(store.generationHolder).toBeNull();
+    await expect(store.acquireGeneration()).resolves.not.toBeNull();
+    warn.mockRestore();
+  });
+
+  it('stops the utterance when the right it holds is yielded, then hands it over', async () => {
+    interruptibleSpeaker(speechResult({stopReason: 'aborted', aborted: true}));
+
+    const pending = speakWithModel('Salom');
+    await sleep(10);
+
+    // The next turn's patience: wait, then cut — the lease's own abort
+    // listener calling the bridge's stop, and the `finally` giving the context
+    // back as the interrupt lands.
+    const outcome = await store.yieldSpeechClaim(50);
+    const report = await pending;
+
+    expect(outcome).toBe('cut');
+    expect(stopSpeech).toHaveBeenCalledTimes(1);
+    expect(report.spoken).toBe(false);
+    expect(store.generationHolder).toBeNull();
+  });
+
+  it('waits behind a completion instead of speaking on top of it', async () => {
+    pendingSpeaker(speechResult());
+    const held = await store.acquireGeneration();
+
+    const pending = speakWithModel('Salom');
+    await sleep(10);
+
+    expect(generateSpeech).not.toHaveBeenCalled();
+    expect(store.generationHolder).toBe('completion');
+
+    held!.end();
+    await sleep(10);
+    expect(store.generationHolder).toBe('speech');
+    release();
+
+    const report = await pending;
+    expect(report.spoken).toBe(true);
+  });
+
+  it('lets the completion queued behind an utterance run once it ends', async () => {
+    pendingSpeaker(speechResult());
+
+    const speaking = speakWithModel('Salom');
+    await sleep(10);
+    let granted: unknown = 'waiting';
+    const queued = store.acquireGeneration().then(lease => {
+      granted = lease;
+      return lease;
+    });
+    await sleep(10);
+    expect(granted).toBe('waiting');
+
+    release();
+    await speaking;
+
+    // This is the turn the device used to lose to `Context is busy`.
+    const lease = await queued;
+    expect(lease).not.toBeNull();
+    expect(lease.holder).toBe('completion');
+    lease.end();
+  });
+
+  it('refuses the utterance, not the model voice, when there is nothing to grant', async () => {
+    pendingSpeaker(speechResult());
+    runInAction(() => {
+      store.engine = undefined;
+    });
+
+    const report = await speakWithModel('Salom');
+
+    expect(report).toEqual(
+      expect.objectContaining({
+        spoken: false,
+        stopReason: 'busy',
+        stage: 'claim',
+        keepModelVoice: true,
+      }),
+    );
+    expect(generateSpeech).not.toHaveBeenCalled();
+    expect(store.isGenerationBusy).toBe(false);
+    await expect(store.acquireGeneration()).resolves.not.toBeNull();
   });
 });

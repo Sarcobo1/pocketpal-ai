@@ -6,6 +6,7 @@ import {vtrace} from '../../utils/voiceTrace';
 
 import {findTurn} from './chatTurns';
 import {addTurnInfo, logPerf, markTurn, startPerf} from '../../utils/mediaPerf';
+import {VOICE_CLAIM_WAIT_MS} from './constants';
 import {captureVoiceFrame} from './frameSource';
 import {gateUtterance} from './speechLevel';
 import {writeUtteranceWav} from './wav';
@@ -120,6 +121,20 @@ export class OmniVoiceEngine implements VoiceEngine {
         audioUri,
         frames: imageUris.length,
       });
+      // The clip waits for the context's one claim before it is submitted.
+      // The turn already waits for the reply to be *heard*; this is the other
+      // half, that the answer before it has stopped being *made* — a clip put
+      // in front of a decoding speech pass is a question that throws instead
+      // of waiting, and the listener hears "Couldn't get an answer" for a turn
+      // the model never saw. Bounded, and past the bound the utterance is cut
+      // rather than waited out.
+      const claim = await modelStore.yieldSpeechClaim(VOICE_CLAIM_WAIT_MS);
+      if (claim !== 'no-speech') {
+        addTurnInfo({claim});
+      }
+      if (aborted) {
+        return 'interrupted';
+      }
       on.transcribed('');
       // The reply is text until the model can voice itself, so the turn is not
       // over when the tokens stop: it is over when the voice stops with them.

@@ -286,8 +286,15 @@ const report = (
  * is already what the device's audio focus and ducking are arranged around.
  * With `streamSpeech` on, that buffer never exists — the player is fed piece by
  * piece while the engine is still decoding, and this resolves once the last
- * piece has played. Both cases take the same context claim a completion takes,
- * so the reply's text is complete before a sample is asked for.
+ * piece has played.
+ *
+ * The whole utterance runs inside the app's generation lease, which is the one
+ * thing that makes a speech pass and a completion mutually exclusive. The
+ * native bridge cannot be that thing: `ContextClaim` answers a second taker by
+ * throwing `Context is busy`, and a decode that ignored the lease was audio
+ * still being made while the next turn's completion started on top of it. The
+ * `finally` is the other half — an aborted, thrown or refused utterance still
+ * owes the context back, so one failed reply cannot brick the session.
  */
 export const speakWithModel = async (
   text: string,
@@ -317,6 +324,69 @@ export const speakWithModel = async (
       keepModelVoice: false,
     });
   }
+  const lease = await modelStore.acquireGeneration('speech');
+  if (!lease) {
+    return refuseSpokenReply(text, language);
+  }
+  // Stop takes the utterance off the context rather than leaving it decoding
+  // into a lease nobody is waiting for: the bridge's own `speech_interrupted`
+  // flag lands between frames, and the `finally` hands the claim back as soon
+  // as it does. One function, or the removal below removes nothing.
+  const cut = () => {
+    ctx.stopSpeech();
+  };
+  lease.signal.addEventListener('abort', cut);
+  try {
+    return await speakUnderClaim(ctx, text, language, onPlaying);
+  } finally {
+    lease.signal.removeEventListener('abort', cut);
+    lease.end();
+  }
+};
+
+/**
+ * The reply the model was going to voice, said instead with nothing asked of
+ * the context — because the context's right is held by someone else and this
+ * pass will not take it from them.
+ *
+ * `keepModelVoice` stays true: the reason here is a collision, not a model
+ * without a voice, and a session that lost its voice for one unlucky reply is
+ * the failure this whole path is here to stop.
+ */
+const refuseSpokenReply = (text: string, language: string) => {
+  logPerf('speech.reply', {
+    stop: 'busy',
+    stage: 'claim',
+    err: 'no generation lease',
+    chars: text.length,
+    frames: 0,
+    seconds: '0.00',
+    rtf: '-',
+    drop: 'none',
+    lang: language || 'template',
+    voice: 'template',
+  });
+  return report({
+    stopReason: 'busy',
+    stage: 'claim',
+    language: language || 'template',
+  });
+};
+
+/**
+ * The utterance itself, with the context's right to run it already in hand.
+ *
+ * `speechFastStart` is off by default for a reason this shows: one context
+ * serves one thing at a time, so a sample cannot be asked for until the text
+ * generation has ended — the two hands of a reply are one after the other,
+ * never side by side.
+ */
+const speakUnderClaim = async (
+  ctx: NonNullable<typeof modelStore.context>,
+  text: string,
+  language: string,
+  onPlaying?: () => void,
+): Promise<ModelSpeechReport> => {
   let thrown = '';
   // One feed per reply. It owns the piece boundary and the pace of the output,
   // so the engine has only to hand samples over — and when the setting is off
@@ -663,43 +733,60 @@ export const prewarmSpeech = async (): Promise<void> => {
   if (!(await modelCanVoiceReplies())) {
     return;
   }
-  prewarmedContext = ctx.id;
-  const t0 = Date.now();
-  const out = await ctx
-    .generateSpeech(
-      {
-        text: 'Aa.',
-        maxSeconds: 1,
-        stream: true,
-        ...(speechIsolation() ? {isolateSeq: true} : {}),
-      },
-      // One sample is the whole point: everything before it is the cost being
-      // paid in advance, so the utterance stops the moment it lands.
-      () => ctx.stopSpeech(),
-    )
-    .catch(err => {
-      console.warn('[voice] speech prewarm failed:', err);
-      return null;
-    });
-  if (!out) {
-    // Nothing was learned, so the next session asks again.
-    prewarmedContext = null;
+  // The warm-up wants the context for itself too, so it goes through the same
+  // right a reply does and gives up at once when something else is holding it
+  // — a session that starts on top of an answer is worse than one that starts
+  // without the warm-up.
+  const lease = await modelStore.acquireGeneration('speech');
+  if (!lease) {
     return;
   }
-  if (out.seqIsolated !== true && TOUCHED_CACHE.has(out.stopReason)) {
-    // The warm-up decoded over the conversation's own positions, so it owes the
-    // next turn the same clear a spoken reply would.
-    await ctx.clearCache(true).catch(() => undefined);
+  const cut = () => {
+    ctx.stopSpeech();
+  };
+  lease.signal.addEventListener('abort', cut);
+  try {
+    prewarmedContext = ctx.id;
+    const t0 = Date.now();
+    const out = await ctx
+      .generateSpeech(
+        {
+          text: 'Aa.',
+          maxSeconds: 1,
+          stream: true,
+          ...(speechIsolation() ? {isolateSeq: true} : {}),
+        },
+        // One sample is the whole point: everything before it is the cost being
+        // paid in advance, so the utterance stops the moment it lands.
+        () => ctx.stopSpeech(),
+      )
+      .catch(err => {
+        console.warn('[voice] speech prewarm failed:', err);
+        return null;
+      });
+    if (!out) {
+      // Nothing was learned, so the next session asks again.
+      prewarmedContext = null;
+      return;
+    }
+    if (out.seqIsolated !== true && TOUCHED_CACHE.has(out.stopReason)) {
+      // The warm-up decoded over the conversation's own positions, so it owes the
+      // next turn the same clear a spoken reply would.
+      await ctx.clearCache(true).catch(() => undefined);
+    }
+    logPerf('speech.prewarm', {
+      ms: Date.now() - t0,
+      promptMs: Math.round(out.promptMs),
+      firstAudioMs: Math.round(out.firstAudioMs),
+      frames: out.frames,
+      stop: out.stopReason,
+      stage: out.stage,
+      cache: out.seqIsolated === true ? 'kept' : 'shared',
+    });
+  } finally {
+    lease.signal.removeEventListener('abort', cut);
+    lease.end();
   }
-  logPerf('speech.prewarm', {
-    ms: Date.now() - t0,
-    promptMs: Math.round(out.promptMs),
-    firstAudioMs: Math.round(out.firstAudioMs),
-    frames: out.frames,
-    stop: out.stopReason,
-    stage: out.stage,
-    cache: out.seqIsolated === true ? 'kept' : 'shared',
-  });
 };
 
 /**

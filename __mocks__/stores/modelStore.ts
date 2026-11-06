@@ -14,7 +14,11 @@ import type {Samplers} from '../../src/utils/samplerParams';
 import type {ErrorState} from '../../src/utils/errors';
 import {LlamaContext} from 'llama.rn';
 import {CompletionEngine} from '../../src/utils/completionTypes';
-import {GenerationSlot} from '../../src/store/generationLease';
+import {
+  GenerationSlot,
+  type GenerationHolder,
+  type YieldOutcome,
+} from '../../src/store/generationLease';
 import {createDefaultContextInitParams} from '../../src/utils/contextInitParamsVersions';
 import {
   MemoryEstimateSettings,
@@ -135,6 +139,7 @@ class MockModelStore {
   acquireGeneration: jest.Mock;
   tryAcquireGeneration: jest.Mock;
   abortActiveGeneration: jest.Mock;
+  yieldSpeechClaim: (waitMs: number) => Promise<YieldOutcome>;
   // A real slot, so lease ordering behaves as in the store.
   generationSlot = new GenerationSlot();
   benchmarkActive: boolean = false;
@@ -202,6 +207,9 @@ class MockModelStore {
       abortActiveGeneration: false,
       generationSlot: false,
       isGenerationBusy: false,
+      generationHolder: false,
+      generationHeldMs: false,
+      yieldSpeechClaim: false,
       extendedRamSetting: false,
       memoryBudget: false,
       lastCrashedModelId: false,
@@ -295,10 +303,11 @@ class MockModelStore {
     this.setSpecDraftCacheTypeK = jest.fn();
     this.setSpecDraftCacheTypeV = jest.fn();
     this.enterBenchmarkMode = jest.fn().mockResolvedValue(undefined);
-    this.acquireGeneration = jest.fn(() =>
+    this.acquireGeneration = jest.fn((holder?: GenerationHolder) =>
       this.generationSlot.acquire(
         () => Promise.resolve(),
         () => this.engine ?? null,
+        holder,
       ),
     );
     this.tryAcquireGeneration = jest.fn(() =>
@@ -337,6 +346,22 @@ class MockModelStore {
   get isGenerationBusy(): boolean {
     return this.generationSlot.isBusy;
   }
+
+  get generationHolder(): GenerationHolder | null {
+    return this.generationSlot.holder;
+  }
+
+  get generationHeldMs(): number {
+    return this.generationSlot.holderMs;
+  }
+
+  yieldSpeechClaim = async (waitMs: number): Promise<YieldOutcome> => {
+    if (this.generationHolder !== 'speech') {
+      return 'no-speech';
+    }
+    const outcome = await this.generationSlot.yieldSpeech(waitMs);
+    return outcome;
+  };
 
   /** A lease a test left held must not make a later test's send wait. */
   resetGenerationSlot = () => {

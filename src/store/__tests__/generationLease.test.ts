@@ -162,3 +162,139 @@ describe('GenerationSlot', () => {
     expect(slot.isBusy).toBe(false);
   });
 });
+
+/**
+ * Who the context belongs to, and what waiting for a speaker came to.
+ *
+ * A spoken reply holds the native claim for its whole decode, so a completion
+ * granted on top of it throws `Context is busy` — the failure these tests pin
+ * the door against. The waits are short and real: the outcome under test is
+ * which side of a deadline the release landed on, and a fake clock would only
+ * be testing the mock.
+ */
+describe('GenerationSlot claim ownership', () => {
+  const sleep = (ms: number) =>
+    new Promise<void>(resolve => {
+      setTimeout(resolve, ms);
+    });
+
+  it('names the holder, and says free when nobody holds it', async () => {
+    const slot = new GenerationSlot();
+    expect(slot.holder).toBeNull();
+
+    const speaking = await slot.acquire(immediately, () => engineA, 'speech');
+    expect(slot.holder).toBe('speech');
+    expect(slot.holderMs).toBeGreaterThanOrEqual(0);
+
+    speaking!.end();
+    const answering = await slot.acquire(
+      immediately,
+      () => engineA,
+      'completion',
+    );
+    expect(slot.holder).toBe('completion');
+
+    answering!.end();
+    expect(slot.holder).toBeNull();
+    expect(slot.holderMs).toBe(0);
+  });
+
+  it('reports the speech holder to the next acquirer before it waits', async () => {
+    const slot = new GenerationSlot();
+    const speaking = await slot.acquire(immediately, () => engineA, 'speech');
+
+    // What `handleSendPress` prints at the head of a turn: the owner and how
+    // long it has had the context, from the slot, not from a second register.
+    expect(slot.holder).toBe('speech');
+    expect(slot.isBusy).toBe(true);
+
+    speaking!.end();
+  });
+
+  it('waits out a speaker that finishes on its own', async () => {
+    const slot = new GenerationSlot();
+    const speaking = await slot.acquire(immediately, () => engineA, 'speech');
+    setTimeout(() => speaking!.end(), 10);
+
+    expect(await slot.yieldSpeech(1000)).toBe('waited');
+    expect(speaking!.signal.aborted).toBe(false);
+    expect(slot.holder).toBeNull();
+  });
+
+  it('cuts a speaker that will not let go, once it has been stopped', async () => {
+    const slot = new GenerationSlot();
+    const speaking = await slot.acquire(immediately, () => engineA, 'speech');
+    // The bridge's own interrupt flag lands between frames; the utterance's
+    // `finally` is what hands the claim back, so the abort has to be answered
+    // by an end — this is that exchange.
+    speaking!.signal.addEventListener('abort', () => {
+      setTimeout(() => speaking!.end(), 5);
+    });
+
+    expect(await slot.yieldSpeech(10)).toBe('cut');
+    expect(speaking!.signal.aborted).toBe(true);
+    expect(slot.holder).toBeNull();
+  });
+
+  it('says stuck when a stopped speaker never came back, and still queues behind it', async () => {
+    const slot = new GenerationSlot();
+    const speaking = await slot.acquire(immediately, () => engineA, 'speech');
+
+    expect(await slot.yieldSpeech(10)).toBe('stuck');
+    expect(speaking!.signal.aborted).toBe(true);
+    expect(slot.holder).toBe('speech');
+
+    // The patience running out is not a licence to run on top of the utterance:
+    // the acquirer still waits for the release.
+    let granted = false;
+    const waiting = slot
+      .acquire(immediately, () => engineA, 'completion')
+      .then(lease => {
+        granted = true;
+        return lease;
+      });
+    await flush();
+    expect(granted).toBe(false);
+
+    speaking!.end();
+    const next = await waiting;
+    expect(next!.holder).toBe('completion');
+  });
+
+  it('never cuts a completion, which is a turn somebody asked for', async () => {
+    const slot = new GenerationSlot();
+    const answering = await slot.acquire(
+      immediately,
+      () => engineA,
+      'completion',
+    );
+
+    expect(await slot.yieldSpeech(10)).toBe('no-speech');
+    expect(answering!.signal.aborted).toBe(false);
+    expect(slot.holder).toBe('completion');
+    answering!.end();
+  });
+
+  it('says no-speech when the context is already free', async () => {
+    await expect(new GenerationSlot().yieldSpeech(10)).resolves.toBe(
+      'no-speech',
+    );
+  });
+
+  it('grants a completion queued behind a spoken reply once it is released', async () => {
+    const slot = new GenerationSlot();
+    const speaking = await slot.acquire(immediately, () => engineA, 'speech');
+
+    const waiting = slot.acquire(immediately, () => engineA, 'completion');
+    await flush();
+    expect(slot.holder).toBe('speech');
+
+    // The turn the device was asking for: no throw, no busy, one lease.
+    speaking!.end();
+    const answering = await waiting;
+
+    expect(answering).not.toBeNull();
+    expect(answering!.holder).toBe('completion');
+    expect(slot.holder).toBe('completion');
+  });
+});

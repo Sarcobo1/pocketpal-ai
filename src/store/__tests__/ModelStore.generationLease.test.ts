@@ -185,6 +185,61 @@ describe('ModelStore generation lease', () => {
     expect(context.release).toHaveBeenCalledTimes(1);
   });
 
+  describe('the model voicing a reply', () => {
+    it('names the speaker as the holder, and free once it has ended', async () => {
+      loadFakeModel();
+      expect(modelStore.generationHolder).toBeNull();
+
+      const speaking = await modelStore.acquireGeneration('speech');
+      expect(modelStore.generationHolder).toBe('speech');
+      expect(modelStore.generationHeldMs).toBeGreaterThanOrEqual(0);
+
+      speaking!.end();
+      const answering = await modelStore.acquireGeneration();
+      expect(answering!.holder).toBe('completion');
+      answering!.end();
+    });
+
+    it('lets the completion through when the speech releases on its own', async () => {
+      loadFakeModel();
+      const speaking = await modelStore.acquireGeneration('speech');
+      setTimeout(() => speaking!.end(), 10);
+
+      expect(await modelStore.yieldSpeechClaim(1000)).toBe('waited');
+      expect(modelStore.generationHolder).toBeNull();
+
+      const answering = await modelStore.acquireGeneration();
+      expect(answering).not.toBeNull();
+      answering!.end();
+    });
+
+    it('stops a speech that outlives the patience rather than queueing behind it', async () => {
+      loadFakeModel();
+      const speaking = await modelStore.acquireGeneration('speech');
+      // The bridge notices the interrupt between frames, and the utterance's
+      // own `finally` is what gives the context back.
+      speaking!.signal.addEventListener('abort', () => {
+        setTimeout(() => speaking!.end(), 5);
+      });
+
+      expect(await modelStore.yieldSpeechClaim(10)).toBe('cut');
+      expect(speaking!.signal.aborted).toBe(true);
+
+      const answering = await modelStore.acquireGeneration();
+      expect(answering).not.toBeNull();
+      answering!.end();
+    });
+
+    it('never yields a completion, which is a turn somebody asked for', async () => {
+      loadFakeModel();
+      const answering = await modelStore.acquireGeneration();
+
+      expect(await modelStore.yieldSpeechClaim(10)).toBe('no-speech');
+      expect(answering!.signal.aborted).toBe(false);
+      answering!.end();
+    });
+  });
+
   describe('VideoPal image completion', () => {
     it('skips frames while a completion holds the lease, stops it on abort, and release waits only for it', async () => {
       const {context} = loadFakeModel({multimodal: true});

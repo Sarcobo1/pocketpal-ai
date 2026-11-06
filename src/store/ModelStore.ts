@@ -25,7 +25,12 @@ import {uiStore, hfStore} from '.';
 import {serverStore} from './ServerStore';
 import {routerStore} from './RouterStore';
 import {chatSessionStore} from './ChatSessionStore';
-import {GenerationSlot, type GenerationLease} from './generationLease';
+import {
+  GenerationSlot,
+  type GenerationHolder,
+  type GenerationLease,
+  type YieldOutcome,
+} from './generationLease';
 import {
   draftCacheDefaults,
   effectiveDraftModeOf,
@@ -370,6 +375,11 @@ class ModelStore {
       generationSlot: false,
       isReleasingContext: false,
       isGenerationBusy: false,
+      // Both read the slot, which is not observable: as computeds they would
+      // keep answering with whoever held the claim the first time they were
+      // asked.
+      generationHolder: false,
+      generationHeldMs: false,
       activeModel: computed,
       activeModelCaps: computed({equals: comparer.structural}),
       activeSamplerDefaults: computed,
@@ -4966,11 +4976,18 @@ class ModelStore {
    * Waits for every earlier generation to end and for any context operation
    * queued by then (a model switch) to finish, then grants a lease on the
    * current engine; null when no model is ready.
+   *
+   * `holder` says what the right is being taken for, which is what makes a
+   * spoken reply and a turn collide in one queue instead of one throwing
+   * `Context is busy` on top of the other.
    */
-  acquireGeneration = (): Promise<GenerationLease | null> =>
+  acquireGeneration = (
+    holder: GenerationHolder = 'completion',
+  ): Promise<GenerationLease | null> =>
     this.generationSlot.acquire(
       () => this.contextOperationMutex,
       this.grantableEngine,
+      holder,
     );
 
   tryAcquireGeneration = (): GenerationLease | null =>
@@ -4984,6 +5001,38 @@ class ModelStore {
   get isGenerationBusy(): boolean {
     return this.generationSlot.isBusy;
   }
+
+  /** Whose right is in hand now — the claim's owner, or null when it is free. */
+  get generationHolder(): GenerationHolder | null {
+    return this.generationSlot.holder;
+  }
+
+  /** How long the current holder has had the context, in ms. */
+  get generationHeldMs(): number {
+    return this.generationSlot.holderMs;
+  }
+
+  /**
+   * Frees the context for a turn that is about to queue behind an utterance.
+   *
+   * The llama.cpp context hands out one claim, and the bridge answers a second
+   * taker with `Context is busy` rather than a wait, so a spoken reply has to
+   * hold the same lease a completion takes — and a lease held by a voice
+   * nobody is listening to any more should end, not be waited out. The bound
+   * is the listener's patience, not the model's: past it the utterance is cut
+   * at its next frame and this turn goes first.
+   */
+  yieldSpeechClaim = async (waitMs: number): Promise<YieldOutcome> => {
+    if (this.generationHolder !== 'speech') {
+      return 'no-speech';
+    }
+    // Written before the wait, so the line is there even when the wait is
+    // what a turn's whole pause turns out to have been.
+    const heldMs = this.generationHeldMs;
+    const outcome = await this.generationSlot.yieldSpeech(waitMs);
+    logPerf('claim.yield', {outcome, heldMs, waitMs});
+    return outcome;
+  };
 
   private grantableEngine = (): CompletionEngine | null =>
     this.isReleasingContext ? null : (this.engine ?? null);

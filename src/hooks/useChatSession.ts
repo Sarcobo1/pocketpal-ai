@@ -44,6 +44,7 @@ import {
   convertToChatMessages,
   countMediaParts,
   excludeEchoedAssistantTurns,
+  isRefusedReply,
   removeThinkingParts,
   visibleStepContent,
 } from '../utils/chat';
@@ -58,7 +59,6 @@ import {
 } from '../utils/omniMode';
 import {
   VOICE_ANSWER_INSTRUCTION,
-  VOICE_AUDIO_INSTRUCTION,
   VOICE_CLAIM_WAIT_MS,
 } from '../services/voice/constants';
 import {toLocalMediaPath} from '../utils/multimodalPatterns';
@@ -165,16 +165,14 @@ const prepareCompletion = async ({
   const canAudio = hasAudio && media.audioInput;
   const multimodalReady = canImages || canAudio;
 
-  // A spoken turn reaches the model with no words at all, which reads as "say
-  // back what you heard" to a model trained to transcribe. The instruction goes
-  // in the prompt part beside the clip and never in the row: the row stays
-  // empty so the bubble keeps its "Voice message" label, the history keeps its
-  // placeholder, and a dictated turn — whose text the engine already knows —
-  // keeps the words it was sent with.
-  const spokenInstruction = canAudio && !message.text.trim();
-  const userTextPart = spokenInstruction
-    ? VOICE_AUDIO_INSTRUCTION
-    : message.text;
+  // A spoken turn is the clip and nothing else. Words beside it are words the
+  // model can answer *with* instead of answering the sound: on a weak clip it
+  // said our own instruction back, quoted as something the user had spoken.
+  // Steering is persona in the system prompt, where there is nothing to quote
+  // as the question. The row stays empty so the bubble keeps its "Voice
+  // message" label, the history keeps its placeholder, and a dictated turn —
+  // whose text the engine already knows — keeps the words it was sent with.
+  const audioOnly = canAudio && !message.text.trim();
 
   // Create user message content - use array format only for multimodal,
   // string for text-only.
@@ -182,10 +180,7 @@ const prepareCompletion = async ({
 
   if (multimodalReady) {
     userMessageContent = [
-      {
-        type: 'text',
-        text: userTextPart,
-      },
+      ...(audioOnly ? [] : [{type: 'text', text: message.text}]),
       ...(canImages
         ? imageUris.map(path => ({
             // The raw URI: llama.rn strips file:// off an image url itself, and
@@ -339,11 +334,14 @@ const prepareCompletion = async ({
     systemTail: systemMessage
       ? oneLine(String(systemMessage.content)).slice(-110)
       : '-',
-    // The whole of a spoken turn as the model receives it: the words beside the
-    // clip, and the clip itself. A question answered with its own text back is a
-    // prompt-shape failure before it is a sampling one, and the chat template
-    // runs natively, so this is the only place the shape is visible.
-    textPart: multimodalReady ? oneLine(userTextPart).slice(-90) : '-',
+    // The whole of a spoken turn as the model receives it. `none` is the voice
+    // turn working as designed: the clip alone, nothing beside it to quote back
+    // as the question. A dictated turn still carries the words it was sent.
+    textPart: audioOnly
+      ? 'none'
+      : multimodalReady
+        ? oneLine(message.text).slice(-90)
+        : '-',
     audioPath:
       canAudio && audioUri
         ? oneLine(toLocalMediaPath(audioUri)).slice(-46)
@@ -612,6 +610,40 @@ function releaseHeldStepToTts(
   }
 }
 
+/**
+ * Judge a reply as it arrives, and stop it being heard if it is not one.
+ *
+ * Two shapes are refused: the app's own prompt said back — the line that used to
+ * stand beside a voice clip, quoted on a clip too weak to hear — and a reply that
+ * reports the speaker instead of answering them. Neither is stored, neither is
+ * spoken, and the question is asked once more.
+ *
+ * Called on every chunk, so it is the plain string shapes only: `measureEcho`
+ * needs a transcript and a table, and a voice turn has neither to spare
+ * mid-stream. The engine's own final text is judged the same way at the end,
+ * which is where a reply the stream never showed is caught.
+ */
+function refuseReply(text: string): string | null {
+  const clean = stripControlTokens(text);
+  if (!isRefusedReply(clean)) {
+    return null;
+  }
+  const reason = classifyReply(clean, '').reason;
+  logPerf('chat.refuse', {
+    reason,
+    chars: clean.length,
+    reply: oneLine(clean).slice(0, 60),
+  });
+  // On the turn's own line, next to the clip that produced it: a refused reply
+  // and a weak clip are one story, and one grep should hold both.
+  addTurnInfo({refused: reason});
+  // Whatever of it was already queued has to go quiet before the notice.
+  ttsStore.stop('reply_refused').catch(err => {
+    console.warn('[useChatSession] TTS stop on refusal failed:', err);
+  });
+  return reason;
+}
+
 // Normalise a finished turn's result into the snapshot the banner reads.
 // `contextFull` is frozen here as the OR of the native full/truncated flags
 // and (remote only) a 'length' finish reason derived from `stopped_limit`.
@@ -669,6 +701,12 @@ async function applyEventToStore(
     echoFrom: string;
     tts: TtsRunState;
     stopped: boolean;
+    /**
+     * Set when the reply turned out to be the app's own prompt read back, or a
+     * report of the speaker. Once set, nothing more of this turn is written or
+     * spoken: the row is deleted and the question is asked once more.
+     */
+    refused: {reason: string | null};
   },
 ): Promise<void> {
   switch (event.type) {
@@ -688,6 +726,11 @@ async function applyEventToStore(
       });
       return;
     case 'token': {
+      // The turn is already refused: a chunk still in flight reaches neither
+      // the row nor the voice on its way out.
+      if (ctx.refused.reason) {
+        return;
+      }
       // A control token can still arrive — from a cache an earlier turn left,
       // or from a model that answers around the bias. It is never part of an
       // answer, so it comes out at the one place both the voice and the stored
@@ -779,7 +822,11 @@ async function applyEventToStore(
       );
       return;
     case 'step_finished':
-      if (ctx.tts.enabled && ctx.tts.stepMode === 'held') {
+      if (
+        ctx.tts.enabled &&
+        ctx.tts.stepMode === 'held' &&
+        !ctx.refused.reason
+      ) {
         try {
           releaseHeldStepToTts(ctx.messageId, event.toolCalls, ctx.tts);
         } catch (ttsErr) {
@@ -800,10 +847,24 @@ async function applyEventToStore(
       await chatSessionStore.finalizeActiveStep(ctx.messageId, ctx.sessionId);
       return;
     case 'run_finished': {
+      // A refused turn is over: its row is on its way out, so none of its
+      // numbers are recorded as an answer's and none of its text is spoken.
+      if (ctx.refused.reason) {
+        return;
+      }
       // Final timings + observability for hit-max-turns. Kept here
       // (not in the runner) because timings are an observability
       // concern of the hook, not the runner.
       const finalResult = event.result.finalResult;
+      // The engine's own final text can hold what the stream never showed — a
+      // wind-down chunk, or a reply assembled after the last token event.
+      const refusal = refuseReply(
+        finalResult.content ?? finalResult.text ?? '',
+      );
+      if (refusal) {
+        ctx.refused.reason = refusal;
+        return;
+      }
       vtrace('run.done', {
         stopped: ctx.stopped,
         tokens: finalResult.tokens_predicted,
@@ -977,11 +1038,12 @@ export type UndoneSend = {
   message: MessageType.PartialText;
   sessionId: string;
   /**
-   * Why the send came back undone. `claim_busy` is the transient one: the
-   * context was still voicing the previous reply, so nothing of this turn was
-   * kept and it is worth asking again.
+   * Why the send came back undone. Both are transient, and both leave nothing
+   * of the turn behind: `claim_busy` is a context still voicing the reply before
+   * this question, `reply_refused` an answer that was the app's own prompt read
+   * back. Either is worth asking once more.
    */
-  reason?: 'claim_busy';
+  reason?: 'claim_busy' | 'reply_refused';
 };
 
 export type SendOptions = {
@@ -1029,10 +1091,30 @@ export const useChatSession = (
     await addMessage(systemRow(text, metadata));
   };
 
+  /**
+   * A turn refused twice is one the app cannot answer, and the listener is told
+   * so out loud — in the device voice, because the model's own answer is what
+   * just failed. Awaited, so the microphone cannot reopen over the notice. The
+   * row is written either way: a typed turn reads it, and so does a device with
+   * no voice to say it with.
+   */
+  const sayUnclear = async (opts: SendOptions) => {
+    const text = l10n.voiceMode.unclearReply;
+    await addSystemMessage(text);
+    const said = opts.spoken ? await ttsStore.sayNotice(text) : false;
+    logPerf('chat.unclear', {
+      spoken: !!opts.spoken,
+      notice: said ? 'spoken' : 'shown',
+    });
+  };
+
   const handleSendPress = async (
     message: MessageType.PartialText,
     opts: SendOptions = {},
-    /** Second attempt only, after a context that was still speaking let go. */
+    /**
+     * Second attempt only: one retry after a context that was still speaking
+     * let go, or after a reply that was the app's own prompt read back.
+     */
     attempt = 1,
   ): Promise<UndoneSend | undefined> => {
     const sentFrom = chatSessionStore.activeSessionId;
@@ -1122,6 +1204,16 @@ export const useChatSession = (
     if (undone?.reason === 'claim_busy' && attempt === 1) {
       logPerf('chat.retry', {by: 'claim_busy'});
       return handleSendPress(message, opts, 2);
+    }
+    // The same one retry for an answer that was our own prompt read back: the
+    // clip is worth hearing once more before the listener is asked to repeat.
+    // The second refusal is the real one, and it is said rather than stored.
+    if (undone?.reason === 'reply_refused') {
+      if (attempt === 1) {
+        logPerf('chat.retry', {by: 'reply_refused'});
+        return handleSendPress(message, opts, 2);
+      }
+      await sayUnclear(opts);
     }
     return undone;
   };
@@ -1218,6 +1310,7 @@ export const useChatSession = (
 
     const completionStartTime = Date.now();
     const timeToFirstTokenMs: {value: number | null} = {value: null};
+    const refused: {reason: string | null} = {reason: null};
     let uiState: AgentUiState = initialAgentUiState;
 
     // Precompute trigger markers via the per-hook cache. We use the
@@ -1266,6 +1359,31 @@ export const useChatSession = (
     }
 
     let undone: UndoneSend | undefined;
+    // A reply that was our own prompt read back is kept in no form at all: not
+    // the answer, not the question it failed to answer, not the title that
+    // question would have given a new session. The retry then starts from the
+    // history this turn started from, with no bad example left in it.
+    const undoRefusedTurn = async (): Promise<UndoneSend> => {
+      await chatSessionStore.deleteMessageFromSession(
+        messageInfo.sessionId,
+        messageInfo.id,
+      );
+      await chatSessionStore.deleteMessageFromSession(
+        messageInfo.sessionId,
+        textMessage.id,
+      );
+      if (wasUntitled) {
+        await chatSessionStore.updateSessionTitleBySessionId(
+          messageInfo.sessionId,
+          NEW_SESSION_TITLE,
+        );
+      }
+      return {
+        message,
+        sessionId: messageInfo.sessionId,
+        reason: 'reply_refused',
+      };
+    };
     try {
       const events = runAgent({
         engine,
@@ -1349,6 +1467,17 @@ export const useChatSession = (
                 chatSessionStore.setToolCallTokenCount(toolCallTokensRaw);
               }
             }
+            // Our own prompt read back is not an answer, and it is caught while
+            // it is still arriving: this chunk reaches neither the row nor the
+            // voice, and the generation stops rather than finishing the line.
+            if (!refused.reason && !lease.signal.aborted) {
+              const reason = refuseReply(event.delta.content ?? '');
+              if (reason) {
+                refused.reason = reason;
+                lease.abort();
+                continue;
+              }
+            }
             break;
           default:
             break;
@@ -1372,6 +1501,7 @@ export const useChatSession = (
           spoken: !!opts.spoken,
           echoSource,
           echoFrom,
+          refused,
         });
 
         if (performance.now() - lastYieldTs >= YIELD_INTERVAL_MS) {
@@ -1383,7 +1513,16 @@ export const useChatSession = (
           throw event.error;
         }
       }
+
+      if (refused.reason) {
+        undone = await undoRefusedTurn();
+      }
     } catch (error) {
+      // Stopping the engine mid-reply can surface as an error. The turn was
+      // refused either way, and nothing of it is kept or explained.
+      if (refused.reason) {
+        return undoRefusedTurn();
+      }
       console.error('Completion error:', error);
       vtrace('run.error', {aborted: lease.signal.aborted});
       // Send stays blocked until an undone turn's rows are gone.

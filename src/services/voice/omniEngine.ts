@@ -92,7 +92,26 @@ export class OmniVoiceEngine implements VoiceEngine {
       vtrace('utt.gate', {reason: gate.reason, speechMs: gate.speechMs});
       logPerf('utt.gate', {...gate});
       markTurn('gate');
+      // The clip's own numbers travel with the turn, so a reply that came back
+      // wrong can be read against the sound that produced it — one line holds
+      // both. 16-bit mono at 16 kHz is 32 bytes per millisecond, which is what
+      // `gate.ms` measures.
+      addTurnInfo({
+        clipMs: gate.ms,
+        clipRms: gate.rms,
+        speechMs: gate.speechMs,
+      });
       if (!gate.pass) {
+        // Too short or too quiet to be a question. A clip like this is what the
+        // model answered by reading its own prompt back, so it never reaches the
+        // model at all: dropped here, named as itself.
+        logPerf('utt.drop', {
+          reason: 'weak-clip',
+          gate: gate.reason,
+          ms: gate.ms,
+          rms: gate.rms,
+          speechMs: gate.speechMs,
+        });
         return 'empty';
       }
       let audioUri: string;
@@ -110,9 +129,6 @@ export class OmniVoiceEngine implements VoiceEngine {
       const imageUris = await captureVoiceFrame();
       lap('utt.frame', {frames: imageUris.length});
       markTurn('frame');
-      // How long the clip the model has to listen to is: 16-bit mono at 16 kHz
-      // is 32 bytes per millisecond.
-      addTurnInfo({clipMs: Math.round(utterance.length / 32)});
       if (aborted) {
         return 'interrupted';
       }

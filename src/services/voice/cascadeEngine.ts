@@ -6,12 +6,13 @@ import type {AsrTier, AsrTranscript} from '../asr';
 import {getEngine, ttsRuntime} from '../tts';
 import {asrStore, ttsStore} from '../../store';
 import {measureEcho} from '../../utils/chat';
-import {logPerf} from '../../utils/mediaPerf';
+import {addTurnInfo, logPerf} from '../../utils/mediaPerf';
 import {vtrace} from '../../utils/voiceTrace';
 
 import {findTurn} from './chatTurns';
 import {VOICE_ECHO_GUARD_MS} from './constants';
 import {captureVoiceFrame} from './frameSource';
+import {pcmLevel} from './speechLevel';
 import type {
   VoiceEngine,
   VoiceTurn,
@@ -94,7 +95,23 @@ export class CascadeVoiceEngine implements VoiceEngine {
         voicedMs: vad.voicedMs,
         ms: Math.round(vad.durationMs),
       });
+      // The clip's own numbers travel with the turn, exactly as they do on the
+      // omni path, so a reply that came back wrong can be read against the sound
+      // that produced it — on this path too, whether the turn is kept or dropped.
+      const clipMs = Math.round(vad.durationMs);
+      const clipRms = Number(pcmLevel(utterance).rms.toFixed(4));
+      addTurnInfo({clipMs, clipRms, speechMs: vad.voicedMs});
       if (!vad.passed) {
+        // The same refusal the omni path names, with the same numbers: too short
+        // or too quiet to be a question, dropped before a model is asked
+        // anything.
+        logPerf('utt.drop', {
+          reason: 'weak-clip',
+          gate: 'vad',
+          ms: clipMs,
+          rms: clipRms,
+          speechMs: vad.voicedMs,
+        });
         return 'empty';
       }
       let transcript: AsrTranscript;

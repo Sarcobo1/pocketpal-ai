@@ -78,20 +78,29 @@ describe('spoken-turn A/B prompt shapes', () => {
         type: string;
         input_audio?: {url: string; format: string};
       }>;
-      expect(parts[1]).toEqual({
+      expect(parts[0]).toEqual({
         type: 'input_audio',
         input_audio: {url: CLIP, format: 'wav'},
       });
     },
   );
 
+  it.each(['V0', 'V1', 'V2', 'V3'])(
+    '%s is the clip alone: no words beside it to answer with',
+    id => {
+      const {messages} = build(id);
+      const parts = lastTurn(messages).content as Array<{type: string}>;
+      expect(parts.filter(part => part.type === 'text')).toEqual([]);
+      // The line that used to stand beside the clip is the one a weak-clip
+      // reply quoted back as the question. It reaches no prompt at all now.
+      const prompt = JSON.stringify(messages);
+      expect(prompt).not.toContain(VOICE_AUDIO_INSTRUCTION);
+      expect(prompt).not.toContain('Do not repeat or transcribe');
+    },
+  );
+
   it('V0 says nothing beside the clip and nothing on the system message', () => {
     const {messages, params} = build('V0');
-    const parts = lastTurn(messages).content as Array<{
-      type: string;
-      text?: string;
-    }>;
-    expect(parts[0]).toEqual({type: 'text', text: ''});
     expect(systemText(messages)).toBe(SYSTEM[0].content);
     expect(params.logit_bias).toBeUndefined();
     expect(params.stop).toBeUndefined();
@@ -105,18 +114,13 @@ describe('spoken-turn A/B prompt shapes', () => {
     expect(systemText(messages)).not.toContain(VOICE_ANSWER_INSTRUCTION);
   });
 
-  it('V2 is the current build: both instructions, in order, and the bans', () => {
+  it('V2 is the current build: both system lines, in order, and the bans', () => {
     const {messages, params} = build('V2');
     expect(systemText(messages)).toBe(
       [SYSTEM[0].content, TEXT_MODE_INSTRUCTION, VOICE_ANSWER_INSTRUCTION].join(
         '\n\n',
       ),
     );
-    const parts = lastTurn(messages).content as Array<{
-      type: string;
-      text?: string;
-    }>;
-    expect(parts[0]?.text).toBe(VOICE_AUDIO_INSTRUCTION);
     expect(params.stop).toEqual(['stop-one', ...GUARD.stopWords]);
     expect(params.logit_bias).toEqual(GUARD.logitBias);
   });
@@ -125,7 +129,6 @@ describe('spoken-turn A/B prompt shapes', () => {
     const {messages, params} = build('V3');
     expect(systemText(messages)).toBe(SYSTEM[0].content);
     expect(lastTurn(messages).content).toEqual([
-      {type: 'text', text: ''},
       expect.objectContaining({type: 'input_audio'}),
     ]);
     expect(params.logit_bias).toEqual(GUARD.logitBias);

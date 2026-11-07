@@ -7,9 +7,11 @@ import {
   ttsStore,
   voiceModeStore,
 } from '../../../store';
+import {closeTurnTimeline, openTurnTimeline} from '../../../utils/mediaPerf';
 
 import {OmniVoiceEngine, isOmniVoiceModel} from '../omniEngine';
 import {setVoiceFrameSource} from '../frameSource';
+import {VOICE_CLIP_MIN_RMS} from '../constants';
 import type {VoiceTurnEvents, VoiceTurnPayload} from '../types';
 
 const chat = chatSessionStore as any;
@@ -228,12 +230,76 @@ describe('OmniVoiceEngine', () => {
     await expect(turn.done).resolves.toBe('speech_failed');
   });
 
-  it('sends nothing for audio the VAD rejects', async () => {
-    const port = makePort();
-    const turn = engine.runTurn(speech(500, 0.001), port, events());
+  // A loud syllable in a quiet room: enough level to pass the RMS floor, not
+  // enough of a run to be a question.
+  const burst = (loudMs: number, totalMs: number): Uint8Array => {
+    const loud = speech(loudMs);
+    const quiet = speech(totalMs - loudMs, 0.0005);
+    const pcm = new Uint8Array(loud.length + quiet.length);
+    pcm.set(loud);
+    pcm.set(quiet, loud.length);
+    return pcm;
+  };
 
-    await expect(turn.done).resolves.toBe('empty');
-    expect(port.send).not.toHaveBeenCalled();
+  it.each([
+    ['short', speech(200), 200, 0],
+    ['silent', speech(500, 0.001), 500, 0],
+    ['quiet', burst(120, 600), 600, 120],
+  ] as const)(
+    'sends nothing for a %s clip, and keeps its numbers on the turn',
+    async (_reason, clip, ms, speechMs) => {
+      openTurnTimeline();
+      const port = makePort();
+      const on = events();
+      const turn = engine.runTurn(clip, port, on);
+
+      await expect(turn.done).resolves.toBe('empty');
+      expect(port.send).not.toHaveBeenCalled();
+      expect(on.transcribed).not.toHaveBeenCalled();
+
+      const {info} = closeTurnTimeline();
+      expect(info.clipMs).toBe(ms);
+      expect(info.speechMs).toBe(speechMs);
+      expect(typeof info.clipRms).toBe('number');
+    },
+  );
+
+  it('names the dropped clip in the line the phone prints', async () => {
+    const printed: string[] = [];
+    const log = jest.spyOn(console, 'log').mockImplementation(line => {
+      printed.push(String(line));
+    });
+    // logPerf is silent under test; the line is what the report is read from,
+    // so it is printed here the way the release APK prints it.
+    const env = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+    try {
+      const turn = engine.runTurn(speech(500, 0.001), makePort(), events());
+      await expect(turn.done).resolves.toBe('empty');
+    } finally {
+      process.env.NODE_ENV = env;
+      log.mockRestore();
+    }
+
+    expect(printed).toContain(
+      '[framePerf] utt.drop reason=weak-clip gate=silent ms=500 rms=0.001 speechMs=0',
+    );
+  });
+
+  it('carries the clip numbers on a turn that was sent', async () => {
+    openTurnTimeline();
+    const port = makePort();
+    const turn = engine.runTurn(speech(500), port, events());
+    await flush();
+    answerWith('turn-1');
+    port.onTurn!('turn-1');
+    port.settle();
+    await expect(turn.done).resolves.toBe('answered');
+
+    const {info} = closeTurnTimeline();
+    expect(info.clipMs).toBe(500);
+    expect(info.speechMs).toBe(480);
+    expect(info.clipRms).toBeGreaterThan(VOICE_CLIP_MIN_RMS);
   });
 
   it('stops the reply on interrupt and reports the turn as interrupted', async () => {

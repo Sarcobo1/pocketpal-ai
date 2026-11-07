@@ -7,6 +7,7 @@ import {asrStore, chatSessionStore, ttsStore} from '../../../store';
 
 import {CascadeVoiceEngine} from '../cascadeEngine';
 import {VOICE_ECHO_GUARD_MS} from '../constants';
+import {closeTurnTimeline, openTurnTimeline} from '../../../utils/mediaPerf';
 import type {VoiceTurnEvents, VoiceTurnPayload} from '../types';
 
 const transcribe = jest.spyOn(whisperAsrEngine, 'transcribe');
@@ -119,6 +120,45 @@ describe('CascadeVoiceEngine', () => {
       await expect(turn.done).resolves.toBe('empty');
       expect(transcribe).not.toHaveBeenCalled();
       expect(port.send).not.toHaveBeenCalled();
+    });
+
+    it('names the dropped clip in the line the phone prints', async () => {
+      const printed: string[] = [];
+      const log = jest.spyOn(console, 'log').mockImplementation(line => {
+        printed.push(String(line));
+      });
+      // logPerf is silent under test; this is the line the report is read from.
+      const env = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      try {
+        const turn = engine.runTurn(speech(500, 0.001), makePort(), events());
+        await expect(turn.done).resolves.toBe('empty');
+      } finally {
+        process.env.NODE_ENV = env;
+        log.mockRestore();
+      }
+
+      expect(printed).toContain(
+        '[framePerf] utt.drop reason=weak-clip gate=vad ms=500 rms=0.001 speechMs=0',
+      );
+    });
+
+    it('carries the clip numbers on a turn that was sent', async () => {
+      openTurnTimeline();
+      const port = makePort();
+      const turn = engine.runTurn(speech(500), port, events());
+      await flush();
+      createTurn(port);
+      port.settle();
+      await flush();
+      setPlayback('idle');
+
+      await expect(turn.done).resolves.toBe('answered');
+
+      const {info} = closeTurnTimeline();
+      expect(info.clipMs).toBe(500);
+      expect(info.clipRms).toBeGreaterThan(0.004);
+      expect(info.speechMs).toBe(480);
     });
 
     it('sends nothing for an empty transcript', async () => {

@@ -1704,6 +1704,7 @@
     "errorTranscribe": "Couldn't catch that. Try again.",
     "errorReply": "Couldn't get an answer. Try again.",
     "errorSpeech": "Couldn't play the answer aloud.",
+    "unclearReply": "I didn't catch that, please repeat.",
     "pullDownHint": "Pull down to see the chat",
     "showChatLabel": "Show chat",
     "swipeUpHint": "Swipe up for voice view",

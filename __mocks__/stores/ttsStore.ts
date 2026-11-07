@@ -117,6 +117,7 @@ class MockTTSStore {
   init: jest.Mock;
   refreshPhononSupport: jest.Mock;
   play: jest.Mock;
+  sayNotice: jest.Mock;
   preview: jest.Mock;
   isPreviewingVoice: jest.Mock;
   stop: jest.Mock;
@@ -186,6 +187,7 @@ class MockTTSStore {
       init: false,
       refreshPhononSupport: false,
       play: false,
+      sayNotice: false,
       preview: false,
       isPreviewingVoice: false,
       stop: false,
@@ -222,6 +224,10 @@ class MockTTSStore {
     this.init = jest.fn().mockResolvedValue(undefined);
     this.refreshPhononSupport = jest.fn().mockResolvedValue(undefined);
     this.play = jest.fn().mockResolvedValue(undefined);
+    // Mirrors the real gate: the notice is said when TTS is available at all,
+    // in the device voice rather than the one a reply would have used. A test
+    // that wants it spoken says so with `userTTSOverride`.
+    this.sayNotice = jest.fn(async () => this.isTTSAvailable);
     this.preview = jest.fn().mockResolvedValue(undefined);
     this.isPreviewingVoice = jest.fn().mockReturnValue(false);
     this.stop = jest.fn().mockResolvedValue(undefined);

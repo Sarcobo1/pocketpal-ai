@@ -3,7 +3,11 @@ import {JinjaFormattedChatResult, LlamaContext} from 'llama.rn';
 import {CompletionParams} from './completionTypes';
 import {defaultCompletionParams} from './completionSettingsVersions';
 import {toLocalMediaPath} from './multimodalPatterns';
-import {stripControlTokens} from './omniMode';
+import {stripControlTokens, TEXT_MODE_INSTRUCTION} from './omniMode';
+import {
+  VOICE_ANSWER_INSTRUCTION,
+  VOICE_AUDIO_INSTRUCTION,
+} from '../services/voice/constants';
 
 import {
   AgentStep,
@@ -660,14 +664,69 @@ export function isReportedSpeech(reply: string): boolean {
 }
 
 /**
+ * The app's own prompt, said back as the answer.
+ *
+ * A spoken turn used to carry an instruction beside the clip, and on a clip too
+ * weak to hear the model answered with that instruction quoted as something the
+ * user had said. The turn is the clip alone now, but a history an older build
+ * left behind still holds the line, and a reply built from it is never an
+ * answer — it is the listener hearing their own question read back in a
+ * stranger's voice.
+ *
+ * Read flat, because case and spacing are the model's to vary, and on the
+ * distinctive halves as well as the whole line: the guard also runs mid-stream,
+ * where only the first half of it has arrived.
+ */
+const flatText = (text: string): string =>
+  (text ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+// Flattened once: the guard runs on every token of every reply.
+const INSTRUCTION_LINES = [
+  VOICE_AUDIO_INSTRUCTION,
+  VOICE_ANSWER_INSTRUCTION,
+  'The user spoke the attached audio',
+  'Do not repeat or transcribe',
+].map(flatText);
+
+export function isInstructionEcho(reply: string): boolean {
+  const said = flatText(reply);
+  if (!said) {
+    return false;
+  }
+  if (INSTRUCTION_LINES.some(line => said.includes(line))) {
+    return true;
+  }
+  // The mode line is short enough to be quoted inside a real answer about
+  // prompts, so it counts only as the answer's own opening.
+  return said.startsWith(flatText(TEXT_MODE_INSTRUCTION));
+}
+
+/**
+ * A reply the app will neither keep nor speak: its own words back, or the
+ * speaker reported instead of answered.
+ */
+export function isRefusedReply(reply: string): boolean {
+  return isInstructionEcho(reply) || isReportedSpeech(reply);
+}
+
+/**
  * Whether a reply repeats the turn it answers, by either of the two shapes it
  * repeats it in.
  */
 export function classifyReply(
   reply: string,
   source: string,
-): {reason: 'echo' | 'reported' | 'ok'; ratio: number; shared: number} {
+): {
+  reason: 'echo' | 'instruction' | 'reported' | 'ok';
+  ratio: number;
+  shared: number;
+} {
   const echo = measureEcho(reply, source);
+  // Our own line first: it is the most specific thing a reply can be, and an
+  // echo of the question is the one shape still worth keeping on screen.
+  if (isInstructionEcho(reply)) {
+    return {reason: 'instruction', ratio: echo.ratio, shared: echo.shared};
+  }
   if (echo.echo) {
     return {reason: 'echo', ratio: echo.ratio, shared: echo.shared};
   }
@@ -689,7 +748,8 @@ export function classifyReply(
  *
  * The shape is checked as well as the mark, because the mark is new: a session
  * recorded before it existed still holds the replies that started repeating the
- * speaker, and the fix would otherwise only apply to chats started after it.
+ * speaker, or quoting the instruction that used to stand beside the clip, and
+ * the fix would otherwise only apply to chats started after it.
  */
 export function excludeEchoedAssistantTurns(
   messages: MessageType.Any[],
@@ -705,15 +765,14 @@ export function excludeEchoedAssistantTurns(
     }
     if (message.type === 'assistant_turn') {
       return (
-        !message.metadata?.echoExcluded &&
-        !isReportedSpeech(derivedText(message))
+        !message.metadata?.echoExcluded && !isRefusedReply(derivedText(message))
       );
     }
     // The same shape in the other row type an answer can be stored as: older
     // sessions, and every reply a plain text completion wrote before the turn
     // rows existed.
     if (message.type === 'text' && message.author.id === assistant.id) {
-      return !isReportedSpeech(derivedText(message));
+      return !isRefusedReply(derivedText(message));
     }
     return true;
   });

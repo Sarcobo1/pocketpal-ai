@@ -6,12 +6,19 @@ import {
   countMediaParts,
   derivedText,
   excludeEchoedAssistantTurns,
+  isInstructionEcho,
+  isRefusedReply,
   isReportedSpeech,
   measureEcho,
   user,
   assistant,
   visibleStepContent,
 } from '../chat';
+import {TEXT_MODE_INSTRUCTION} from '../omniMode';
+import {
+  VOICE_ANSWER_INSTRUCTION,
+  VOICE_AUDIO_INSTRUCTION,
+} from '../../services/voice/constants';
 import {
   AgentStep,
   ChatMessage,
@@ -1053,6 +1060,44 @@ describe('isReportedSpeech', () => {
   });
 });
 
+describe('isInstructionEcho', () => {
+  // The reply the phone actually gave: our own instruction quoted as something
+  // the user had said, on a clip too weak to hear.
+  const quoted = `The user said, "${VOICE_AUDIO_INSTRUCTION}"`;
+
+  it.each([
+    quoted,
+    VOICE_AUDIO_INSTRUCTION,
+    VOICE_ANSWER_INSTRUCTION,
+    TEXT_MODE_INSTRUCTION,
+    // Half a line, as it stands mid-stream when the guard first sees it.
+    'The user said, "The user spoke the attached audio.',
+    'Sure — do not repeat or transcribe it.',
+    // Case and spacing are the model's to vary, not the guard's to miss on.
+    'THE USER SPOKE THE ATTACHED AUDIO.\nReply to what they said in 1-2 sentences.',
+  ])('refuses our own words back: %s', reply => {
+    expect(isInstructionEcho(reply)).toBe(true);
+    expect(isRefusedReply(reply)).toBe(true);
+  });
+
+  it.each([
+    'It is raining in Tashkent.',
+    'The capital of France is Paris.',
+    // The mode line quoted inside an answer about prompts is still an answer.
+    `The system prompt ends with "${TEXT_MODE_INSTRUCTION}" on this model.`,
+    'A city the user said they liked is Paris.',
+    '',
+  ])('leaves an answer alone: %s', reply => {
+    expect(isInstructionEcho(reply)).toBe(false);
+  });
+
+  it('refuses a report of the speaker, which is not our line', () => {
+    const reported = 'The user asked what the weather is like.';
+    expect(isInstructionEcho(reported)).toBe(false);
+    expect(isRefusedReply(reported)).toBe(true);
+  });
+});
+
 describe('classifyReply', () => {
   // Both shapes are the same defect, and only one of them needs a transcript to
   // see. A voice turn with no words to diff against still gets judged.
@@ -1069,6 +1114,12 @@ describe('classifyReply', () => {
     expect(
       classifyReply('The user asked what the weather is like.', ''),
     ).toEqual({reason: 'reported', ratio: 0, shared: 0});
+  });
+
+  it('names our own prompt read back, ahead of any echo', () => {
+    expect(
+      classifyReply(`The user said, "${VOICE_AUDIO_INSTRUCTION}"`, ''),
+    ).toEqual({reason: 'instruction', ratio: 0, shared: 0});
   });
 
   it('leaves a normal answer alone', () => {
@@ -1123,6 +1174,30 @@ describe('excludeEchoedAssistantTurns', () => {
       'r',
     );
     expect(excludeEchoedAssistantTurns([said, reported, answered])).toEqual([
+      said,
+      answered,
+    ]);
+  });
+
+  it('drops a reply that quoted the instruction beside the clip', () => {
+    // A session an older build recorded: the line it sent beside every voice
+    // clip, said back as the answer. It is not an example of answering.
+    const leaked = makeAssistantTurn(
+      [{content: `The user said, "${VOICE_AUDIO_INSTRUCTION}"`}],
+      'l',
+    );
+    expect(excludeEchoedAssistantTurns([said, leaked, answered])).toEqual([
+      said,
+      answered,
+    ]);
+  });
+
+  it('drops the same leak stored as a plain text row', () => {
+    const leaked = {
+      ...makeUserText(VOICE_AUDIO_INSTRUCTION),
+      author: assistant,
+    } as MessageType.Text;
+    expect(excludeEchoedAssistantTurns([said, leaked, answered])).toEqual([
       said,
       answered,
     ]);

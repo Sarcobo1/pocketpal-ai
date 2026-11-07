@@ -22,7 +22,7 @@ import {DEFAULT_MAX_TURNS} from '../agent';
 import type {ToolDefinition} from '../talents/types';
 import {collectSystemPromptFragments} from '../talents';
 
-import {VOICE_ANSWER_INSTRUCTION, VOICE_AUDIO_INSTRUCTION} from './constants';
+import {VOICE_ANSWER_INSTRUCTION} from './constants';
 import {pullableDir, voiceAudioDir} from './wav';
 
 /**
@@ -41,8 +41,6 @@ export type AbVariantId = 'V0' | 'V1' | 'V2' | 'V3';
 export interface AbVariant {
   id: AbVariantId;
   label: string;
-  /** VOICE_AUDIO_INSTRUCTION as the words beside the clip. */
-  besideClip: boolean;
   /** `Respond with text.` on the system message. */
   textMode: boolean;
   /** The short-answer line, when the setting asks for it. */
@@ -55,7 +53,6 @@ export const AB_VARIANTS: AbVariant[] = [
   {
     id: 'V0',
     label: 'audio only — no instruction, no guard',
-    besideClip: false,
     textMode: false,
     shortAnswer: false,
     bans: false,
@@ -63,7 +60,6 @@ export const AB_VARIANTS: AbVariant[] = [
   {
     id: 'V1',
     label: 'audio only + "Respond with text."',
-    besideClip: false,
     textMode: true,
     shortAnswer: false,
     bans: false,
@@ -71,7 +67,6 @@ export const AB_VARIANTS: AbVariant[] = [
   {
     id: 'V2',
     label: 'current build as-is',
-    besideClip: true,
     textMode: true,
     shortAnswer: true,
     bans: true,
@@ -79,7 +74,6 @@ export const AB_VARIANTS: AbVariant[] = [
   {
     id: 'V3',
     label: 'audio only + logit-bias/stop bans',
-    besideClip: false,
     textMode: false,
     shortAnswer: false,
     bans: true,
@@ -196,17 +190,12 @@ export const buildAbTurn = ({
     ...(variant.shortAnswer && shortAnswerOn ? [VOICE_ANSWER_INSTRUCTION] : []),
   ];
 
-  // The empty text part is not an accident: that is what a spoken turn carried
-  // before any instruction stood beside the clip. The audio part is the one the
-  // live turn builds, which the app's ChatMessage content union predates — the
-  // spoken path passes it through an untyped content array too.
+  // The clip alone, exactly as the live turn builds it: nothing beside it to
+  // answer with instead of answering the sound. The content array is untyped
+  // because the app's ChatMessage union predates an audio part.
   const turn = {
     role: 'user',
     content: [
-      {
-        type: 'text',
-        text: variant.besideClip ? VOICE_AUDIO_INSTRUCTION : '',
-      },
       {
         type: 'input_audio',
         input_audio: {url: toLocalMediaPath(clipPath), format: 'wav'},

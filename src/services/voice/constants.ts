@@ -147,20 +147,29 @@ export const VOICE_START_TIMEOUT_MS = 45_000;
  * A spoken answer is listened to, not read, and every sentence past the second
  * costs the listener twice: the wait for the audio and then the words. Voice
  * turns only — a typed turn with the same model keeps the prompt it always had.
+ *
+ * Persona, not an instruction about the input: it stands in the system prompt
+ * and names neither the user, the audio nor a transcript, because anything that
+ * does is a sentence the model can say back instead of answering.
  */
 export const VOICE_ANSWER_INSTRUCTION =
-  'Answer in one or two short sentences. Your reply is read aloud, not shown as text.';
+  'You are a voice assistant. Answer the person directly, in first person, ' +
+  'in one or two short sentences.';
 
 /**
- * What stands beside the clip in a spoken turn's user message.
+ * What used to stand beside the clip in a spoken turn's user message, and is
+ * sent no more.
  *
  * A spoken turn carries no words of its own, so a model that hears has nothing
  * to answer but the sound — and a model trained to be useful reads that as a
- * request to say the sound back. This is the turn asking for a reply instead.
- * It rides the user message and not the system prompt, because only here is the
- * input something the user spoke; a typed turn with the same model never sees
- * it. Text output needs no change: the `Respond with text.` guard is appended
- * to the system prompt separately, and both are in front of the model at once.
+ * request to say the sound back. This was the turn asking for a reply instead,
+ * and on a weak clip the model answered with these words verbatim:
+ * `The user said, "The user spoke the attached audio. …"`. The turn is the clip
+ * alone now, and the steering is persona in the system prompt.
+ *
+ * The string stays because it is what a leaked reply is recognised by — both
+ * the one this build refuses to store or speak and the rows an older build
+ * already left in a history.
  */
 export const VOICE_AUDIO_INSTRUCTION =
   'The user spoke the attached audio. Reply to what they said in 1-2 sentences. ' +

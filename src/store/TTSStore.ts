@@ -996,6 +996,24 @@ export class TTSStore {
   }
 
   /**
+   * Say a line the app wrote rather than the model — a turn it refused to keep.
+   *
+   * The device voice, not the one a reply would have used: that voice belongs to
+   * the model whose answer was just refused, and it may be why there was nothing
+   * worth hearing. Counted and awaited like any reply, so the microphone stays
+   * shut until the notice has been heard. False when no voice can say it, which
+   * leaves the caller to show it instead.
+   */
+  async sayNotice(text: string): Promise<boolean> {
+    const voice = await this.resolveSystemVoice();
+    if (!voice || !this.isTTSAvailable) {
+      return false;
+    }
+    await this.play(`notice-${Date.now()}`, text, {voiceOverride: voice});
+    return true;
+  }
+
+  /**
    * Hand one finished text to `voice`'s engine and wait for it to be said.
    *
    * `play` wraps the store's playback state around this; the fast start calls it

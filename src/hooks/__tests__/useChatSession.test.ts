@@ -1267,11 +1267,48 @@ describe('useChatSession', () => {
       const parts = lastUserParts(messages);
 
       expect(audioPartsOf(parts)).toHaveLength(1);
-      // The instruction rides the user turn, beside the audio, because that is
-      // where a model trained to transcribe an input looks for what to do with
-      // it. The system prompt keeps only the short-answer rule.
-      expect(textPartsOf(parts)).toEqual([VOICE_AUDIO_INSTRUCTION]);
+      // The clip alone. Words beside it are words the model can answer *with*
+      // instead of answering the sound: on a weak clip it said our own
+      // instruction back, quoted as something the user had spoken.
+      expect(textPartsOf(parts)).toEqual([]);
+      expect(JSON.stringify(messages)).not.toContain(VOICE_AUDIO_INSTRUCTION);
       expect(promptOf(messages)).not.toContain(VOICE_AUDIO_INSTRUCTION);
+    });
+
+    it('prints the spoken turn as the clip alone', async () => {
+      const printed: string[] = [];
+      const log = jest.spyOn(console, 'log').mockImplementation(line => {
+        printed.push(String(line));
+      });
+      const env = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      try {
+        await sendClip('');
+      } finally {
+        process.env.NODE_ENV = env;
+        log.mockRestore();
+      }
+
+      expect(
+        printed.some(
+          line =>
+            line.startsWith('[framePerf] chat.prompt ') &&
+            line.includes('textPart=none'),
+        ),
+      ).toBe(true);
+    });
+
+    it('steers as persona, naming neither the user nor the audio', async () => {
+      const {messages} = await sendClip('');
+      const persona = VOICE_ANSWER_INSTRUCTION.toLowerCase();
+
+      // The steering stands in the system prompt, where there is nothing to
+      // quote as the question — and it is about who the model is, not about
+      // what the user did or what the input was.
+      expect(promptOf(messages)).toContain(VOICE_ANSWER_INSTRUCTION);
+      expect(persona).not.toContain('the user');
+      expect(persona).not.toContain('audio');
+      expect(persona).not.toContain('transcri');
     });
 
     it('keeps the row empty so the bubble keeps its label', async () => {
@@ -1294,13 +1331,14 @@ describe('useChatSession', () => {
       ]);
     });
 
-    // The write side of the same rule: an omni voice turn has no transcript to
-    // diff against, so the reply that reports the speaker is caught by its
-    // shape. Marked here, filtered out of every later prompt.
-    it('marks a reply that reports the speaker instead of answering', async () => {
+    // The write side of the same rule: a reply built out of the question's own
+    // words is marked and kept out of the next prompt, but it is still an answer
+    // the user heard. Only our own prompt read back is refused outright — that
+    // is 'a reply that is our own prompt' below.
+    it('marks a reply that repeats the question it was sent with', async () => {
       const {metadata} = await sendClip(
-        '',
-        'The user asked what the weather is like.',
+        'what is the capital of france',
+        'what is the capital of france',
       );
 
       expect(metadata.echoExcluded).toBe(true);
@@ -1965,5 +2003,234 @@ describe('a turn the context refused as busy', () => {
     expect(modelStore.generationHolder).toBeNull();
     expect(modelStore.isGenerationBusy).toBe(false);
     error.mockRestore();
+  });
+});
+
+/**
+ * An answer that is the app's own prompt read back.
+ *
+ * A spoken turn used to carry an instruction beside the clip, and on a clip too
+ * weak to hear the model answered with that instruction quoted as the question:
+ * `The user said, "The user spoke the attached audio. …"`. The turn is the clip
+ * alone now; this is the other half of the fix. A reply in that shape is never
+ * stored and never spoken, the question is asked once more, and only a second
+ * refusal is told to the listener — in the device voice, because the model's own
+ * answer is what just failed.
+ */
+describe('a reply that is our own prompt read back', () => {
+  const LEAK =
+    'The user said, "The user spoke the attached audio. Reply to what they ' +
+    'said in 1-2 sentences. Do not repeat or transcribe it."';
+  const GOOD = 'It is raining in Tashkent.';
+  const NOTICE = l10n.en.voiceMode.unclearReply;
+
+  const completion = () => modelStore.engine!.completion as jest.Mock;
+  const addedRows = () =>
+    (chatSessionStore.addMessageToCurrentSession as jest.Mock).mock.calls.map(
+      ([row]) => row,
+    );
+  const deletedIds = () =>
+    (chatSessionStore.deleteMessageFromSession as jest.Mock).mock.calls.map(
+      ([, id]) => id as string,
+    );
+  const survivingRows = () => {
+    const gone = new Set(deletedIds());
+    return addedRows().filter(row => !gone.has(row.id));
+  };
+  /** Everything the voice was handed, as one string to search. */
+  const spokenText = () =>
+    [
+      ...(ttsStore.onAssistantMessageChunk as jest.Mock).mock.calls,
+      ...(ttsStore.onAssistantMessageComplete as jest.Mock).mock.calls,
+      ...(ttsStore.play as jest.Mock).mock.calls,
+      ...(ttsStore.sayNotice as jest.Mock).mock.calls,
+    ]
+      .map(args =>
+        args.filter((arg: unknown) => typeof arg === 'string').join(' '),
+      )
+      .join('\n');
+
+  /** One attempt's reply, streamed as the engine streams it: cumulative text. */
+  const answerWith = (text: string, chunks: string[] = [text]) => {
+    completion().mockImplementationOnce(async (_params: any, onData: any) => {
+      for (const chunk of chunks) {
+        onData?.({token: 'tok', content: chunk});
+      }
+      return {
+        timings: {total: 10},
+        usage: {},
+        text,
+        content: text,
+        reasoning_content: '',
+      };
+    });
+  };
+
+  const send = async (opts: {spoken?: boolean} = {spoken: true}) => {
+    const {result} = renderHook(() =>
+      useChatSession({current: null}, textMessage.author, mockAssistant),
+    );
+    let undone: any;
+    await act(async () => {
+      undone = await result.current.handleSendPress(textMessage, opts);
+    });
+    return undone;
+  };
+
+  beforeEach(() => {
+    // The mock store keeps no rows of its own, so ids are what a rollback can
+    // be read against: what survives is what was added minus what was deleted.
+    let n = 0;
+    (
+      chatSessionStore.addMessageToCurrentSession as jest.Mock
+    ).mockImplementation(async (row: any) => {
+      n += 1;
+      row.id = `row-${n}`;
+    });
+    // The voice gate open, so "never spoken" is a claim about a reply that
+    // would otherwise have been read out loud.
+    (ttsStore as any).userTTSOverride = true;
+    (ttsStore as any).autoSpeakEnabled = true;
+  });
+
+  afterEach(() => {
+    (
+      chatSessionStore.addMessageToCurrentSession as jest.Mock
+    ).mockImplementation(async () => undefined);
+    (ttsStore as any).userTTSOverride = null;
+    (ttsStore as any).autoSpeakEnabled = false;
+  });
+
+  it('names the refusal and the retry in the line the phone prints', async () => {
+    const printed: string[] = [];
+    const log = jest.spyOn(console, 'log').mockImplementation(line => {
+      printed.push(String(line));
+    });
+    const env = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+    try {
+      answerWith(LEAK);
+      answerWith(GOOD);
+      await send();
+    } finally {
+      process.env.NODE_ENV = env;
+      log.mockRestore();
+    }
+
+    expect(
+      printed.some(line =>
+        line.startsWith('[framePerf] chat.refuse reason=instruction '),
+      ),
+    ).toBe(true);
+    expect(printed).toContain('[framePerf] chat.retry by=reply_refused');
+  });
+
+  it('keeps nothing of it, speaks none of it, and asks once more', async () => {
+    // Caught on the opening words, before the instruction itself has arrived.
+    answerWith(LEAK, ['The user said, "', LEAK]);
+    answerWith(GOOD);
+
+    const undone = await send();
+
+    expect(completion()).toHaveBeenCalledTimes(2);
+    expect(undone).toBeUndefined();
+    // Both halves of the refused attempt are gone: the answer that was our own
+    // prompt, and the question it never answered.
+    expect(deletedIds().sort()).toEqual(['row-1', 'row-2']);
+    for (const row of survivingRows()) {
+      expect(JSON.stringify(row)).not.toContain(
+        'The user spoke the attached audio',
+      );
+      expect(String(row.text ?? '')).not.toMatch(/^The user said/);
+    }
+    expect(spokenText()).not.toContain('Do not repeat or transcribe');
+    expect(spokenText()).not.toContain('The user said');
+    expect(spokenText()).toContain('raining');
+    expect(ttsStore.stop).toHaveBeenCalledWith('reply_refused');
+  });
+
+  it('says it did not catch the question when the retry leaks too', async () => {
+    answerWith(LEAK);
+    answerWith(LEAK);
+
+    const undone = await send();
+
+    expect(completion()).toHaveBeenCalledTimes(2);
+    expect(undone).toEqual(expect.objectContaining({reason: 'reply_refused'}));
+    // Both attempts rolled back, and the notice is the app's own row — marked
+    // system, so no later prompt reads it as one of the model's answers.
+    expect(deletedIds().sort()).toEqual(['row-1', 'row-2', 'row-3', 'row-4']);
+    expect(ttsStore.sayNotice).toHaveBeenCalledWith(NOTICE);
+    const rows = survivingRows();
+    expect(rows.some(row => row.metadata?.system && row.text === NOTICE)).toBe(
+      true,
+    );
+    for (const row of rows) {
+      expect(JSON.stringify(row)).not.toContain(
+        'The user spoke the attached audio',
+      );
+    }
+    expect(spokenText()).not.toContain('Do not repeat or transcribe');
+  });
+
+  it('shows the notice on a typed turn without speaking it', async () => {
+    answerWith(LEAK);
+    answerWith(LEAK);
+
+    await send({});
+
+    expect(ttsStore.sayNotice).not.toHaveBeenCalled();
+    expect(
+      survivingRows().some(row => row.metadata?.system && row.text === NOTICE),
+    ).toBe(true);
+  });
+
+  it('leaves an answer that answers alone', async () => {
+    answerWith(GOOD);
+
+    const undone = await send();
+
+    expect(completion()).toHaveBeenCalledTimes(1);
+    expect(undone).toBeUndefined();
+    expect(deletedIds()).toEqual([]);
+    expect(ttsStore.sayNotice).not.toHaveBeenCalled();
+    expect(ttsStore.stop).not.toHaveBeenCalledWith('reply_refused');
+    expect(spokenText()).toContain('raining');
+  });
+
+  it('keeps a leaked row an older build stored out of the next prompt', async () => {
+    const original = Object.getOwnPropertyDescriptor(
+      chatSessionStore,
+      'currentSessionMessages',
+    );
+    Object.defineProperty(chatSessionStore, 'currentSessionMessages', {
+      get: () => [
+        {...textMessage, id: 'old-q'},
+        {
+          id: 'old-a',
+          author: assistant,
+          type: 'assistant_turn',
+          steps: [{content: LEAK}],
+          metadata: {},
+        } as MessageType.AssistantTurn,
+      ],
+      configurable: true,
+    });
+    try {
+      answerWith(GOOD);
+      await send();
+
+      const sent = JSON.stringify(completion().mock.calls[0][0].messages);
+      expect(sent).not.toContain('The user spoke the attached audio');
+      expect(sent).not.toContain('Do not repeat or transcribe');
+    } finally {
+      if (original) {
+        Object.defineProperty(
+          chatSessionStore,
+          'currentSessionMessages',
+          original,
+        );
+      }
+    }
   });
 });

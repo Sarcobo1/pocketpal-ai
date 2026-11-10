@@ -372,7 +372,7 @@ describe.each([
     nextFrame();
     expect(calls.map(({target, event: sent}) => [target, sent])).toEqual([
       ['header:Push local AI further.', event],
-      ['header:Thank you for keeping PocketPal going.', event],
+      ['header:Thank you for keeping Limi going.', event],
     ]);
   });
 
@@ -393,9 +393,7 @@ describe.each([
     act(() => openPlus());
     nextFrame();
 
-    expect(targets()).toEqual([
-      'header:Thank you for keeping PocketPal going.',
-    ]);
+    expect(targets()).toEqual(['header:Thank you for keeping Limi going.']);
   });
 
   it('makes no call when Plus is relocked while shown', () => {
@@ -421,9 +419,7 @@ describe.each([
     );
     nextFrame();
 
-    expect(targets()).toEqual([
-      'header:Thank you for keeping PocketPal going.',
-    ]);
+    expect(targets()).toEqual(['header:Thank you for keeping Limi going.']);
   });
 
   it('makes no close call when no hamburger holds the slot', () => {

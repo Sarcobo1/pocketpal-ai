@@ -128,7 +128,7 @@ export const createStyles = (theme: Theme) =>
     },
     accordionTitle: {
       fontSize: 14,
-      color: theme.colors.secondary,
+      color: theme.colors.onSurfaceVariant,
     },
     // Floor, not a fixed width: dropdown items size to their longest label
     // (the outer menu clamps at 90% screen and item titles ellipsize past it).

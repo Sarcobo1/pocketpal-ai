@@ -9,19 +9,15 @@ export type ItalicAccentTitleProps = {
   /** Full title string — may contain `\n` for forced line breaks. */
   title: string;
   /**
-   * Substring rendered in Fraunces-Italic. When omitted the entire
-   * title renders italic (screen 6 "Pip"). On non-Latin locales the
-   * Fraunces family swaps to Inter via the `typographyForLocale`
-   * fallback; we mirror that by switching the italic-run family to
-   * Inter-Medium + `fontStyle:'italic'` when the base title is
-   * already on Inter.
+   * Substring rendered in italic. When omitted the entire
+   * title renders italic.
    */
   accent?: string;
   align?: 'left' | 'center';
 };
 
 /**
- * Splits a title string into a plain run and a Fraunces-italic accent
+ * Splits a title string into a plain run and an italic accent
  * run. When `accent` is omitted (or missing) the whole title renders
  * italic. `title` may contain `\n` — each line renders as its own
  * Text so they center independently of each other's widths.

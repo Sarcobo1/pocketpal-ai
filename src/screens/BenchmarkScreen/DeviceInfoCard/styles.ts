@@ -50,8 +50,9 @@ export const createStyles = (theme: Theme) =>
       marginVertical: 8,
     },
     sectionTitle: {
-      color: theme.colors.primary,
+      color: theme.colors.onSurface,
+      fontSize: 14,
+      fontFamily: 'Geist-Medium',
       marginBottom: 8,
-      textTransform: 'uppercase',
     },
   });

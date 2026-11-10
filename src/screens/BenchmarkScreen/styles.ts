@@ -71,7 +71,7 @@ export const createStyles = (theme: Theme) =>
       marginBottom: 16,
     },
     settingLabel: {
-      color: theme.colors.primary,
+      color: theme.colors.onSurface,
       marginBottom: 0,
     },
     settingValue: {
@@ -91,7 +91,9 @@ export const createStyles = (theme: Theme) =>
       }),
     },
     sectionTitle: {
-      color: theme.colors.primary,
+      color: theme.colors.onSurface,
+      fontSize: 14,
+      fontFamily: 'Geist-Medium',
       marginBottom: 8,
     },
     advancedButton: {

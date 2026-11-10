@@ -162,7 +162,7 @@
     "importError": "Failed to import chat sessions. Please check the file format.",
     "internetSearch": {
       "title": "Internet Search",
-      "description": "Let Pals search the web with their own tools. Bring your own API key — PocketPal never holds your keys or routes your queries.",
+      "description": "Let Pals search the web with their own tools. Bring your own API key — Limi never holds your keys or routes your queries.",
       "providerLabel": "Search provider",
       "providerGated": "Coming soon",
       "keyLabel": "API key",
@@ -179,7 +179,7 @@
       "resultCountLabel": "Results per search",
       "resultCountDescription": "Fewer results keep more room in the model's context.",
       "consentTitle": "Searches leave your device",
-      "consentDescription": "When a Pal searches the web, your query is sent to the selected provider over the internet. When a Pal reads a page, the URL and page content may instead be sent to a default reader service (r.jina.ai) if the selected provider has no native reader. Keys and queries are never sent to PocketPal.",
+      "consentDescription": "When a Pal searches the web, your query is sent to the selected provider over the internet. When a Pal reads a page, the URL and page content may instead be sent to a default reader service (r.jina.ai) if the selected provider has no native reader. Keys and queries are never sent to Limi.",
       "consentAccept": "I understand",
       "consentRequired": "Accept the disclosure above to set a key and enable search.",
       "consentGivenTitle": "Searching the web is enabled",
@@ -289,15 +289,15 @@
     "memoryDetailMessage": "This model needs ~{{needed}} but only ~{{available}} is estimated as usable. Estimates improve as you use the app.",
     "estimatedMemory": "Estimated memory: ~{{size}}",
     "virtualRamShort": "Virtual RAM",
-    "virtualRamDetailMessage": "This model needs ~{{needed}} but only ~{{physical}} fits in RAM. Your phone has ~{{virtual}} of virtual RAM, so PocketPal can load it there — answers arrive slower, the app stays open.",
-    "crashRecoveryMessage": "The last attempt to load this model closed the app. PocketPal will load it from virtual RAM instead.",
+    "virtualRamDetailMessage": "This model needs ~{{needed}} but only ~{{physical}} fits in RAM. Your phone has ~{{virtual}} of virtual RAM, so Limi can load it there — answers arrive slower, the app stays open.",
+    "crashRecoveryMessage": "The last attempt to load this model closed the app. Limi will load it from virtual RAM instead.",
     "alerts": {
       "memoryWarningTitle": "Memory Warning",
       "memoryWarningMessage": "This model may exceed available memory, which could cause instability. Continue loading?",
       "virtualRamTitle": "Not enough RAM",
-      "virtualRamMessage": "This model needs ~{{needed}} but only ~{{physical}} fits in RAM. Your phone has ~{{virtual}} of virtual RAM to borrow, so PocketPal can load it there: answers arrive slower, but the app keeps running.",
+      "virtualRamMessage": "This model needs ~{{needed}} but only ~{{physical}} fits in RAM. Your phone has ~{{virtual}} of virtual RAM to borrow, so Limi can load it there: answers arrive slower, but the app keeps running.",
       "virtualRamContinue": "Load with virtual RAM",
-      "storageMessage": "This model needs ~{{needed}} but only ~{{physical}} fits in RAM. This phone has no virtual RAM to borrow, so PocketPal will keep the model in storage and read it as it goes: answers arrive much slower, but the app keeps running.",
+      "storageMessage": "This model needs ~{{needed}} but only ~{{physical}} fits in RAM. This phone has no virtual RAM to borrow, so Limi will keep the model in storage and read it as it goes: answers arrive much slower, but the app keeps running.",
       "storageContinue": "Load from storage",
       "noRoomTitle": "Not enough RAM",
       "noRoomMessage": "This model needs ~{{needed}} but only ~{{physical}} fits in RAM, and this phone has no virtual RAM to borrow. Loading it anyway can close the app.",
@@ -606,13 +606,13 @@
     "screenTitle": "App Info",
     "description": "An app that brings language models directly to your phone. Sits on the shoulders of llama.cpp and llama.rn.",
     "supportProject": "Support the Project",
-    "supportProjectDescription": "If you enjoy using PocketPal AI, please consider supporting the project by:",
+    "supportProjectDescription": "If you enjoy using Limi, please consider supporting the project by:",
     "githubButton": "Star on GitHub",
     "orBy": "or by",
     "versionCopiedTitle": "Version copied",
     "versionCopiedDescription": "Version information has been copied to clipboard",
     "tour": "Tour",
-    "tourDescription": "Replay the welcome screens to see what PocketPal AI offers.",
+    "tourDescription": "Replay the welcome screens to see what Limi offers.",
     "showIntroButton": "Show intro again",
     "privacyPolicy": "Privacy Policy",
     "termsOfService": "Terms of Service",
@@ -621,10 +621,10 @@
   },
   "feedback": {
     "title": "Send Feedback",
-    "description": "Your voice matters! Tell us how PocketPal AI is helping you and what we can do to make it even more useful.",
+    "description": "Your voice matters! Tell us how Limi is helping you and what we can do to make it even more useful.",
     "shareThoughtsButton": "Sharing your thoughts",
     "useCase": {
-      "label": "What are you using PocketPal AI for?",
+      "label": "What are you using Limi for?",
       "placeholder": "e.g., summarization, roleplay, etc."
     },
     "featureRequests": {
@@ -636,7 +636,7 @@
       "placeholder": "Share any other thoughts you may have."
     },
     "usageFrequency": {
-      "label": "How often do you use PocketPal AI? (Optional)",
+      "label": "How often do you use Limi? (Optional)",
       "options": {
         "daily": "Daily",
         "weekly": "Weekly",
@@ -760,7 +760,7 @@
     },
     "modelErrorReportSheet": {
       "title": "Report Model Loading Issue",
-      "privacyNote": "Help us improve PocketPal by sharing details about this error. Review below what will be shared - you can deselect any items you prefer not to include.",
+      "privacyNote": "Help us improve Limi by sharing details about this error. Review below what will be shared - you can deselect any items you prefer not to include.",
       "errorMessage": "Error message",
       "modelInfo": "Model Information",
       "modelName": "Name",
@@ -778,7 +778,7 @@
       "submit": "Submit Report",
       "success": {
         "title": "Report Submitted",
-        "message": "Thank you for helping us improve PocketPal. Your report will help us fix this issue."
+        "message": "Thank you for helping us improve Limi. Your report will help us fix this issue."
       },
       "error": {
         "title": "Report Failed",
@@ -1274,7 +1274,7 @@
   },
   "camera": {
     "permissionTitle": "Camera Permission Required",
-    "permissionMessage": "PocketPal needs camera access to analyze images",
+    "permissionMessage": "Limi needs camera access to analyze images",
     "requestingPermission": "Requesting camera permission...",
     "noDevice": "No camera device found",
     "errorTitle": "Camera Error",
@@ -1288,7 +1288,7 @@
   },
   "video": {
     "permissionTitle": "Camera Permission Required",
-    "permissionMessage": "PocketPal needs camera access for video analysis",
+    "permissionMessage": "Limi needs camera access for video analysis",
     "requestingPermission": "Requesting camera permission...",
     "noDevice": "No camera device found",
     "errorTitle": "Camera Error",
@@ -1744,7 +1744,7 @@
     "continueAnywayCta": "Continue anyway",
     "chooseSmallerModelCta": "Choose a smaller model",
     "startLabel": "Start voice mode",
-    "startLockedLabel": "Hands-free voice, PocketPal Plus",
+    "startLockedLabel": "Hands-free voice, Limi Plus",
     "startLockedHint": "Opens a short preview. Typing and dictation stay free.",
     "teaserTitle": "Voice conversation is a Plus feature",
     "teaserBody": "Talk hands-free. It answers aloud.",
@@ -1850,11 +1850,11 @@
     "retry": "Retry"
   },
   "plus": {
-    "eyebrow": "PocketPal Plus",
+    "eyebrow": "Limi Plus",
     "headline": "Push local AI further.",
-    "subline": "Plus keeps PocketPal free and open source. The extra features are our thanks.",
-    "unsupportedSubline": "Plus features don't run on this phone yet. You can still support PocketPal.",
-    "thanksHeadline": "Thank you for keeping PocketPal going.",
+    "subline": "Plus keeps Limi free and open source. The extra features are our thanks.",
+    "unsupportedSubline": "Plus features don't run on this phone yet. You can still support Limi.",
+    "thanksHeadline": "Thank you for keeping Limi going.",
     "thanksSubline": "Plus is unlocked on this device.",
     "features": {
       "handsFreeVoice": "Hands-free voice",
@@ -1890,7 +1890,7 @@
     "noPurchaseFound": "No Plus purchase found.",
     "restoreFailed": "Couldn't reach the store. Try again.",
     "sidebar": {
-      "title": "PocketPal Plus",
+      "title": "Limi Plus",
       "unlocked": "Unlocked",
       "subtitleOne": "{{first}}",
       "subtitleTwo": "{{first}}, {{second}}",

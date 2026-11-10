@@ -6,9 +6,16 @@ export const createStyles = (theme: Theme) =>
   StyleSheet.create({
     root: {
       flex: 1,
-      // Figma `Color/Background/Muted` (#fafafa) — maps to `colors.surfaceVariant`.
-      backgroundColor: theme.colors.surfaceVariant,
+      backgroundColor: theme.colors.background,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    brandTitle: {
+      fontFamily: 'Geist-Medium',
+      fontSize: 56,
+      lineHeight: 64,
+      color: theme.colors.onBackground,
+      marginTop: 20,
+      textAlign: 'center',
     },
   });

@@ -8,6 +8,9 @@ export const ROUTES = {
   SETTINGS: 'Settings',
   APP_INFO: 'App Info',
 
+  // Dars (Lessons) route. Feature-flagged, only shown when FEATURE_DARS is enabled.
+  DARS: 'Dars',
+
   // Dev tools route. Only available in debug mode.
   DEV_TOOLS: 'Dev Tools',
 

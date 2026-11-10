@@ -38,10 +38,7 @@ export const ModelAccordion: React.FC<ModelAccordionProps> = observer(
       <List.Accordion
         testID={`model-accordion-${group.type}`}
         title={group.type}
-        titleStyle={StyleSheet.flatten([
-          styles.accordionTitle,
-          {color: colors.secondary},
-        ])}
+        titleStyle={styles.accordionTitle}
         description={description}
         descriptionStyle={styles.accordionDescription}
         expanded={expanded}

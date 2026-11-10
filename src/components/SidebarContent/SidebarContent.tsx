@@ -588,6 +588,18 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
               style={styles.menuDrawerItem}
               testID="drawer-item-pals"
             />
+            {/* Dars: feature flag — only in __DEV__ builds */}
+            {__DEV__ && (
+              <Drawer.Item
+                label="Dars"
+                icon={() => (
+                  <BenchmarkIcon stroke={theme.colors.onSurfaceVariant} />
+                )}
+                onPress={() => navigateTo(ROUTES.DARS)}
+                style={styles.menuDrawerItem}
+                testID="drawer-item-dars"
+              />
+            )}
             <Drawer.Item
               label={l10n.components.sidebarContent.menuItems.models}
               icon={() => <ModelIcon stroke={theme.colors.primary} />}

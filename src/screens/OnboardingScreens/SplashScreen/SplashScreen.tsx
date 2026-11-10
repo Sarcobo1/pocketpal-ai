@@ -1,25 +1,23 @@
-import React, {useContext} from 'react';
+import React from 'react';
 import {View} from 'react-native';
+import {Text} from 'react-native-paper';
 import {useNavigation} from '@react-navigation/native';
 
-import {SplashMark} from '../../../assets/onboarding/illustrations';
+import {LimiGhost} from '../../../components/LimiGhost';
 import {useTheme} from '../../../hooks';
-import {L10nContext} from '../../../utils';
 import {ROUTES} from '../../../utils/navigationConstants';
 import {createStyles} from './styles';
 
 const SPLASH_MIN_DWELL_MS = 600;
 
 /**
- * Brand splash — post-hydration, pre-Onboarding-1. Renders the
- * 112×112 mark from Figma `884:28352` then transitions after
- * `SPLASH_MIN_DWELL_MS`.
+ * Brand splash — post-hydration, pre-Onboarding-1.
+ * Renders LimiGhost (default) + "Limi" (56/500).
  */
 export const SplashScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const theme = useTheme();
   const styles = createStyles(theme);
-  const l10n = useContext(L10nContext);
 
   React.useEffect(() => {
     const t = setTimeout(() => {
@@ -30,12 +28,8 @@ export const SplashScreen: React.FC = () => {
 
   return (
     <View testID="onboarding-splash" style={styles.root}>
-      <SplashMark
-        width={112}
-        height={112}
-        accessibilityLabel={l10n.onboarding.splash.brand}
-        accessibilityRole="image"
-      />
+      <LimiGhost size={100} state="default" label="Limi" />
+      <Text style={styles.brandTitle}>Limi</Text>
     </View>
   );
 };

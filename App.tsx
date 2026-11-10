@@ -56,6 +56,7 @@ import {
   SettingsScreen,
   BenchmarkScreen,
   AboutScreen,
+  DarsScreen,
 
   // Dev tools screen. Always in a debug build; in a release build after the
   // seven-tap unlock on the About screen.
@@ -206,6 +207,19 @@ const App = observer(() => {
                                 title: currentL10n.screenTitles.appInfo,
                               }}
                             />
+
+                            {/* Dars (Lessons): feature-flagged, mock UI only */}
+                            {__DEV__ && (
+                              <Drawer.Screen
+                                name={ROUTES.DARS}
+                                component={gestureHandlerRootHOC(DarsScreen)}
+                                options={{
+                                  headerStyle: styles.headerWithoutDivider,
+                                  title: 'Dars',
+                                  drawerItemStyle: {display: 'none'},
+                                }}
+                              />
+                            )}
 
                             {/*
                       Dev Tools: always in a debug build, and in a release

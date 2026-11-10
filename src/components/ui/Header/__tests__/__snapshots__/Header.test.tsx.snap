@@ -16,7 +16,7 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#F9FAFB",
+          "backgroundColor": "#FFFFFF",
           "flexDirection": "row",
           "paddingHorizontal": 16,
           "paddingVertical": 8,
@@ -40,11 +40,11 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
-            "fontSize": 18,
+            "color": "#04110E",
+            "fontFamily": "Geist-Medium",
+            "fontSize": 20,
             "fontWeight": "500",
-            "lineHeight": 24,
+            "lineHeight": 28,
           }
         }
       >
@@ -53,8 +53,8 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Regular",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Regular",
             "fontSize": 11,
             "fontWeight": "400",
             "lineHeight": 14,
@@ -85,7 +85,7 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#F9FAFB",
+          "backgroundColor": "#FFFFFF",
           "flexDirection": "row",
           "paddingHorizontal": 16,
           "paddingVertical": 8,
@@ -109,11 +109,11 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
-            "fontSize": 18,
+            "color": "#04110E",
+            "fontFamily": "Geist-Medium",
+            "fontSize": 20,
             "fontWeight": "500",
-            "lineHeight": 24,
+            "lineHeight": 28,
           }
         }
       >
@@ -122,8 +122,8 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Regular",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Regular",
             "fontSize": 11,
             "fontWeight": "400",
             "lineHeight": 14,
@@ -154,7 +154,7 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#F9FAFB",
+          "backgroundColor": "#FFFFFF",
           "flexDirection": "row",
           "paddingHorizontal": 16,
           "paddingVertical": 8,
@@ -180,11 +180,11 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
-            "fontSize": 18,
+            "color": "#04110E",
+            "fontFamily": "Geist-Medium",
+            "fontSize": 20,
             "fontWeight": "500",
-            "lineHeight": 24,
+            "lineHeight": 28,
           }
         }
       >
@@ -193,8 +193,8 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Regular",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Regular",
             "fontSize": 11,
             "fontWeight": "400",
             "lineHeight": 14,
@@ -225,7 +225,7 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#F9FAFB",
+          "backgroundColor": "#FFFFFF",
           "flexDirection": "row",
           "paddingHorizontal": 16,
           "paddingVertical": 8,
@@ -251,11 +251,11 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
-            "fontSize": 18,
+            "color": "#04110E",
+            "fontFamily": "Geist-Medium",
+            "fontSize": 20,
             "fontWeight": "500",
-            "lineHeight": 24,
+            "lineHeight": 28,
           }
         }
       >
@@ -264,8 +264,8 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Regular",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Regular",
             "fontSize": 11,
             "fontWeight": "400",
             "lineHeight": 14,
@@ -296,7 +296,7 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#F9FAFB",
+          "backgroundColor": "#FFFFFF",
           "flexDirection": "row",
           "paddingHorizontal": 16,
           "paddingVertical": 8,
@@ -317,11 +317,11 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
-            "fontSize": 18,
+            "color": "#04110E",
+            "fontFamily": "Geist-Medium",
+            "fontSize": 20,
             "fontWeight": "500",
-            "lineHeight": 24,
+            "lineHeight": 28,
           }
         }
       >
@@ -330,8 +330,8 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Regular",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Regular",
             "fontSize": 11,
             "fontWeight": "400",
             "lineHeight": 14,
@@ -362,7 +362,7 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#F9FAFB",
+          "backgroundColor": "#FFFFFF",
           "flexDirection": "row",
           "paddingHorizontal": 16,
           "paddingVertical": 8,
@@ -383,11 +383,11 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
-            "fontSize": 18,
+            "color": "#04110E",
+            "fontFamily": "Geist-Medium",
+            "fontSize": 20,
             "fontWeight": "500",
-            "lineHeight": 24,
+            "lineHeight": 28,
           }
         }
       >
@@ -396,8 +396,8 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Regular",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Regular",
             "fontSize": 11,
             "fontWeight": "400",
             "lineHeight": 14,
@@ -428,7 +428,7 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#F9FAFB",
+          "backgroundColor": "#FFFFFF",
           "flexDirection": "row",
           "paddingHorizontal": 16,
           "paddingVertical": 8,
@@ -451,11 +451,11 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
-            "fontSize": 18,
+            "color": "#04110E",
+            "fontFamily": "Geist-Medium",
+            "fontSize": 20,
             "fontWeight": "500",
-            "lineHeight": 24,
+            "lineHeight": 28,
           }
         }
       >
@@ -464,8 +464,8 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Regular",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Regular",
             "fontSize": 11,
             "fontWeight": "400",
             "lineHeight": 14,
@@ -496,7 +496,7 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#F9FAFB",
+          "backgroundColor": "#FFFFFF",
           "flexDirection": "row",
           "paddingHorizontal": 16,
           "paddingVertical": 8,
@@ -519,11 +519,11 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
-            "fontSize": 18,
+            "color": "#04110E",
+            "fontFamily": "Geist-Medium",
+            "fontSize": 20,
             "fontWeight": "500",
-            "lineHeight": 24,
+            "lineHeight": 28,
           }
         }
       >
@@ -532,8 +532,8 @@ exports[`Header — snapshot matrix baseline (variant x size x {default,disabled
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Regular",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Regular",
             "fontSize": 11,
             "fontWeight": "400",
             "lineHeight": 14,
@@ -564,7 +564,7 @@ exports[`Header — snapshot matrix non-Latin font-fallback canary (canaryVarian
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#F9FAFB",
+          "backgroundColor": "#FFFFFF",
           "flexDirection": "row",
           "paddingHorizontal": 16,
           "paddingVertical": 8,
@@ -585,11 +585,11 @@ exports[`Header — snapshot matrix non-Latin font-fallback canary (canaryVarian
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
-            "fontSize": 18,
+            "color": "#04110E",
+            "fontFamily": "Geist-Medium",
+            "fontSize": 20,
             "fontWeight": "500",
-            "lineHeight": 24,
+            "lineHeight": 28,
           }
         }
       >
@@ -598,8 +598,8 @@ exports[`Header — snapshot matrix non-Latin font-fallback canary (canaryVarian
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Regular",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Regular",
             "fontSize": 11,
             "fontWeight": "400",
             "lineHeight": 14,

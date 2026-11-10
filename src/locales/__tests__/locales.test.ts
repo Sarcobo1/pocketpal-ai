@@ -58,6 +58,7 @@ const ALL_LANGUAGES: AvailableLanguage[] = [
   'pt_BR',
   'ru',
   'uk',
+  'uz',
   'zh',
   'zh_Hant',
 ];

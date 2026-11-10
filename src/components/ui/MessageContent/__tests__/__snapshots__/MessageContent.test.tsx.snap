@@ -16,7 +16,7 @@ exports[`MessageContent — snapshot matrix baseline (variant x size x {default,
       [
         {
           "alignSelf": "flex-start",
-          "backgroundColor": "rgba(51, 51, 51, 0.02)",
+          "backgroundColor": "#FFFFFF",
           "borderRadius": 16,
           "maxWidth": "85%",
           "paddingHorizontal": 16,
@@ -30,8 +30,8 @@ exports[`MessageContent — snapshot matrix baseline (variant x size x {default,
     <Text
       style={
         {
-          "color": "#333333",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 16,
           "fontWeight": "400",
           "lineHeight": 24,
@@ -60,7 +60,7 @@ exports[`MessageContent — snapshot matrix baseline (variant x size x {default,
       [
         {
           "alignSelf": "flex-start",
-          "backgroundColor": "rgba(51, 51, 51, 0.02)",
+          "backgroundColor": "#FFFFFF",
           "borderRadius": 16,
           "maxWidth": "85%",
           "paddingHorizontal": 16,
@@ -74,8 +74,8 @@ exports[`MessageContent — snapshot matrix baseline (variant x size x {default,
     <Text
       style={
         {
-          "color": "#333333",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 16,
           "fontWeight": "400",
           "lineHeight": 24,
@@ -104,7 +104,7 @@ exports[`MessageContent — snapshot matrix baseline (variant x size x {default,
       [
         {
           "alignSelf": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 16,
           "maxWidth": "85%",
           "paddingHorizontal": 16,
@@ -118,8 +118,8 @@ exports[`MessageContent — snapshot matrix baseline (variant x size x {default,
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 16,
           "fontWeight": "400",
           "lineHeight": 24,
@@ -148,7 +148,7 @@ exports[`MessageContent — snapshot matrix baseline (variant x size x {default,
       [
         {
           "alignSelf": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 16,
           "maxWidth": "85%",
           "paddingHorizontal": 16,
@@ -162,8 +162,8 @@ exports[`MessageContent — snapshot matrix baseline (variant x size x {default,
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 16,
           "fontWeight": "400",
           "lineHeight": 24,
@@ -192,7 +192,7 @@ exports[`MessageContent — snapshot matrix baseline (variant x size x {default,
       [
         {
           "alignSelf": "flex-end",
-          "backgroundColor": "#DEE0E6",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 16,
           "maxWidth": "85%",
           "paddingHorizontal": 16,
@@ -206,8 +206,8 @@ exports[`MessageContent — snapshot matrix baseline (variant x size x {default,
     <Text
       style={
         {
-          "color": "#2D2F33",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 16,
           "fontWeight": "400",
           "lineHeight": 24,
@@ -236,7 +236,7 @@ exports[`MessageContent — snapshot matrix baseline (variant x size x {default,
       [
         {
           "alignSelf": "flex-end",
-          "backgroundColor": "#DEE0E6",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 16,
           "maxWidth": "85%",
           "paddingHorizontal": 16,
@@ -250,8 +250,8 @@ exports[`MessageContent — snapshot matrix baseline (variant x size x {default,
     <Text
       style={
         {
-          "color": "#2D2F33",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 16,
           "fontWeight": "400",
           "lineHeight": 24,
@@ -280,7 +280,7 @@ exports[`MessageContent — snapshot matrix non-Latin font-fallback canary (cana
       [
         {
           "alignSelf": "flex-end",
-          "backgroundColor": "#DEE0E6",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 16,
           "maxWidth": "85%",
           "paddingHorizontal": 16,
@@ -294,8 +294,8 @@ exports[`MessageContent — snapshot matrix non-Latin font-fallback canary (cana
     <Text
       style={
         {
-          "color": "#2D2F33",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 16,
           "fontWeight": "400",
           "lineHeight": 24,

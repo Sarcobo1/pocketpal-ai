@@ -14,8 +14,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -30,7 +30,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "flex-start",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -45,12 +45,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={true}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#333333",
+            "color": "#04110E",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -64,8 +64,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -93,8 +93,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -109,7 +109,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "flex-start",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -124,12 +124,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={true}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#333333",
+            "color": "#04110E",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -143,8 +143,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -172,8 +172,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -188,7 +188,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "flex-start",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -203,12 +203,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={true}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#646466",
+            "color": "#3F6155",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -222,8 +222,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -251,8 +251,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -267,7 +267,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "flex-start",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -282,12 +282,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={true}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#646466",
+            "color": "#3F6155",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -301,8 +301,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -330,8 +330,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -346,7 +346,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "flex-start",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -361,12 +361,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={true}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#333333",
+            "color": "#04110E",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -380,8 +380,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -409,8 +409,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -425,7 +425,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "flex-start",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -440,12 +440,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={true}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#333333",
+            "color": "#04110E",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -459,8 +459,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -488,8 +488,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -504,7 +504,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "flex-start",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -519,12 +519,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={true}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#646466",
+            "color": "#3F6155",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -538,8 +538,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -567,8 +567,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -583,7 +583,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "flex-start",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -598,12 +598,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={true}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#646466",
+            "color": "#3F6155",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -617,8 +617,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -646,8 +646,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -662,7 +662,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "flex-start",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -677,12 +677,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={true}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#333333",
+            "color": "#04110E",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -696,8 +696,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -725,8 +725,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -741,7 +741,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "flex-start",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -756,12 +756,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={true}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#333333",
+            "color": "#04110E",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -775,8 +775,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -804,8 +804,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -820,7 +820,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "flex-start",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -835,12 +835,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={true}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#646466",
+            "color": "#3F6155",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -854,8 +854,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -883,8 +883,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -899,7 +899,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "flex-start",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -914,12 +914,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={true}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#646466",
+            "color": "#3F6155",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -933,8 +933,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -962,8 +962,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -978,7 +978,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "center",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -993,12 +993,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={false}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#333333",
+            "color": "#04110E",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -1012,8 +1012,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1041,8 +1041,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1057,7 +1057,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "center",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -1072,12 +1072,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={false}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#333333",
+            "color": "#04110E",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -1091,8 +1091,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1120,8 +1120,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1136,7 +1136,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "center",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -1151,12 +1151,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={false}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#646466",
+            "color": "#3F6155",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -1170,8 +1170,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1199,8 +1199,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1215,7 +1215,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "center",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -1230,12 +1230,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={false}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#646466",
+            "color": "#3F6155",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -1249,8 +1249,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1278,8 +1278,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1294,7 +1294,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "center",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -1309,12 +1309,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={false}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#333333",
+            "color": "#04110E",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -1328,8 +1328,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1357,8 +1357,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1373,7 +1373,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "center",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -1388,12 +1388,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={false}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#333333",
+            "color": "#04110E",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -1407,8 +1407,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1436,8 +1436,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1452,7 +1452,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "center",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -1467,12 +1467,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={false}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#646466",
+            "color": "#3F6155",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -1486,8 +1486,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1515,8 +1515,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1531,7 +1531,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "center",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -1546,12 +1546,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={false}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#646466",
+            "color": "#3F6155",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -1565,8 +1565,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1594,8 +1594,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1610,7 +1610,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "center",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -1625,12 +1625,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={false}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#333333",
+            "color": "#04110E",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -1644,8 +1644,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1673,8 +1673,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1689,7 +1689,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "center",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -1704,12 +1704,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={false}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#333333",
+            "color": "#04110E",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -1723,8 +1723,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1752,8 +1752,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1768,7 +1768,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "center",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -1783,12 +1783,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={false}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#646466",
+            "color": "#3F6155",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -1802,8 +1802,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1831,8 +1831,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1847,7 +1847,7 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         {
           "alignItems": "center",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -1862,12 +1862,12 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
         multiline={false}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#646466",
+            "color": "#3F6155",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -1881,8 +1881,8 @@ exports[`Input — snapshot matrix baseline (variant x size x {default,disabled}
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1910,8 +1910,8 @@ exports[`Input — snapshot matrix non-Latin font-fallback canary (canaryVariant
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -1926,7 +1926,7 @@ exports[`Input — snapshot matrix non-Latin font-fallback canary (canaryVariant
         {
           "alignItems": "center",
           "backgroundColor": "transparent",
-          "borderBottomColor": "rgba(51, 51, 51, 0.05)",
+          "borderBottomColor": "rgba(4, 17, 14, 0.08)",
           "borderBottomWidth": 1,
           "flexDirection": "row",
           "gap": 4,
@@ -1941,12 +1941,12 @@ exports[`Input — snapshot matrix non-Latin font-fallback canary (canaryVariant
         multiline={false}
         onBlur={[Function]}
         onFocus={[Function]}
-        placeholderTextColor="#646466"
+        placeholderTextColor="#3F6155"
         style={
           {
-            "color": "#333333",
+            "color": "#04110E",
             "flex": 1,
-            "fontFamily": "Inter-Regular",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -1960,8 +1960,8 @@ exports[`Input — snapshot matrix non-Latin font-fallback canary (canaryVariant
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Regular",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,

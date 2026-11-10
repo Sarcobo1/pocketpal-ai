@@ -111,26 +111,24 @@ export const PendingIndicator: React.FC<PendingIndicatorProps> = ({
   }
 
   let orbState: LimiOrbState = 'composing';
-  let defaultLabel = 'O‘ylayapman…';
   if (firstTalent === 'calculate') {
     orbState = 'solving';
-    defaultLabel = 'Yechyapman…';
   } else if (firstTalent?.includes('search')) {
     orbState = 'searching';
-    defaultLabel = 'Qidiryapman…';
   } else if (inToolCallMode) {
     orbState = 'working';
-    defaultLabel = 'Ishlayapman…';
   }
 
   return (
     <View style={styles.container} testID="pending-indicator">
       <LimiOrb state={orbState} size={20} />
-      <Text
-        style={[countStyle, {marginLeft: 8}]}
-        testID="pending-indicator-suffix">
-        {suffix !== null ? suffix : defaultLabel}
-      </Text>
+      {suffix !== null && (
+        <Text
+          style={[countStyle, {marginLeft: 8}]}
+          testID="pending-indicator-suffix">
+          {suffix}
+        </Text>
+      )}
     </View>
   );
 };

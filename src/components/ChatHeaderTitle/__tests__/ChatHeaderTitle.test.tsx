@@ -10,13 +10,13 @@ describe('ChatHeaderTitle', () => {
     jest.clearAllMocks();
   });
 
-  it('renders "Chat" when no active session exists', () => {
+  it('renders "Limi" when no active session exists', () => {
     runInAction(() => {
       chatSessionStore.resetActiveSession();
       chatSessionStore.sessions = [];
     });
     const {getByText} = render(<ChatHeaderTitle />);
-    expect(getByText('Chat')).toBeTruthy();
+    expect(getByText('Limi')).toBeTruthy();
   });
 
   it('renders session title when active session exists', () => {

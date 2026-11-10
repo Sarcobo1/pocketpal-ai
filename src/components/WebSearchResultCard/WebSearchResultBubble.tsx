@@ -59,8 +59,14 @@ export const WebSearchResultBubble: React.FC<WebSearchResultBubbleProps> = ({
         testID="web-search-result-trigger">
         <View style={componentStyles.headerRow}>
           <View style={componentStyles.row}>
+            <Text style={componentStyles.label} numberOfLines={1}>
+              {t(l10n.chat.webSearch.searched, {query})}
+            </Text>
             <Text style={componentStyles.count} numberOfLines={1}>
-              {results.length} ta manba · «{query}»
+              {' · '}
+              {results.length === 1
+                ? l10n.chat.webSearch.resultsCountOne
+                : t(l10n.chat.webSearch.resultsCount, {count: results.length})}
             </Text>
           </View>
           <ChevronRightIcon
@@ -72,16 +78,24 @@ export const WebSearchResultBubble: React.FC<WebSearchResultBubbleProps> = ({
 
         {/* Source chips */}
         <View style={componentStyles.chipList}>
-          {results.slice(0, 3).map((item, idx) => (
-            <View key={idx} style={componentStyles.chip}>
-              <View style={componentStyles.orbCircle}>
-                <LimiOrb state="searching" size={20} paused={true} />
+          {results.slice(0, 3).map((item, idx) => {
+            let sourceName = item.url;
+            try {
+              sourceName = new URL(item.url).hostname.replace(/^www\./, '');
+            } catch {
+              sourceName = item.url;
+            }
+            return (
+              <View key={idx} style={componentStyles.chip}>
+                <View style={componentStyles.orbCircle}>
+                  <LimiOrb state="searching" size={20} paused={true} />
+                </View>
+                <Text style={componentStyles.chipText} numberOfLines={1}>
+                  {sourceName}
+                </Text>
               </View>
-              <Text style={componentStyles.chipText} numberOfLines={1}>
-                {item.title || item.url}
-              </Text>
-            </View>
-          ))}
+            );
+          })}
         </View>
       </TouchableOpacity>
 

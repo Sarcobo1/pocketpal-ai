@@ -21,7 +21,24 @@ export const Avatar = React.memo(
     theme: Theme;
   }) => {
     const renderAvatar = () => {
-      if (!currentUserIsAuthor) {
+      if (author.imageUrl) {
+        return (
+          <Image
+            accessibilityRole="image"
+            testID="avatar-image"
+            resizeMode="cover"
+            source={{uri: author.imageUrl}}
+            style={[styles.image]}
+          />
+        );
+      }
+
+      if (
+        !currentUserIsAuthor &&
+        (!author.firstName ||
+          author.id === 'assistant' ||
+          author.firstName === 'Limi')
+      ) {
         return (
           <LimiGhost
             size={36}
@@ -37,18 +54,6 @@ export const Avatar = React.memo(
         theme.colors.userAvatarNameColors,
       );
       const initials = getUserInitials(author);
-
-      if (author.imageUrl) {
-        return (
-          <Image
-            accessibilityRole="image"
-            testID="avatar-image"
-            resizeMode="cover"
-            source={{uri: author.imageUrl}}
-            style={[styles.image]}
-          />
-        );
-      }
 
       return (
         <View style={[styles.avatarBackground, {backgroundColor: color}]}>

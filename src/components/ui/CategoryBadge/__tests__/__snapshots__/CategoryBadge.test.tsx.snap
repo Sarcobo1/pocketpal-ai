@@ -17,7 +17,7 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
       [
         {
           "alignSelf": "flex-start",
-          "backgroundColor": "rgba(51, 51, 51, 0.02)",
+          "backgroundColor": "#FFFFFF",
           "borderRadius": 2,
           "paddingHorizontal": 8,
           "paddingVertical": 2,
@@ -30,8 +30,8 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
     <Text
       style={
         {
-          "color": "#333333",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 12,
           "fontWeight": "400",
           "lineHeight": 16,
@@ -61,7 +61,7 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
       [
         {
           "alignSelf": "flex-start",
-          "backgroundColor": "rgba(51, 51, 51, 0.02)",
+          "backgroundColor": "#FFFFFF",
           "borderRadius": 2,
           "paddingHorizontal": 8,
           "paddingVertical": 2,
@@ -74,8 +74,8 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
     <Text
       style={
         {
-          "color": "#333333",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 12,
           "fontWeight": "400",
           "lineHeight": 16,
@@ -105,7 +105,7 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
       [
         {
           "alignSelf": "flex-start",
-          "backgroundColor": "rgba(51, 51, 51, 0.02)",
+          "backgroundColor": "#FFFFFF",
           "borderRadius": 2,
           "paddingHorizontal": 4,
           "paddingVertical": 2,
@@ -118,8 +118,8 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
     <Text
       style={
         {
-          "color": "#333333",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -149,7 +149,7 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
       [
         {
           "alignSelf": "flex-start",
-          "backgroundColor": "rgba(51, 51, 51, 0.02)",
+          "backgroundColor": "#FFFFFF",
           "borderRadius": 2,
           "paddingHorizontal": 4,
           "paddingVertical": 2,
@@ -162,8 +162,8 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
     <Text
       style={
         {
-          "color": "#333333",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -193,7 +193,7 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
       [
         {
           "alignSelf": "flex-start",
-          "backgroundColor": "#DEE0E6",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 2,
           "paddingHorizontal": 8,
           "paddingVertical": 2,
@@ -206,8 +206,8 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
     <Text
       style={
         {
-          "color": "#2D2F33",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 12,
           "fontWeight": "400",
           "lineHeight": 16,
@@ -237,7 +237,7 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
       [
         {
           "alignSelf": "flex-start",
-          "backgroundColor": "#DEE0E6",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 2,
           "paddingHorizontal": 8,
           "paddingVertical": 2,
@@ -250,8 +250,8 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
     <Text
       style={
         {
-          "color": "#2D2F33",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 12,
           "fontWeight": "400",
           "lineHeight": 16,
@@ -281,7 +281,7 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
       [
         {
           "alignSelf": "flex-start",
-          "backgroundColor": "#DEE0E6",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 2,
           "paddingHorizontal": 4,
           "paddingVertical": 2,
@@ -294,8 +294,8 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
     <Text
       style={
         {
-          "color": "#2D2F33",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -325,7 +325,7 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
       [
         {
           "alignSelf": "flex-start",
-          "backgroundColor": "#DEE0E6",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 2,
           "paddingHorizontal": 4,
           "paddingVertical": 2,
@@ -338,8 +338,8 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
     <Text
       style={
         {
-          "color": "#2D2F33",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -369,7 +369,7 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
       [
         {
           "alignSelf": "flex-start",
-          "backgroundColor": "#E0E0E0",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 2,
           "paddingHorizontal": 8,
           "paddingVertical": 2,
@@ -382,8 +382,8 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
     <Text
       style={
         {
-          "color": "#424242",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 12,
           "fontWeight": "400",
           "lineHeight": 16,
@@ -413,7 +413,7 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
       [
         {
           "alignSelf": "flex-start",
-          "backgroundColor": "#E0E0E0",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 2,
           "paddingHorizontal": 8,
           "paddingVertical": 2,
@@ -426,8 +426,8 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
     <Text
       style={
         {
-          "color": "#424242",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 12,
           "fontWeight": "400",
           "lineHeight": 16,
@@ -457,7 +457,7 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
       [
         {
           "alignSelf": "flex-start",
-          "backgroundColor": "#E0E0E0",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 2,
           "paddingHorizontal": 4,
           "paddingVertical": 2,
@@ -470,8 +470,8 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
     <Text
       style={
         {
-          "color": "#424242",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -501,7 +501,7 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
       [
         {
           "alignSelf": "flex-start",
-          "backgroundColor": "#E0E0E0",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 2,
           "paddingHorizontal": 4,
           "paddingVertical": 2,
@@ -514,8 +514,8 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
     <Text
       style={
         {
-          "color": "#424242",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -545,7 +545,7 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
       [
         {
           "alignSelf": "flex-start",
-          "backgroundColor": "#F1F3FF",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 2,
           "paddingHorizontal": 8,
           "paddingVertical": 2,
@@ -558,8 +558,8 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
     <Text
       style={
         {
-          "color": "#013332",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 12,
           "fontWeight": "400",
           "lineHeight": 16,
@@ -589,7 +589,7 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
       [
         {
           "alignSelf": "flex-start",
-          "backgroundColor": "#F1F3FF",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 2,
           "paddingHorizontal": 8,
           "paddingVertical": 2,
@@ -602,8 +602,8 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
     <Text
       style={
         {
-          "color": "#013332",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 12,
           "fontWeight": "400",
           "lineHeight": 16,
@@ -633,7 +633,7 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
       [
         {
           "alignSelf": "flex-start",
-          "backgroundColor": "#F1F3FF",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 2,
           "paddingHorizontal": 4,
           "paddingVertical": 2,
@@ -646,8 +646,8 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
     <Text
       style={
         {
-          "color": "#013332",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -677,7 +677,7 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
       [
         {
           "alignSelf": "flex-start",
-          "backgroundColor": "#F1F3FF",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 2,
           "paddingHorizontal": 4,
           "paddingVertical": 2,
@@ -690,8 +690,8 @@ exports[`CategoryBadge — snapshot matrix baseline (variant x size x {default,d
     <Text
       style={
         {
-          "color": "#013332",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,
@@ -721,7 +721,7 @@ exports[`CategoryBadge — snapshot matrix non-Latin font-fallback canary (canar
       [
         {
           "alignSelf": "flex-start",
-          "backgroundColor": "rgba(51, 51, 51, 0.02)",
+          "backgroundColor": "#FFFFFF",
           "borderRadius": 2,
           "paddingHorizontal": 4,
           "paddingVertical": 2,
@@ -734,8 +734,8 @@ exports[`CategoryBadge — snapshot matrix non-Latin font-fallback canary (canar
     <Text
       style={
         {
-          "color": "#333333",
-          "fontFamily": "Inter-Regular",
+          "color": "#04110E",
+          "fontFamily": "Geist-Regular",
           "fontSize": 11,
           "fontWeight": "400",
           "lineHeight": 14,

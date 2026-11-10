@@ -50,6 +50,7 @@ import {
   setVoiceFrameSource,
   storeVoiceFrame,
 } from '../../services/voice/frameSource';
+import {voiceVisual} from '../VoiceCloud';
 import {LimiOrb} from '../LimiOrb';
 
 import {useVoiceModeControls} from './controls';
@@ -73,6 +74,7 @@ export const VoiceModeView: React.FC = observer(() => {
   const insets = useSafeAreaInsets();
   const {tapCloud, toggleMute, end} = useVoiceModeControls();
   const {phase, micMuted, lastError, cameraOn} = voiceModeStore;
+  const visual = voiceVisual(phase, micMuted);
   const status = voiceStatus(
     phase,
     micMuted,
@@ -285,16 +287,18 @@ export const VoiceModeView: React.FC = observer(() => {
             accessibilityLabel={l10n.voiceMode.cloudLabel}
             accessibilityHint={hint}
             testID="voice-cloud">
-            <LimiOrb
-              state={
-                phase === 'thinking'
-                  ? 'composing'
-                  : phase === 'speaking'
-                    ? 'breathing'
-                    : 'listening'
-              }
-              size={220}
-            />
+            <View testID={`voice-cloud-${visual}`}>
+              <LimiOrb
+                state={
+                  phase === 'thinking'
+                    ? 'composing'
+                    : phase === 'speaking'
+                      ? 'breathing'
+                      : 'listening'
+                }
+                size={220}
+              />
+            </View>
           </Pressable>
           <View style={[styles.status, {gap: theme.spacing.xs}]}>
             <Text style={[theme.typography.titleL, {color: theme.colors.text}]}>

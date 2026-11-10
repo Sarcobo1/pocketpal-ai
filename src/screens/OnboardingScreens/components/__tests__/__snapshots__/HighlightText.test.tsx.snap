@@ -27,8 +27,8 @@ exports[`HighlightText ignores empty phrase entries (defensive) 1`] = `
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Regular",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -39,8 +39,8 @@ exports[`HighlightText ignores empty phrase entries (defensive) 1`] = `
         <Text
           style={
             {
-              "backgroundColor": "#FCE7CF",
-              "color": "#111111",
+              "backgroundColor": "#0F9D6E",
+              "color": "#04110E",
             }
           }
         >
@@ -82,8 +82,8 @@ exports[`HighlightText renders the body plain when no phrase matches 1`] = `
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Regular",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -127,8 +127,8 @@ exports[`HighlightText wraps a single matching phrase in a pill segment 1`] = `
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Regular",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -142,8 +142,8 @@ exports[`HighlightText wraps a single matching phrase in a pill segment 1`] = `
         <Text
           style={
             {
-              "backgroundColor": "#FCE7CF",
-              "color": "#111111",
+              "backgroundColor": "#0F9D6E",
+              "color": "#04110E",
             }
           }
         >
@@ -185,8 +185,8 @@ exports[`HighlightText wraps multiple distinct phrases in separate pills 1`] = `
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Regular",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Regular",
             "fontSize": 16,
             "fontWeight": "400",
             "lineHeight": 24,
@@ -197,8 +197,8 @@ exports[`HighlightText wraps multiple distinct phrases in separate pills 1`] = `
         <Text
           style={
             {
-              "backgroundColor": "#FCE7CF",
-              "color": "#111111",
+              "backgroundColor": "#0F9D6E",
+              "color": "#04110E",
             }
           }
         >
@@ -210,8 +210,8 @@ exports[`HighlightText wraps multiple distinct phrases in separate pills 1`] = `
         <Text
           style={
             {
-              "backgroundColor": "#FCE7CF",
-              "color": "#111111",
+              "backgroundColor": "#0F9D6E",
+              "color": "#04110E",
             }
           }
         >
@@ -223,8 +223,8 @@ exports[`HighlightText wraps multiple distinct phrases in separate pills 1`] = `
         <Text
           style={
             {
-              "backgroundColor": "#FCE7CF",
-              "color": "#111111",
+              "backgroundColor": "#0F9D6E",
+              "color": "#04110E",
             }
           }
         >

@@ -50,7 +50,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
           {
             "alignItems": "center",
             "alignSelf": "flex-start",
-            "backgroundColor": "rgba(51, 51, 51, 0.02)",
+            "backgroundColor": "#FFFFFF",
             "borderRadius": 8,
             "flexDirection": "row",
             "gap": 4,
@@ -66,8 +66,8 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#04110E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -78,7 +78,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       </Text>
       <SvgMock
         height={16}
-        stroke="#333333"
+        stroke="#04110E"
         width={16}
       />
     </View>
@@ -136,7 +136,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
           {
             "alignItems": "center",
             "alignSelf": "flex-start",
-            "backgroundColor": "rgba(51, 51, 51, 0.02)",
+            "backgroundColor": "#FFFFFF",
             "borderRadius": 8,
             "flexDirection": "row",
             "gap": 4,
@@ -152,8 +152,8 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#04110E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -164,7 +164,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       </Text>
       <SvgMock
         height={16}
-        stroke="#333333"
+        stroke="#04110E"
         width={16}
       />
     </View>
@@ -222,7 +222,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
           {
             "alignItems": "center",
             "alignSelf": "flex-start",
-            "backgroundColor": "rgba(51, 51, 51, 0.01)",
+            "backgroundColor": "#F1F8F4",
             "borderRadius": 8,
             "flexDirection": "row",
             "gap": 4,
@@ -238,8 +238,8 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -250,7 +250,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       </Text>
       <SvgMock
         height={16}
-        stroke="#646466"
+        stroke="#3F6155"
         width={16}
       />
     </View>
@@ -308,7 +308,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
           {
             "alignItems": "center",
             "alignSelf": "flex-start",
-            "backgroundColor": "rgba(51, 51, 51, 0.01)",
+            "backgroundColor": "#F1F8F4",
             "borderRadius": 8,
             "flexDirection": "row",
             "gap": 4,
@@ -324,8 +324,8 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -336,7 +336,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       </Text>
       <SvgMock
         height={16}
-        stroke="#646466"
+        stroke="#3F6155"
         width={16}
       />
     </View>
@@ -394,7 +394,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
           {
             "alignItems": "center",
             "alignSelf": "flex-start",
-            "backgroundColor": "rgba(51, 51, 51, 0.02)",
+            "backgroundColor": "#FFFFFF",
             "borderRadius": 8,
             "flexDirection": "row",
             "gap": 4,
@@ -410,8 +410,8 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#04110E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -422,7 +422,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       </Text>
       <SvgMock
         height={16}
-        stroke="#333333"
+        stroke="#04110E"
         width={16}
       />
     </View>
@@ -480,7 +480,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
           {
             "alignItems": "center",
             "alignSelf": "flex-start",
-            "backgroundColor": "rgba(51, 51, 51, 0.02)",
+            "backgroundColor": "#FFFFFF",
             "borderRadius": 8,
             "flexDirection": "row",
             "gap": 4,
@@ -496,8 +496,8 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#04110E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -508,7 +508,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       </Text>
       <SvgMock
         height={16}
-        stroke="#333333"
+        stroke="#04110E"
         width={16}
       />
     </View>
@@ -566,7 +566,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
           {
             "alignItems": "center",
             "alignSelf": "flex-start",
-            "backgroundColor": "rgba(51, 51, 51, 0.01)",
+            "backgroundColor": "#F1F8F4",
             "borderRadius": 8,
             "flexDirection": "row",
             "gap": 4,
@@ -582,8 +582,8 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -594,7 +594,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       </Text>
       <SvgMock
         height={16}
-        stroke="#646466"
+        stroke="#3F6155"
         width={16}
       />
     </View>
@@ -652,7 +652,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
           {
             "alignItems": "center",
             "alignSelf": "flex-start",
-            "backgroundColor": "rgba(51, 51, 51, 0.01)",
+            "backgroundColor": "#F1F8F4",
             "borderRadius": 8,
             "flexDirection": "row",
             "gap": 4,
@@ -668,8 +668,8 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -680,7 +680,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       </Text>
       <SvgMock
         height={16}
-        stroke="#646466"
+        stroke="#3F6155"
         width={16}
       />
     </View>
@@ -738,7 +738,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
           {
             "alignItems": "center",
             "alignSelf": "flex-start",
-            "backgroundColor": "rgba(51, 51, 51, 0.02)",
+            "backgroundColor": "#FFFFFF",
             "borderRadius": 8,
             "flexDirection": "row",
             "gap": 4,
@@ -754,8 +754,8 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#04110E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -766,7 +766,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       </Text>
       <SvgMock
         height={16}
-        stroke="#333333"
+        stroke="#04110E"
         width={16}
       />
     </View>
@@ -824,7 +824,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
           {
             "alignItems": "center",
             "alignSelf": "flex-start",
-            "backgroundColor": "rgba(51, 51, 51, 0.02)",
+            "backgroundColor": "#FFFFFF",
             "borderRadius": 8,
             "flexDirection": "row",
             "gap": 4,
@@ -840,8 +840,8 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#04110E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -852,7 +852,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       </Text>
       <SvgMock
         height={16}
-        stroke="#333333"
+        stroke="#04110E"
         width={16}
       />
     </View>
@@ -910,7 +910,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
           {
             "alignItems": "center",
             "alignSelf": "flex-start",
-            "backgroundColor": "rgba(51, 51, 51, 0.01)",
+            "backgroundColor": "#F1F8F4",
             "borderRadius": 8,
             "flexDirection": "row",
             "gap": 4,
@@ -926,8 +926,8 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -938,7 +938,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       </Text>
       <SvgMock
         height={16}
-        stroke="#646466"
+        stroke="#3F6155"
         width={16}
       />
     </View>
@@ -996,7 +996,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
           {
             "alignItems": "center",
             "alignSelf": "flex-start",
-            "backgroundColor": "rgba(51, 51, 51, 0.01)",
+            "backgroundColor": "#F1F8F4",
             "borderRadius": 8,
             "flexDirection": "row",
             "gap": 4,
@@ -1012,8 +1012,8 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -1024,7 +1024,7 @@ exports[`Dropdown — snapshot matrix baseline (variant x size x {default,disabl
       </Text>
       <SvgMock
         height={16}
-        stroke="#646466"
+        stroke="#3F6155"
         width={16}
       />
     </View>
@@ -1082,7 +1082,7 @@ exports[`Dropdown — snapshot matrix non-Latin font-fallback canary (canaryVari
           {
             "alignItems": "center",
             "alignSelf": "flex-start",
-            "backgroundColor": "rgba(51, 51, 51, 0.02)",
+            "backgroundColor": "#FFFFFF",
             "borderRadius": 8,
             "flexDirection": "row",
             "gap": 4,
@@ -1098,8 +1098,8 @@ exports[`Dropdown — snapshot matrix non-Latin font-fallback canary (canaryVari
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#04110E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -1110,7 +1110,7 @@ exports[`Dropdown — snapshot matrix non-Latin font-fallback canary (canaryVari
       </Text>
       <SvgMock
         height={16}
-        stroke="#333333"
+        stroke="#04110E"
         width={16}
       />
     </View>

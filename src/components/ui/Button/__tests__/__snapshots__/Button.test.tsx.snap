@@ -46,8 +46,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#FF653F",
-          "borderRadius": 12,
+          "backgroundColor": "#C62A2F",
+          "borderRadius": 10,
           "flexDirection": "row",
           "justifyContent": "center",
           "paddingHorizontal": 24,
@@ -62,7 +62,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       style={
         {
           "color": "#FFFFFF",
-          "fontFamily": "Inter-Medium",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -121,8 +121,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#FF653F",
-          "borderRadius": 12,
+          "backgroundColor": "#C62A2F",
+          "borderRadius": 10,
           "flexDirection": "row",
           "justifyContent": "center",
           "paddingHorizontal": 24,
@@ -137,7 +137,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       style={
         {
           "color": "#FFFFFF",
-          "fontFamily": "Inter-Medium",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -196,8 +196,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
-          "borderRadius": 12,
+          "backgroundColor": "#F1F8F4",
+          "borderRadius": 10,
           "flexDirection": "row",
           "justifyContent": "center",
           "paddingHorizontal": 24,
@@ -211,8 +211,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -271,8 +271,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
-          "borderRadius": 12,
+          "backgroundColor": "#F1F8F4",
+          "borderRadius": 10,
           "flexDirection": "row",
           "justifyContent": "center",
           "paddingHorizontal": 24,
@@ -286,8 +286,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -346,7 +346,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#FF653F",
+          "backgroundColor": "#C62A2F",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -362,7 +362,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       style={
         {
           "color": "#FFFFFF",
-          "fontFamily": "Inter-Medium",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -421,7 +421,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#FF653F",
+          "backgroundColor": "#C62A2F",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -437,7 +437,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       style={
         {
           "color": "#FFFFFF",
-          "fontFamily": "Inter-Medium",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -496,7 +496,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -511,8 +511,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -571,7 +571,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -586,8 +586,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -646,7 +646,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#FF653F",
+          "backgroundColor": "#C62A2F",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -662,7 +662,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       style={
         {
           "color": "#FFFFFF",
-          "fontFamily": "Inter-Medium",
+          "fontFamily": "Geist-Medium",
           "fontSize": 12,
           "fontWeight": "500",
           "lineHeight": 16,
@@ -721,7 +721,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#FF653F",
+          "backgroundColor": "#C62A2F",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -737,7 +737,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       style={
         {
           "color": "#FFFFFF",
-          "fontFamily": "Inter-Medium",
+          "fontFamily": "Geist-Medium",
           "fontSize": 12,
           "fontWeight": "500",
           "lineHeight": 16,
@@ -796,7 +796,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -811,8 +811,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 12,
           "fontWeight": "500",
           "lineHeight": 16,
@@ -871,7 +871,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -886,8 +886,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 12,
           "fontWeight": "500",
           "lineHeight": 16,
@@ -946,8 +946,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#333333",
-          "borderRadius": 12,
+          "backgroundColor": "#0F9D6E",
+          "borderRadius": 10,
           "flexDirection": "row",
           "justifyContent": "center",
           "paddingHorizontal": 24,
@@ -962,7 +962,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       style={
         {
           "color": "#FFFFFF",
-          "fontFamily": "Inter-Medium",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -1021,8 +1021,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#333333",
-          "borderRadius": 12,
+          "backgroundColor": "#0F9D6E",
+          "borderRadius": 10,
           "flexDirection": "row",
           "justifyContent": "center",
           "paddingHorizontal": 24,
@@ -1037,7 +1037,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       style={
         {
           "color": "#FFFFFF",
-          "fontFamily": "Inter-Medium",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -1096,8 +1096,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
-          "borderRadius": 12,
+          "backgroundColor": "#F1F8F4",
+          "borderRadius": 10,
           "flexDirection": "row",
           "justifyContent": "center",
           "paddingHorizontal": 24,
@@ -1111,8 +1111,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -1171,8 +1171,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
-          "borderRadius": 12,
+          "backgroundColor": "#F1F8F4",
+          "borderRadius": 10,
           "flexDirection": "row",
           "justifyContent": "center",
           "paddingHorizontal": 24,
@@ -1186,8 +1186,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -1246,7 +1246,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#333333",
+          "backgroundColor": "#0F9D6E",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -1262,7 +1262,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       style={
         {
           "color": "#FFFFFF",
-          "fontFamily": "Inter-Medium",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -1321,7 +1321,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#333333",
+          "backgroundColor": "#0F9D6E",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -1337,7 +1337,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       style={
         {
           "color": "#FFFFFF",
-          "fontFamily": "Inter-Medium",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -1396,7 +1396,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -1411,8 +1411,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -1471,7 +1471,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -1486,8 +1486,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -1546,7 +1546,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#333333",
+          "backgroundColor": "#0F9D6E",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -1562,7 +1562,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       style={
         {
           "color": "#FFFFFF",
-          "fontFamily": "Inter-Medium",
+          "fontFamily": "Geist-Medium",
           "fontSize": 12,
           "fontWeight": "500",
           "lineHeight": 16,
@@ -1621,7 +1621,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#333333",
+          "backgroundColor": "#0F9D6E",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -1637,7 +1637,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       style={
         {
           "color": "#FFFFFF",
-          "fontFamily": "Inter-Medium",
+          "fontFamily": "Geist-Medium",
           "fontSize": 12,
           "fontWeight": "500",
           "lineHeight": 16,
@@ -1696,7 +1696,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -1711,8 +1711,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 12,
           "fontWeight": "500",
           "lineHeight": 16,
@@ -1771,7 +1771,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -1786,8 +1786,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 12,
           "fontWeight": "500",
           "lineHeight": 16,
@@ -1846,8 +1846,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#E0E0E0",
-          "borderRadius": 12,
+          "backgroundColor": "#EAF4EF",
+          "borderRadius": 10,
           "flexDirection": "row",
           "justifyContent": "center",
           "paddingHorizontal": 24,
@@ -1861,8 +1861,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#424242",
-          "fontFamily": "Inter-Medium",
+          "color": "#04110E",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -1921,8 +1921,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#E0E0E0",
-          "borderRadius": 12,
+          "backgroundColor": "#EAF4EF",
+          "borderRadius": 10,
           "flexDirection": "row",
           "justifyContent": "center",
           "paddingHorizontal": 24,
@@ -1936,8 +1936,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#424242",
-          "fontFamily": "Inter-Medium",
+          "color": "#04110E",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -1996,8 +1996,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
-          "borderRadius": 12,
+          "backgroundColor": "#F1F8F4",
+          "borderRadius": 10,
           "flexDirection": "row",
           "justifyContent": "center",
           "paddingHorizontal": 24,
@@ -2011,8 +2011,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -2071,8 +2071,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
-          "borderRadius": 12,
+          "backgroundColor": "#F1F8F4",
+          "borderRadius": 10,
           "flexDirection": "row",
           "justifyContent": "center",
           "paddingHorizontal": 24,
@@ -2086,8 +2086,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -2146,7 +2146,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#E0E0E0",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -2161,8 +2161,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#424242",
-          "fontFamily": "Inter-Medium",
+          "color": "#04110E",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -2221,7 +2221,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#E0E0E0",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -2236,8 +2236,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#424242",
-          "fontFamily": "Inter-Medium",
+          "color": "#04110E",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -2296,7 +2296,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -2311,8 +2311,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -2371,7 +2371,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -2386,8 +2386,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -2446,7 +2446,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#E0E0E0",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -2461,8 +2461,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#424242",
-          "fontFamily": "Inter-Medium",
+          "color": "#04110E",
+          "fontFamily": "Geist-Medium",
           "fontSize": 12,
           "fontWeight": "500",
           "lineHeight": 16,
@@ -2521,7 +2521,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#E0E0E0",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -2536,8 +2536,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#424242",
-          "fontFamily": "Inter-Medium",
+          "color": "#04110E",
+          "fontFamily": "Geist-Medium",
           "fontSize": 12,
           "fontWeight": "500",
           "lineHeight": 16,
@@ -2596,7 +2596,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -2611,8 +2611,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 12,
           "fontWeight": "500",
           "lineHeight": 16,
@@ -2671,7 +2671,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -2686,8 +2686,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 12,
           "fontWeight": "500",
           "lineHeight": 16,
@@ -2747,7 +2747,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
         {
           "alignItems": "center",
           "backgroundColor": "transparent",
-          "borderRadius": 12,
+          "borderRadius": 10,
           "flexDirection": "row",
           "justifyContent": "center",
           "paddingHorizontal": 24,
@@ -2761,8 +2761,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#333333",
-          "fontFamily": "Inter-Medium",
+          "color": "#0F9D6E",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -2822,7 +2822,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
         {
           "alignItems": "center",
           "backgroundColor": "transparent",
-          "borderRadius": 12,
+          "borderRadius": 10,
           "flexDirection": "row",
           "justifyContent": "center",
           "paddingHorizontal": 24,
@@ -2836,8 +2836,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#333333",
-          "fontFamily": "Inter-Medium",
+          "color": "#0F9D6E",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -2896,8 +2896,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
-          "borderRadius": 12,
+          "backgroundColor": "#F1F8F4",
+          "borderRadius": 10,
           "flexDirection": "row",
           "justifyContent": "center",
           "paddingHorizontal": 24,
@@ -2911,8 +2911,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -2971,8 +2971,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
-          "borderRadius": 12,
+          "backgroundColor": "#F1F8F4",
+          "borderRadius": 10,
           "flexDirection": "row",
           "justifyContent": "center",
           "paddingHorizontal": 24,
@@ -2986,8 +2986,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -3061,8 +3061,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#333333",
-          "fontFamily": "Inter-Medium",
+          "color": "#0F9D6E",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -3136,8 +3136,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#333333",
-          "fontFamily": "Inter-Medium",
+          "color": "#0F9D6E",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -3196,7 +3196,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -3211,8 +3211,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -3271,7 +3271,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -3286,8 +3286,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 14,
           "fontWeight": "500",
           "lineHeight": 20,
@@ -3361,8 +3361,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#333333",
-          "fontFamily": "Inter-Medium",
+          "color": "#0F9D6E",
+          "fontFamily": "Geist-Medium",
           "fontSize": 12,
           "fontWeight": "500",
           "lineHeight": 16,
@@ -3436,8 +3436,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#333333",
-          "fontFamily": "Inter-Medium",
+          "color": "#0F9D6E",
+          "fontFamily": "Geist-Medium",
           "fontSize": 12,
           "fontWeight": "500",
           "lineHeight": 16,
@@ -3496,7 +3496,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -3511,8 +3511,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 12,
           "fontWeight": "500",
           "lineHeight": 16,
@@ -3571,7 +3571,7 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
       [
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(51, 51, 51, 0.01)",
+          "backgroundColor": "#F1F8F4",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -3586,8 +3586,8 @@ exports[`Button — snapshot matrix baseline (variant x size x {default,disabled
     <Text
       style={
         {
-          "color": "#646466",
-          "fontFamily": "Inter-Medium",
+          "color": "#3F6155",
+          "fontFamily": "Geist-Medium",
           "fontSize": 12,
           "fontWeight": "500",
           "lineHeight": 16,
@@ -3646,7 +3646,7 @@ exports[`Button — snapshot matrix non-Latin font-fallback canary (canaryVarian
       [
         {
           "alignItems": "center",
-          "backgroundColor": "#333333",
+          "backgroundColor": "#0F9D6E",
           "borderRadius": 8,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -3662,7 +3662,7 @@ exports[`Button — snapshot matrix non-Latin font-fallback canary (canaryVarian
       style={
         {
           "color": "#FFFFFF",
-          "fontFamily": "Inter-Medium",
+          "fontFamily": "Geist-Medium",
           "fontSize": 12,
           "fontWeight": "500",
           "lineHeight": 16,

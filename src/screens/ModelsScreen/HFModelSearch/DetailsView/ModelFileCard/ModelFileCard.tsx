@@ -2,6 +2,7 @@ import React, {FC, useState, useContext, useMemo} from 'react';
 import {Alert, View, StyleSheet, Pressable} from 'react-native';
 import {computed} from 'mobx';
 import {observer} from 'mobx-react';
+import LinearGradient from 'react-native-linear-gradient';
 import {
   IconButton,
   Text,
@@ -329,12 +330,15 @@ export const ModelFileCard: FC<ModelFileCardProps> = observer(
       <View
         style={styles.fileCardContainer}
         testID={`model-file-card-${modelFile.rfilename}`}>
-        <View
+        <LinearGradient
+          colors={[theme.colors.primary + '40', theme.colors.primary + '40']}
+          locations={[1, 1]}
+          start={{x: 0, y: 0}}
+          end={{x: 1, y: 0}}
           style={[
             StyleSheet.absoluteFill,
             {width: `${downloadProgress}%`},
             styles.gradientBackground,
-            {backgroundColor: theme.colors.primary + '40'},
           ]}
         />
         <View style={styles.fileContent}>

@@ -58,7 +58,7 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       style={
         {
           "alignItems": "center",
-          "backgroundColor": "#E0E0E0",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 20,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -71,8 +71,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#0F9D6E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -143,8 +143,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -215,8 +215,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -301,7 +301,7 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       style={
         {
           "alignItems": "center",
-          "backgroundColor": "#E0E0E0",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 20,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -314,8 +314,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#0F9D6E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -386,8 +386,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -458,8 +458,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -544,7 +544,7 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       style={
         {
           "alignItems": "center",
-          "backgroundColor": "#E0E0E0",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 20,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -557,8 +557,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#0F9D6E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -629,8 +629,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -701,8 +701,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -787,7 +787,7 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       style={
         {
           "alignItems": "center",
-          "backgroundColor": "#E0E0E0",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 20,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -800,8 +800,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#0F9D6E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -872,8 +872,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -944,8 +944,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -1030,7 +1030,7 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       style={
         {
           "alignItems": "center",
-          "backgroundColor": "#E0E0E0",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 20,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -1043,8 +1043,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#0F9D6E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -1115,8 +1115,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -1187,8 +1187,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -1273,7 +1273,7 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       style={
         {
           "alignItems": "center",
-          "backgroundColor": "#E0E0E0",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 20,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -1286,8 +1286,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#0F9D6E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -1358,8 +1358,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -1430,8 +1430,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -1516,7 +1516,7 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       style={
         {
           "alignItems": "center",
-          "backgroundColor": "#E0E0E0",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 20,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -1529,8 +1529,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#0F9D6E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -1601,8 +1601,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -1673,8 +1673,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -1759,7 +1759,7 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       style={
         {
           "alignItems": "center",
-          "backgroundColor": "#E0E0E0",
+          "backgroundColor": "#EAF4EF",
           "borderRadius": 20,
           "flexDirection": "row",
           "justifyContent": "center",
@@ -1772,8 +1772,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#0F9D6E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -1844,8 +1844,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -1916,8 +1916,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -2013,8 +2013,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#0F9D6E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -2027,7 +2027,7 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
         pointerEvents="none"
         style={
           {
-            "backgroundColor": "#333333",
+            "backgroundColor": "#0F9D6E",
             "bottom": 0,
             "height": 1.5,
             "left": 0,
@@ -2083,8 +2083,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -2153,8 +2153,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -2250,8 +2250,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#0F9D6E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -2264,7 +2264,7 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
         pointerEvents="none"
         style={
           {
-            "backgroundColor": "#333333",
+            "backgroundColor": "#0F9D6E",
             "bottom": 0,
             "height": 1.5,
             "left": 0,
@@ -2320,8 +2320,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -2390,8 +2390,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -2487,8 +2487,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#0F9D6E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -2501,7 +2501,7 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
         pointerEvents="none"
         style={
           {
-            "backgroundColor": "#333333",
+            "backgroundColor": "#0F9D6E",
             "bottom": 0,
             "height": 1.5,
             "left": 0,
@@ -2557,8 +2557,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -2627,8 +2627,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -2724,8 +2724,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#0F9D6E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -2738,7 +2738,7 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
         pointerEvents="none"
         style={
           {
-            "backgroundColor": "#333333",
+            "backgroundColor": "#0F9D6E",
             "bottom": 0,
             "height": 1.5,
             "left": 0,
@@ -2794,8 +2794,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -2864,8 +2864,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 14,
             "fontWeight": "500",
             "lineHeight": 20,
@@ -2961,8 +2961,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#0F9D6E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -2975,7 +2975,7 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
         pointerEvents="none"
         style={
           {
-            "backgroundColor": "#333333",
+            "backgroundColor": "#0F9D6E",
             "bottom": 0,
             "height": 1.5,
             "left": 0,
@@ -3031,8 +3031,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -3101,8 +3101,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -3198,8 +3198,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#0F9D6E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -3212,7 +3212,7 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
         pointerEvents="none"
         style={
           {
-            "backgroundColor": "#333333",
+            "backgroundColor": "#0F9D6E",
             "bottom": 0,
             "height": 1.5,
             "left": 0,
@@ -3268,8 +3268,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -3338,8 +3338,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -3435,8 +3435,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#0F9D6E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -3449,7 +3449,7 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
         pointerEvents="none"
         style={
           {
-            "backgroundColor": "#333333",
+            "backgroundColor": "#0F9D6E",
             "bottom": 0,
             "height": 1.5,
             "left": 0,
@@ -3505,8 +3505,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -3575,8 +3575,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -3672,8 +3672,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#0F9D6E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -3686,7 +3686,7 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
         pointerEvents="none"
         style={
           {
-            "backgroundColor": "#333333",
+            "backgroundColor": "#0F9D6E",
             "bottom": 0,
             "height": 1.5,
             "left": 0,
@@ -3742,8 +3742,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -3812,8 +3812,8 @@ exports[`Tabs — snapshot matrix baseline (variant x size x {default,disabled} 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -3909,8 +3909,8 @@ exports[`Tabs — snapshot matrix non-Latin font-fallback canary (canaryVariant 
       <Text
         style={
           {
-            "color": "#333333",
-            "fontFamily": "Inter-Medium",
+            "color": "#0F9D6E",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -3923,7 +3923,7 @@ exports[`Tabs — snapshot matrix non-Latin font-fallback canary (canaryVariant 
         pointerEvents="none"
         style={
           {
-            "backgroundColor": "#333333",
+            "backgroundColor": "#0F9D6E",
             "bottom": 0,
             "height": 1.5,
             "left": 0,
@@ -3979,8 +3979,8 @@ exports[`Tabs — snapshot matrix non-Latin font-fallback canary (canaryVariant 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,
@@ -4049,8 +4049,8 @@ exports[`Tabs — snapshot matrix non-Latin font-fallback canary (canaryVariant 
       <Text
         style={
           {
-            "color": "#646466",
-            "fontFamily": "Inter-Medium",
+            "color": "#3F6155",
+            "fontFamily": "Geist-Medium",
             "fontSize": 12,
             "fontWeight": "500",
             "lineHeight": 16,

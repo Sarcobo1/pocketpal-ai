@@ -113,3 +113,7 @@ android/android-build.log
 # synced into the worktree for local reference; never committed here. Anchored
 # to the root, because an unanchored `workflows/` also hides .github/workflows.
 /workflows/
+
+# APK binaries and captures
+*.apk
+pocketpal-apk/

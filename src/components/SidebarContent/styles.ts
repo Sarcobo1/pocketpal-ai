@@ -8,6 +8,44 @@ export const createStyles = (theme: MD3Theme) =>
       flex: 1,
       backgroundColor: theme.colors.surface,
     },
+    drawerHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 12,
+      gap: 10,
+    },
+    brandTitle: {
+      fontFamily: 'Geist-Medium',
+      fontSize: 20,
+      color: theme.colors.onSurface,
+      fontWeight: '500',
+    },
+    offlineCard: {
+      marginHorizontal: 16,
+      marginBottom: 12,
+      padding: 12,
+      borderRadius: 12,
+      backgroundColor: theme.colors.surfaceVariant,
+      borderWidth: 1,
+      borderColor: theme.colors.outline,
+    },
+    offlineCardRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    offlineCardTitle: {
+      fontSize: 13,
+      fontFamily: 'Geist-Medium',
+      color: theme.colors.onSurface,
+    },
+    offlineCardRam: {
+      fontSize: 12,
+      fontFamily: 'GeistMono-Regular',
+      color: theme.colors.onSurfaceVariant,
+    },
     divider: {
       marginHorizontal: 16,
       backgroundColor: theme.colors.onSurfaceVariant,
@@ -20,10 +58,10 @@ export const createStyles = (theme: MD3Theme) =>
       flexDirection: 'column',
     },
     sessionDrawerItem: {
-      height: 40,
+      height: 52,
     },
     menuDrawerItem: {
-      height: 44,
+      height: 52,
     },
     versionText: {
       color: theme.colors.onSurfaceVariant,

@@ -707,7 +707,7 @@
     },
     "chatEmptyPlaceholder": {
       "noModelsTitle": "No Models Available",
-      "noModelsDescription": "Download a model to start chatting with PocketPal",
+      "noModelsDescription": "Download a model to start chatting with Limi",
       "noModelsButton": "Download Model",
       "activateModelTitle": "Activate Model To Get Started",
       "activateModelDescription": "Select the model and download it. After downloading, tap Load next to the model and start chatting.",
@@ -1756,14 +1756,14 @@
     "skip": "Skip",
     "skipForNow": "Skip for now",
     "splash": {
-      "brand": "PocketPal"
+      "brand": "Limi"
     },
     "screen1": {
       "title": "Meet your pals.",
       "titleAccent": "pals.",
       "body": "Smart little friends that live inside your phone.\nLet’s get you set up - it’ll take a minute.",
       "cta": "Show me Around",
-      "eyebrow": "Welcome to PocketPal"
+      "eyebrow": "Welcome to Limi"
     },
     "screen2": {
       "title": "Anytime,\nAnywhere.",

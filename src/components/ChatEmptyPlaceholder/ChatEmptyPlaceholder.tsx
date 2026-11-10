@@ -1,5 +1,5 @@
 import React, {useContext} from 'react';
-import {Image, View} from 'react-native';
+import {View} from 'react-native';
 import {Button, Text} from 'react-native-paper';
 import {observer} from 'mobx-react';
 
@@ -9,6 +9,7 @@ import {modelStore, palStore} from '../../store';
 import {useNavigation} from '@react-navigation/native';
 import {NavigationProp} from '@react-navigation/native';
 import {L10nContext} from '../../utils';
+import {LimiGhost} from '../LimiGhost';
 
 interface ChatEmptyPlaceholderProps {
   onSelectModel: () => void;
@@ -84,10 +85,11 @@ export const ChatEmptyPlaceholder = observer(
     return (
       <View
         style={[styles.container, {marginBottom: bottomComponentHeight + 100}]}>
-        <Image
-          source={require('../../assets/pocketpal-dark-v2.png')}
-          style={styles.logo}
-          resizeMode="contain"
+        <LimiGhost
+          state="sleeping"
+          size={100}
+          label="Limi mascot"
+          style={styles.ghost}
         />
         <View>
           <Text style={styles.title}>{title}</Text>

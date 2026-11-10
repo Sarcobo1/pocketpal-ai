@@ -86,12 +86,12 @@ describe('useTheme', () => {
 
   // Language swap is reactive (typography fallback applies).
   // Hook-level: changing uiStore.language and rerendering produces a Theme
-  // whose Fraunces typography token resolves to Inter on the next render.
+  // whose Geist typography token resolves to Inter on the next render.
   describe('language swap reactivity', () => {
-    it('headlineH1 swaps Fraunces → Inter when language changes to fa', () => {
+    it('headlineH1 swaps Geist → Inter when language changes to fa', () => {
       const {result, rerender} = renderHook(() => useTheme());
       expect(result.current.typography.headlineH1.fontFamily).toBe(
-        FONT_FAMILIES.FRAUNCES_MEDIUM,
+        FONT_FAMILIES.GEIST_MEDIUM,
       );
 
       uiStore.setLanguage('fa');
@@ -102,20 +102,20 @@ describe('useTheme', () => {
       );
     });
 
-    it('headlineH1 swaps Fraunces → Inter for Cyrillic locales (ru, uk)', () => {
-      // Bundled Fraunces subset is Latin-only — ru/uk must use Inter.
+    it('headlineH1 stays Geist for Cyrillic locales (ru, uk)', () => {
+      // Geist covers Cyrillic, so ru/uk keep Geist rather than falling back.
       for (const lang of ['ru', 'uk'] as const) {
         uiStore.setLanguage(lang);
         const {result} = renderHook(() => useTheme());
         expect(result.current.typography.headlineH1.fontFamily).toBe(
-          FONT_FAMILIES.INTER_MEDIUM,
+          FONT_FAMILIES.GEIST_MEDIUM,
         );
       }
     });
 
-    it('headlineH1 swaps for every Fraunces-fallback locale', () => {
+    it('headlineH1 swaps for every Geist-fallback locale', () => {
       // Derived, not hand-listed — a hardcoded copy silently rots when a
-      // locale joins the fallback set (as pl did).
+      // locale joins the fallback set (as uz did).
       for (const lang of NON_LATIN_LOCALES) {
         uiStore.setLanguage(lang);
         const {result} = renderHook(() => useTheme());

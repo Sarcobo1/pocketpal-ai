@@ -13,6 +13,10 @@ export const createStyles = (theme: Theme) =>
     },
     card: {
       marginBottom: 16,
+      borderRadius: 16,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.outline,
     },
     description: {
       flex: 1,
@@ -23,6 +27,8 @@ export const createStyles = (theme: Theme) =>
     warning: {
       color: theme.colors.error,
       marginVertical: 8,
+      fontSize: 14,
+      fontFamily: 'Geist-Regular',
       textAlign: 'center',
     },
     button: {

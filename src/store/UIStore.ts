@@ -1,5 +1,3 @@
-import {Appearance} from 'react-native';
-
 import {makePersistable} from 'mobx-persist-store';
 import {makeAutoObservable, runInAction} from 'mobx';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -34,9 +32,8 @@ export class UIStore {
   // This is a flag to auto-navigate to the chat page after loading a model
   autoNavigatetoChat = true;
 
-  //colorScheme = useColorScheme();
-  colorScheme: 'light' | 'dark' =
-    Appearance.getColorScheme() === 'dark' ? 'dark' : 'light';
+  // Default: dark mode (Limi)
+  colorScheme: 'light' | 'dark' = 'dark';
 
   // Current selected language (default to English)
   _language: AvailableLanguage = 'en';

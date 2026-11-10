@@ -216,8 +216,7 @@ export const VoiceSetupSheet: React.FC<VoiceSetupSheetProps> = observer(
             {strings.setupBody}
           </Text>
 
-          <View
-            style={[styles.card, {borderColor: theme.colors.outlineVariant}]}>
+          <View style={[styles.card, {borderColor: theme.colors.outline}]}>
             {sttRequired ? (
               <>
                 <WhisperModelRow
@@ -291,7 +290,7 @@ const styles = StyleSheet.create({
   },
   card: {
     borderWidth: 1,
-    borderRadius: 18,
+    borderRadius: 16,
   },
   row: {
     paddingHorizontal: 16,

@@ -5,10 +5,9 @@ import {Theme} from '../../../utils/types';
 export const createStyles = (theme: Theme) =>
   StyleSheet.create({
     card: {
-      borderRadius: 24, // Updated to match rounded-3xl (24px)
+      borderRadius: 16,
       margin: 6,
-      //overflow: 'hidden',
-      backgroundColor: theme.colors.background,
+      backgroundColor: theme.colors.surface,
       borderColor: theme.colors.outline,
       borderWidth: 1,
     },
@@ -82,8 +81,9 @@ export const createStyles = (theme: Theme) =>
       flexShrink: 0,
     },
     compactModelName: {
-      //fontSize: 16,
-      //fontWeight: '600',
+      fontSize: 16,
+      fontFamily: 'Geist-Medium',
+      fontWeight: '500',
       color: theme.colors.onSurface,
       flex: 1,
     },
@@ -94,6 +94,8 @@ export const createStyles = (theme: Theme) =>
     },
     sizeInfoText: {
       fontSize: 12,
+      fontFamily: 'GeistMono-Regular',
+      fontVariant: ['tabular-nums'],
       color: theme.colors.onSurfaceVariant,
       marginLeft: 4,
     },
@@ -182,9 +184,10 @@ export const createStyles = (theme: Theme) =>
     },
     primaryActionButton: {
       flex: 1,
-      borderRadius: 16, // rounded-2xl
+      borderRadius: 10,
       borderWidth: 1,
-      height: 40,
+      height: 44,
+      justifyContent: 'center',
     },
     draftOnlyHint: {
       fontSize: 12,
@@ -192,8 +195,8 @@ export const createStyles = (theme: Theme) =>
       marginTop: 8,
     },
     iconButton: {
-      padding: 10, // p-2.5 equivalent
-      borderRadius: 16, // rounded-2xl
+      padding: 10,
+      borderRadius: 10,
       backgroundColor: 'transparent',
       alignItems: 'center',
       justifyContent: 'center',

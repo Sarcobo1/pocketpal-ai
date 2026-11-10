@@ -6,7 +6,7 @@ export const createStyles = (theme: Theme) =>
   StyleSheet.create({
     safeArea: {
       flex: 1,
-      backgroundColor: theme.colors.surface,
+      backgroundColor: theme.colors.background,
     },
     container: {
       padding: 16,
@@ -17,17 +17,22 @@ export const createStyles = (theme: Theme) =>
     },
     card: {
       marginVertical: 8,
-      borderRadius: 12,
-      backgroundColor: theme.colors.background,
+      borderRadius: 16,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.outline,
     },
     settingItemContainer: {
-      marginVertical: 16,
+      minHeight: 52,
+      justifyContent: 'center',
+      marginVertical: 6,
     },
     switchContainer: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginVertical: 8,
+      minHeight: 52,
+      marginVertical: 4,
     },
     textContainer: {
       flex: 1,
@@ -43,13 +48,17 @@ export const createStyles = (theme: Theme) =>
     },
     textLabel: {
       color: theme.colors.onSurface,
+      fontSize: 16,
+      fontFamily: 'Geist-Medium',
     },
     textDescription: {
       color: theme.colors.onSurfaceVariant,
-      //marginTop: 4,
+      fontSize: 14,
+      fontFamily: 'Geist-Regular',
     },
     divider: {
-      marginVertical: 12,
+      marginVertical: 8,
+      backgroundColor: theme.colors.outline,
     },
     slider: {
       //marginVertical: 8,
@@ -57,6 +66,8 @@ export const createStyles = (theme: Theme) =>
     },
     textInput: {
       marginVertical: 8,
+      backgroundColor: theme.colors.surfaceVariant,
+      borderRadius: 10,
     },
     invalidInput: {
       borderColor: theme.colors.error,
@@ -134,5 +145,7 @@ export const createStyles = (theme: Theme) =>
     },
     segmentedButtons: {
       marginVertical: 8,
+      borderRadius: 10,
+      height: 44,
     },
   });

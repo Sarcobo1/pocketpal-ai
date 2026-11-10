@@ -17,18 +17,31 @@ import {type AvailableLanguage} from '../locales';
 // some time). The builder takes a `Mode` from the tokens module directly.
 
 /**
- * Legacy Inter weight map. Preserved verbatim — `ChatInput/styles.ts`
- * still imports `fontStyles` directly; the export will be removed in a
- * later cleanup phase once consumers migrate to `theme.typography.*`.
+ * Legacy weight map — now Geist.
+ *
+ * This is the single lever that moves the whole app off Inter: every MD3
+ * typescale entry and every component that reads `theme.fonts.*` is built
+ * from this map, so switching the families here restyles all of them at once.
+ *
+ * Inter is still bundled and still reachable — it is the fallback for locales
+ * whose script Geist cannot cover (see NON_LATIN_LOCALES in
+ * src/theme/tokens/typography.ts; Uzbek Latin's oʻ/gʻ is the sharpest case).
+ * That fallback happens per-token in `resolveTypographyForLocale`, not here.
+ *
+ * `bold`, `thin`, `light`, `semibold` and `extraBold` have no Geist cut in
+ * this bundle (only Regular and Medium ship), so they resolve to the nearest
+ * shipped weight rather than naming a font that does not exist — a missing
+ * family is a silent system-font fallback on iOS, which is worse than a
+ * slightly lighter weight.
  */
 export const fontStyles = {
-  regular: {fontFamily: 'Inter-Regular'},
-  medium: {fontFamily: 'Inter-Medium'},
-  bold: {fontFamily: 'Inter-Bold'},
-  thin: {fontFamily: 'Inter-Thin'},
-  light: {fontFamily: 'Inter-Light'},
-  semibold: {fontFamily: 'Inter-SemiBold'},
-  extraBold: {fontFamily: 'Inter-ExtraBold'},
+  regular: {fontFamily: 'Geist-Regular'},
+  medium: {fontFamily: 'Geist-Medium'},
+  bold: {fontFamily: 'Geist-Medium'},
+  thin: {fontFamily: 'Geist-Regular'},
+  light: {fontFamily: 'Geist-Regular'},
+  semibold: {fontFamily: 'Geist-Medium'},
+  extraBold: {fontFamily: 'Geist-Medium'},
 };
 
 const baseFontVariants = configureFonts({
@@ -78,24 +91,23 @@ const configuredFonts = configureFonts({
  * Build a Theme for a given (mode, language) pair.
  *
  * `mode` selects the token binding (light vs dark). `language` selects the
- * locale-aware typography surface (Fraunces → Inter for non-Latin scripts).
+ * locale-aware typography surface (Geist → Inter for scripts Geist cannot
+ * cover).
  *
  * The output is a superset:
  *   - `colors`: every MD3 key Paper expects, sourced from the tokens
- *     module (values copied verbatim from today's createBaseColors +
- *     createSemanticColors output).
- *   - `typography`, `radius`, `stroke`: new surface — what later
- *     per-screen restyle work migrates consumers to.
+ *     module (the Limi Emerald palette).
+ *   - `typography`, `radius`, `stroke`: the Limi surface — what per-screen
+ *     restyle work consumes.
  *   - `fonts`, `spacing.default`, `borders`, `insets`, `icons`: legacy
- *     surface preserved verbatim — pinned to today's values so the ~18
- *     MD3-typescale consumers + 4 spacing.default consumers continue to
- *     render unchanged.
+ *     surface preserved in shape so the ~18 MD3-typescale consumers + 4
+ *     spacing.default consumers keep rendering — now in Geist, on the Limi
+ *     palette.
  *   - Non-color/non-font Paper internals (`isV3`, `dark`, `roundness`,
  *     `animation`): inherited via `...baseTheme` spread.
  *
- * The two surfaces do NOT cross-feed: the legacy `fonts` block is
- * constructed from `configureFonts(...)` exactly as today, NOT derived
- * from `theme.typography.*`.
+ * `roundness` is pinned to the Limi control radius so Paper's own components
+ * (buttons, chips, cards) stop rendering as MD3 pills.
  */
 export const buildTheme = ({
   mode,
@@ -110,23 +122,23 @@ export const buildTheme = ({
 
   return {
     ...baseTheme,
+    // Paper derives every corner from `roundness`; MD3's default of 4 is what
+    // makes its buttons read as pills once padding is applied. Limi's control
+    // radius is 10.
+    roundness: tokens.radius.m,
     colors: {
       // Keep any Paper-internal keys (e.g. elevation tints) the tokens
       // module doesn't explicitly enumerate.
       ...baseTheme.colors,
-      // Token-resolved color surface — same values as today's
-      // createBaseColors + createSemanticColors output.
+      // Token-resolved color surface — the Limi palette.
       ...tokens.colors,
     },
     borders: {
-      inputBorderRadius: 16,
-      messageBorderRadius: 15,
-      default: 12,
+      inputBorderRadius: tokens.radius.m,
+      messageBorderRadius: tokens.radius.ml,
+      default: tokens.radius.m,
     },
-    // Legacy fonts surface — preserved VERBATIM.
-    // Components that read `theme.fonts.bodyMedium`, `theme.fonts.titleSmall`,
-    // `theme.fonts.titleMediumLight`, etc., see the exact same shape and
-    // values as before this slice.
+    // Legacy fonts surface — same shape, Geist families.
     fonts: {
       ...baseTheme.fonts,
       ...configuredFonts,
@@ -136,7 +148,7 @@ export const buildTheme = ({
         lineHeight: 22,
       },
       dateDividerTextStyle: {
-        ...fontStyles.extraBold,
+        ...fontStyles.medium,
         color: tokens.colors.onSurface,
         fontSize: 12,
         lineHeight: 16,
@@ -151,43 +163,43 @@ export const buildTheme = ({
       inputTextStyle: {
         fontSize: 16,
         lineHeight: 24,
-        ...fontStyles.medium,
+        ...fontStyles.regular,
       },
       receivedMessageBodyTextStyle: {
-        color: tokens.colors.onPrimary,
+        color: tokens.colors.onSurfaceVariant,
         fontSize: 16,
         lineHeight: 24,
-        ...fontStyles.medium,
+        ...fontStyles.regular,
       },
       receivedMessageCaptionTextStyle: {
-        color: tokens.colors.onSurfaceVariant,
+        color: tokens.colors.limi.textFaint,
         fontSize: 12,
         lineHeight: 16,
-        ...fontStyles.medium,
+        ...fontStyles.regular,
       },
       receivedMessageLinkDescriptionTextStyle: {
-        color: tokens.colors.onPrimary,
+        color: tokens.colors.onSurfaceVariant,
         fontSize: 14,
         lineHeight: 20,
         ...fontStyles.regular,
       },
       receivedMessageLinkTitleTextStyle: {
-        color: tokens.colors.onPrimary,
+        color: tokens.colors.onSurface,
         fontSize: 16,
         lineHeight: 22,
-        ...fontStyles.extraBold,
+        ...fontStyles.medium,
       },
       sentMessageBodyTextStyle: {
         color: tokens.colors.onSurface,
         fontSize: 16,
         lineHeight: 24,
-        ...fontStyles.medium,
+        ...fontStyles.regular,
       },
       sentMessageCaptionTextStyle: {
-        color: tokens.colors.onSurfaceVariant,
+        color: tokens.colors.limi.textFaint,
         fontSize: 12,
         lineHeight: 16,
-        ...fontStyles.medium,
+        ...fontStyles.regular,
       },
       sentMessageLinkDescriptionTextStyle: {
         color: tokens.colors.onSurface,
@@ -199,18 +211,18 @@ export const buildTheme = ({
         color: tokens.colors.onSurface,
         fontSize: 16,
         lineHeight: 22,
-        ...fontStyles.extraBold,
+        ...fontStyles.medium,
       },
       userAvatarTextStyle: {
         color: tokens.colors.onSurface,
         fontSize: 12,
         lineHeight: 16,
-        ...fontStyles.extraBold,
+        ...fontStyles.medium,
       },
       userNameTextStyle: {
         fontSize: 12,
         lineHeight: 16,
-        ...fontStyles.extraBold,
+        ...fontStyles.medium,
       },
     },
     insets: {

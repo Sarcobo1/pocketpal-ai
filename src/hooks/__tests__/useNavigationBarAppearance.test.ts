@@ -90,7 +90,7 @@ describe('navigation bar appearance writer', () => {
   const filesMatching = (re: RegExp) =>
     [...sourceFiles(path.join(ROOT, 'src')), path.join(ROOT, 'App.tsx')]
       .filter(file => re.test(readCode(file)))
-      .map(file => path.relative(ROOT, file))
+      .map(file => path.relative(ROOT, file).replace(/\\/g, '/'))
       .sort();
 
   it('only the hook calls the native module', () => {

@@ -1,63 +1,42 @@
 import {View, Animated} from 'react-native';
 import React, {useEffect, useRef} from 'react';
+import {Text} from 'react-native-paper';
 
 import {useTheme} from '../../hooks';
-
+import {LimiOrb} from '../LimiOrb';
 import {styles} from './styles';
-
-import {Theme} from '../../utils/types';
-
-interface LoadingDotProps {
-  delay: number;
-  theme: Theme;
-}
-
-const LoadingDot: React.FC<LoadingDotProps> = ({delay, theme}) => {
-  const opacity = useRef(new Animated.Value(0.3)).current;
-
-  useEffect(() => {
-    const animation = Animated.sequence([
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 500,
-        delay,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacity, {
-        toValue: 0.3,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-    ]);
-
-    Animated.loop(animation).start();
-  }, [opacity, delay]);
-
-  return (
-    <Animated.View
-      style={[
-        styles.dot,
-        {
-          backgroundColor: theme.colors.outline,
-          opacity,
-        },
-      ]}
-    />
-  );
-};
 
 export const LoadingBubble: React.FC = () => {
   const theme = useTheme();
+  const opacity = useRef(new Animated.Value(0.6)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.6,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [opacity]);
 
   return (
-    <View
-      style={[
-        styles.container,
-        {backgroundColor: theme.colors.surfaceVariant},
-      ]}>
-      <LoadingDot delay={0} theme={theme} />
-      <LoadingDot delay={200} theme={theme} />
-      <LoadingDot delay={400} theme={theme} />
+    <View style={[styles.container, {backgroundColor: 'transparent'}]}>
+      <LimiOrb state="composing" size={32} />
+      <Animated.View style={{opacity}}>
+        <Text style={[styles.text, {color: theme.colors.onSurfaceVariant}]}>
+          O‘ylayapman…
+        </Text>
+      </Animated.View>
     </View>
   );
 };

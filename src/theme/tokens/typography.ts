@@ -1,61 +1,68 @@
 /**
- * Typography tokens — the new design-system surface.
+ * Typography tokens — Limi.
  *
- * Base (Latin) values. Locale-aware swapping (Fraunces → Inter for
- * non-Latin) is implemented by `typographyForLocale()` and invoked from
- * the theme builder. Components remain locale-agnostic.
+ * Two families:
+ *   - Geist (400 / 500) for every piece of prose and UI text.
+ *   - Geist Mono (400 / 500) for numbers, model names, t/s, RAM, sizes and
+ *     timestamps. Numbers are tabular everywhere they can change in place.
+ *   - JetBrains Mono stays for code blocks (it is already bundled and is the
+ *     better coding face).
+ *
+ * Inter and Fraunces are retired. Inter is kept as a *fallback* only, for the
+ * one thing Geist cannot do: Geist's cmap has no U+02BB (ʻ), the modifier
+ * letter that Uzbek Latin uses for oʻ and gʻ. Inter covers it. See
+ * `UZBEK_LATIN_LOCALES` below — this is a real, verified gap, not a guess.
  *
  * Invariants enforced here:
  *   - Absolute px line-heights only (no multipliers, no '%' strings).
- *     Two known canonical-file offenders resolved:
- *       * Headline/H1: 36 × 1.4 multiplier → lineHeight: 50.
- *       * Styled/xs:  100% multiplier      → lineHeight === fontSize.
- *   - Static weight mapping: weight '400' → '*-Regular' family,
- *     weight '500' → '*-Medium' family. No variable-axis weights.
- *   - Every fontFamily string here must match a bundled font asset
- *     (PostScript name on iOS, filename sans .ttf on Android). Enforced
- *     by scripts/verify-fonts.js + CI.
+ *   - Static weight mapping: '400' → '*-Regular', '500' → '*-Medium'.
+ *   - Every fontFamily string must match a bundled font asset. Enforced by
+ *     scripts/verify-fonts.js + CI.
+ *
+ * Scale (from the Limi spec):
+ *   heading  28 / 32  weight 500
+ *   body     16 / 24  weight 400
+ *   secondary 14 / 20 weight 400
+ *   meta     12 / 16  weight 400
+ *   speak    20 / 28  weight 400  (chat + transcript text, Speak only)
+ *   No letter-spacing anywhere.
  */
 import {type AvailableLanguage} from '../../locales';
 
 import {TokenTypography, TypographyStyle} from './types';
 
 // Family-name constants. Match the PostScript names of the bundled TTFs.
-// The Fraunces cuts under src/assets/fonts/ are static instances of the
-// variable Fraunces pinned at SOFT=0, WONK=1, opsz=36 — WONK=1 selects
-// the design system's eccentric letterforms (single-storey `a`, swooshier
-// italics, alt `g`). PostScript names match the original family so RN
-// font lookup is unchanged.
 export const FONT_FAMILIES = {
-  INTER_REGULAR: 'Inter-Regular',
-  INTER_MEDIUM: 'Inter-Medium',
-  FRAUNCES_REGULAR: 'Fraunces-Regular',
-  FRAUNCES_MEDIUM: 'Fraunces-Medium',
-  FRAUNCES_ITALIC: 'Fraunces-Italic',
-  FRAUNCES_MEDIUM_ITALIC: 'Fraunces-MediumItalic',
+  GEIST_REGULAR: 'Geist-Regular',
+  GEIST_MEDIUM: 'Geist-Medium',
+  GEIST_MONO_REGULAR: 'GeistMono-Regular',
+  GEIST_MONO_MEDIUM: 'GeistMono-Medium',
   JETBRAINS_MONO_REGULAR: 'JetBrainsMono-Regular',
   JETBRAINS_MONO_MEDIUM: 'JetBrainsMono-Medium',
+  // Fallback only — see UZBEK_LATIN_LOCALES.
+  INTER_REGULAR: 'Inter-Regular',
+  INTER_MEDIUM: 'Inter-Medium',
 } as const;
 
 /**
- * Locales whose script is not covered by the bundled Fraunces font
- * subset. For these, Fraunces tokens fall back to Inter (which covers
- * Latin + Latin Extended-A + Cyrillic) so the headline renders in a
- * known family instead of an unpredictable system fallback for missing
- * glyphs.
+ * Locales whose script Geist cannot fully render, so they fall back to Inter.
  *
- * Why Cyrillic (ru, uk) is on this list: the bundled Fraunces TTFs are
- * the Latin-only subset from Fontsource and contain no Cyrillic
- * codepoints. CJK / Hebrew / Arabic / Persian / Hangul are intentionally
- * not bundled — Inter passes those glyphs through to the platform
- * system font.
+ * This list is glyph-coverage driven, not script-family driven — the same
+ * rule the previous Fraunces list used, and the reason it is short.
  *
- * Why Polish is on this list despite being Latin script: that Fraunces
- * subset stops at Latin-1 and has no Latin Extended-A, so it is missing
- * ą ć ę ł ń ś ź ż and their capitals — 16 of Polish's 18 diacritics.
- * The membership test is glyph coverage, not script family; check a new
- * locale's characters against the bundled TTFs before omitting it here.
- * Portuguese needs only Latin-1 (ã õ ç á é í ó ú â ê ô à) and is covered.
+ * `uz` (Uzbek Latin) is here for exactly one reason, verified against the
+ * bundled Geist cmap: Geist has no U+02BB MODIFIER LETTER TURNED COMMA, which
+ * is the character Uzbek orthography uses in oʻ and gʻ. Inter has it. Without
+ * this fallback, every oʻ and gʻ in the Uzbek UI renders as tofu.
+ *
+ * `ar`, `fa`, `he`, `ja`, `ko`, `zh`, `zh_Hant` are here because Geist ships
+ * Latin + Cyrillic + Greek only; those scripts need the platform font, and
+ * Inter is the closest bundled face that hands them off cleanly.
+ *
+ * `pl` is here because Geist's Latin set stops short of the full Latin
+ * Extended-A coverage Polish needs (ą ć ę ł ń ś ź ż).
+ *
+ * `ru`, `uk` are NOT here: Geist covers Cyrillic.
  */
 export const NON_LATIN_LOCALES: ReadonlyArray<AvailableLanguage> = [
   'ar',
@@ -64,8 +71,7 @@ export const NON_LATIN_LOCALES: ReadonlyArray<AvailableLanguage> = [
   'ja',
   'ko',
   'pl',
-  'ru',
-  'uk',
+  'uz',
   'zh',
   'zh_Hant',
 ];
@@ -74,101 +80,92 @@ const isNonLatinLocale = (locale: AvailableLanguage): boolean =>
   NON_LATIN_LOCALES.includes(locale);
 
 /**
- * Base typography tokens. Values mirror the canonical Figma file
- * (`RZxDJea4t6jnBZrV4YBacF`, design system at `789:19792`). All
- * line-heights are absolute pixel values.
+ * Base typography tokens — the Limi scale.
  *
- * No consumer references these in this slice — the new surface coexists
- * with the legacy `theme.fonts.*` MD3 typescale (preserved verbatim by
- * the builder to avoid visual regression). Future restyle slices
- * migrate per screen.
+ * `speakM` is the 20/28 transcript style. It is only used inside Speak, where
+ * the text is read aloud and needs to be legible at arm's length; nowhere
+ * else in the app uses 20px body copy.
  */
 export const typography: TokenTypography = {
-  // Body (Inter)
+  // Body (Geist)
   bodyM: {
-    fontFamily: FONT_FAMILIES.INTER_REGULAR,
+    fontFamily: FONT_FAMILIES.GEIST_REGULAR,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: '400',
   },
   bodyS: {
-    fontFamily: FONT_FAMILIES.INTER_REGULAR,
+    fontFamily: FONT_FAMILIES.GEIST_REGULAR,
     fontSize: 14,
     lineHeight: 20,
     fontWeight: '400',
   },
 
-  // UI (Inter, medium)
+  // UI (Geist, medium)
   uiM: {
-    fontFamily: FONT_FAMILIES.INTER_MEDIUM,
+    fontFamily: FONT_FAMILIES.GEIST_MEDIUM,
     fontSize: 14,
     lineHeight: 20,
     fontWeight: '500',
   },
   uiS: {
-    fontFamily: FONT_FAMILIES.INTER_MEDIUM,
+    fontFamily: FONT_FAMILIES.GEIST_MEDIUM,
     fontSize: 12,
     lineHeight: 16,
     fontWeight: '500',
   },
 
-  // Title (Inter, medium)
+  // Titles (Geist, medium)
   titleL: {
-    fontFamily: FONT_FAMILIES.INTER_MEDIUM,
-    fontSize: 22,
-    lineHeight: 28,
+    fontFamily: FONT_FAMILIES.GEIST_MEDIUM,
+    fontSize: 28,
+    lineHeight: 32,
     fontWeight: '500',
   },
   titleM: {
-    fontFamily: FONT_FAMILIES.INTER_MEDIUM,
-    fontSize: 18,
-    lineHeight: 24,
+    fontFamily: FONT_FAMILIES.GEIST_MEDIUM,
+    fontSize: 20,
+    lineHeight: 28,
     fontWeight: '500',
   },
   titleS: {
-    fontFamily: FONT_FAMILIES.INTER_MEDIUM,
+    fontFamily: FONT_FAMILIES.GEIST_MEDIUM,
     fontSize: 16,
     lineHeight: 22,
     fontWeight: '500',
   },
 
-  // Caption (Inter)
+  // Caption / meta (Geist)
   captionM: {
-    fontFamily: FONT_FAMILIES.INTER_REGULAR,
+    fontFamily: FONT_FAMILIES.GEIST_REGULAR,
     fontSize: 12,
     lineHeight: 16,
     fontWeight: '400',
   },
   captionS: {
-    fontFamily: FONT_FAMILIES.INTER_REGULAR,
+    fontFamily: FONT_FAMILIES.GEIST_REGULAR,
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '400',
   },
 
-  // Headlines (Fraunces — bundled subset is Latin-only; non-Latin and
-  // Cyrillic locales swap to Inter via `typographyForLocale`). Canonical
-  // Headline/H1 uses Fraunces-Regular family at font-medium (500); we
-  // pick the bundled `Fraunces-Medium` static cut to match.
+  // The screen heading — 28/32 at 500, per the Limi spec.
   headlineH1: {
-    fontFamily: FONT_FAMILIES.FRAUNCES_MEDIUM,
-    fontSize: 36,
-    // 36 × 1.4 = 50.4 → 50 (absolute px; canonical multiplier resolved)
-    lineHeight: 50,
+    fontFamily: FONT_FAMILIES.GEIST_MEDIUM,
+    fontSize: 28,
+    lineHeight: 32,
     fontWeight: '500',
   },
 
-  // Accent italic (Fraunces italic). lineHeight === fontSize per the
-  // canonical Styled/xs "100%" multiplier (resolved to absolute px).
-  styledXs: {
-    fontFamily: FONT_FAMILIES.FRAUNCES_ITALIC,
-    fontSize: 14,
-    lineHeight: 14,
+  // Speak transcript text — 20/28, Speak only.
+  speakM: {
+    fontFamily: FONT_FAMILIES.GEIST_REGULAR,
+    fontSize: 20,
+    lineHeight: 28,
     fontWeight: '400',
-    fontStyle: 'italic',
   },
 
-  // Code (JetBrains Mono — locale-agnostic)
+  // Code (JetBrains Mono — locale-agnostic, and the better coding face)
   codeM: {
     fontFamily: FONT_FAMILIES.JETBRAINS_MONO_REGULAR,
     fontSize: 14,
@@ -181,22 +178,34 @@ export const typography: TokenTypography = {
     lineHeight: 16,
     fontWeight: '400',
   },
+
+  // Mono metadata — model names, t/s, RAM, sizes, timestamps. Tabular, so a
+  // number that changes in place does not shift the layout around it.
+  monoM: {
+    fontFamily: FONT_FAMILIES.GEIST_MONO_REGULAR,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '400',
+    fontVariant: ['tabular-nums'],
+  },
+  monoS: {
+    fontFamily: FONT_FAMILIES.GEIST_MONO_REGULAR,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '400',
+    fontVariant: ['tabular-nums'],
+  },
 };
 
 /**
- * Resolve a typography style for a given (style, locale) pair. Fallback
- * rule:
- *   - Fraunces upright + non-Latin locale → Inter (same weight class).
- *   - Fraunces italic  + non-Latin locale → Inter-Medium with
- *     `fontStyle: 'italic'` (synthesised italic — no Inter-Italic cut
- *     bundled).
- *   - Inter / JetBrains Mono → no swap. Inter ships with Latin +
- *     Cyrillic glyphs and renders ru/uk/Latin locales directly; for
- *     scripts Inter doesn't cover, the platform falls back to system
- *     fonts. Code is locale-agnostic.
+ * Resolve a typography style for a given (style, locale) pair.
  *
- * Invoked from the theme builder — components never call this directly,
- * so components remain locale-agnostic.
+ * Fallback rule: any Geist or JetBrains family in a locale from
+ * `NON_LATIN_LOCALES` swaps to the Inter cut of the same weight. The swap is
+ * weight-preserving so a medium label stays medium.
+ *
+ * Invoked from the theme builder — components never call this directly, so
+ * components remain locale-agnostic.
  */
 export function typographyForLocale(
   style: keyof TokenTypography,
@@ -207,21 +216,13 @@ export function typographyForLocale(
     return base;
   }
   switch (base.fontFamily) {
-    case FONT_FAMILIES.FRAUNCES_REGULAR:
+    case FONT_FAMILIES.GEIST_REGULAR:
+    case FONT_FAMILIES.GEIST_MONO_REGULAR:
       return {...base, fontFamily: FONT_FAMILIES.INTER_REGULAR};
-    case FONT_FAMILIES.FRAUNCES_MEDIUM:
+    case FONT_FAMILIES.GEIST_MEDIUM:
+    case FONT_FAMILIES.GEIST_MONO_MEDIUM:
       return {...base, fontFamily: FONT_FAMILIES.INTER_MEDIUM};
-    case FONT_FAMILIES.FRAUNCES_ITALIC:
-    case FONT_FAMILIES.FRAUNCES_MEDIUM_ITALIC:
-      // Synthesised italic on Inter rather than shipping Inter-Italic
-      // cuts (~200KB per cut for an accent-only style).
-      return {
-        ...base,
-        fontFamily: FONT_FAMILIES.INTER_MEDIUM,
-        fontStyle: 'italic',
-      };
     default:
-      // Inter family and JetBrains Mono — no swap.
       return base;
   }
 }

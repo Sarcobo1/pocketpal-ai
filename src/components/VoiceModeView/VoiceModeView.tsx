@@ -50,12 +50,11 @@ import {
   setVoiceFrameSource,
   storeVoiceFrame,
 } from '../../services/voice/frameSource';
-import {VoiceCloud, voiceVisual} from '../VoiceCloud';
+import {LimiOrb} from '../LimiOrb';
 
 import {useVoiceModeControls} from './controls';
 import {useAnnounceVoiceStatus, voiceStatus} from './status';
 
-const CLOUD_SIZE = 280;
 const CONTROL_SIZE = 64;
 const HANDLE_ROW_HEIGHT = 64;
 const PREVIEW_SIZE = 120;
@@ -74,7 +73,6 @@ export const VoiceModeView: React.FC = observer(() => {
   const insets = useSafeAreaInsets();
   const {tapCloud, toggleMute, end} = useVoiceModeControls();
   const {phase, micMuted, lastError, cameraOn} = voiceModeStore;
-  const visual = voiceVisual(phase, micMuted);
   const status = voiceStatus(
     phase,
     micMuted,
@@ -287,7 +285,16 @@ export const VoiceModeView: React.FC = observer(() => {
             accessibilityLabel={l10n.voiceMode.cloudLabel}
             accessibilityHint={hint}
             testID="voice-cloud">
-            <VoiceCloud visual={visual} size={CLOUD_SIZE} />
+            <LimiOrb
+              state={
+                phase === 'thinking'
+                  ? 'composing'
+                  : phase === 'speaking'
+                    ? 'breathing'
+                    : 'listening'
+              }
+              size={220}
+            />
           </Pressable>
           <View style={[styles.status, {gap: theme.spacing.xs}]}>
             <Text style={[theme.typography.titleL, {color: theme.colors.text}]}>
@@ -339,7 +346,7 @@ export const VoiceModeView: React.FC = observer(() => {
               styles.control,
               {
                 backgroundColor: cameraOn
-                  ? theme.colors.secondaryContainer
+                  ? theme.colors.primary
                   : theme.colors.surfaceContainerHighest,
               },
             ]}>
@@ -347,9 +354,7 @@ export const VoiceModeView: React.FC = observer(() => {
               width={24}
               height={24}
               stroke={
-                cameraOn
-                  ? theme.colors.onSecondaryContainer
-                  : theme.colors.onSurface
+                cameraOn ? theme.colors.onPrimary : theme.colors.onSurface
               }
             />
           </Pressable>
@@ -358,8 +363,8 @@ export const VoiceModeView: React.FC = observer(() => {
             accessibilityRole="button"
             accessibilityLabel={l10n.voiceMode.endLabel}
             testID="voice-end"
-            style={[styles.control, {backgroundColor: theme.colors.primary}]}>
-            <CloseIcon width={24} height={24} fill={theme.colors.onPrimary} />
+            style={[styles.control, {backgroundColor: theme.colors.error}]}>
+            <CloseIcon width={24} height={24} fill={theme.colors.onError} />
           </Pressable>
         </View>
       </Animated.View>

@@ -89,7 +89,10 @@ export const createStyles = ({
     inputContainer: {
       flex: 1,
       flexDirection: 'column',
-      borderRadius: 12,
+      borderRadius: 20,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.outline,
       overflow: 'hidden',
     },
     textInputArea: {
@@ -224,9 +227,10 @@ export const createStyles = ({
     },
 
     stopButton: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
+      width: 44,
+      height: 44,
+      borderRadius: 10,
+      backgroundColor: theme.colors.primary,
       justifyContent: 'center',
       alignItems: 'center',
       marginBottom: 8,

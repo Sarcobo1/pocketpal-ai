@@ -134,6 +134,37 @@ export interface TokenColors {
     peach: string;
     greenStrong: string;
   };
+
+  /**
+   * Limi surface/accent vocabulary.
+   *
+   * The MD3 keys above are the compatibility contract Paper reads; these are
+   * the names Limi's own components use. They are the same values, named for
+   * what they mean in this design: a ground, two surface steps, a raised
+   * surface, one accent, and the text/icon tiers.
+   */
+  limi: {
+    /** The deepest ground: the board, inset wells. */
+    deepest: string;
+    /** Second surface step, between background and raised. */
+    surface2: string;
+    /** Raised surface: input, button, user message, active row. */
+    raised: string;
+    /** Active / dashed border. */
+    lineActive: string;
+    /** Faint text — meta only, never body copy. */
+    textFaint: string;
+    /** Icon / chevron tier. */
+    icon: string;
+    /** The single accent. */
+    accent: string;
+    /** Text on the accent. */
+    onAccent: string;
+    /** Positive / success. */
+    positive: string;
+    /** Function names inside code. */
+    codeFn: string;
+  };
 }
 
 /**
@@ -148,6 +179,8 @@ export interface TypographyStyle {
   fontWeight: TextStyle['fontWeight'];
   letterSpacing?: number;
   fontStyle?: TextStyle['fontStyle'];
+  /** Tabular figures for anything numeric that changes in place. */
+  fontVariant?: TextStyle['fontVariant'];
 }
 
 /**
@@ -165,9 +198,13 @@ export interface TokenTypography {
   captionM: TypographyStyle;
   captionS: TypographyStyle;
   headlineH1: TypographyStyle;
-  styledXs: TypographyStyle;
+  /** Speak transcript text — 20/28, Speak only. */
+  speakM: TypographyStyle;
   codeM: TypographyStyle;
   codeS: TypographyStyle;
+  /** Mono metadata (model names, t/s, RAM, sizes, timestamps). */
+  monoM: TypographyStyle;
+  monoS: TypographyStyle;
 }
 
 export interface TokenSpacing {
@@ -191,7 +228,7 @@ export interface TokenRadius {
   xxs: 2;
   xs: 4;
   s: 8;
-  m: 12;
+  m: 10;
   ml: 16;
   l: 20;
   xl: 32;

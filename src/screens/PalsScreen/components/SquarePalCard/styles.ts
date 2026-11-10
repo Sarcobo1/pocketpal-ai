@@ -13,7 +13,7 @@ export const createStyles = (theme: Theme) =>
     card: {
       flex: 1,
       height: '100%',
-      backgroundColor: theme.colors.background,
+      backgroundColor: theme.colors.surface,
       borderRadius: 16,
       borderWidth: 1,
       borderColor: theme.colors.outline,
@@ -38,8 +38,8 @@ export const createStyles = (theme: Theme) =>
     thumbnail: {
       width: '100%',
       height: 80, // Increased from 60px for better image display
-      backgroundColor: theme.colors.primaryContainer,
-      borderRadius: 12,
+      backgroundColor: theme.colors.surfaceVariant,
+      borderRadius: 10,
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: 8, // Reduced from 12px to save space

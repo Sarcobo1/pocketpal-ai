@@ -50,6 +50,10 @@ module.exports = {
     'build/',
     'dist/',
     'e2e/',
+    // Vendored third-party UI libraries (MIT, Jakub Antalik). Upstream code
+    // is kept verbatim so it stays diffable against the source repo; it is
+    // not ours to reformat. See vendor/NOTICE.md.
+    'vendor/',
   ],
   rules: {
     'prettier/prettier': 'error',

@@ -81,7 +81,10 @@
 		<string>Inter-SemiBold.ttf</string>
 		<string>Inter-Thin.ttf</string>
 		<string>Inter-ExtraBold.ttf</string>
-		<string>Fraunces-Regular.ttf</string>
+		<string>Geist-Regular.ttf</string>
+		<string>Geist-Medium.ttf</string>
+		<string>GeistMono-Regular.ttf</string>
+		<string>GeistMono-Medium.ttf</string>
 		<string>Fraunces-Medium.ttf</string>
 		<string>Fraunces-Italic.ttf</string>
 		<string>Fraunces-MediumItalic.ttf</string>

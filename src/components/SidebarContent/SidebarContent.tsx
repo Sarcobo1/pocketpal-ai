@@ -9,8 +9,13 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTheme} from '../../hooks';
 import {createStyles} from './styles';
 import {PlusDrawerItem} from './PlusDrawerItem/PlusDrawerItem';
-import {chatSessionStore, SessionMetaData, uiStore} from '../../store';
-import {Menu, RenameModal, Checkbox} from '..';
+import {
+  chatSessionStore,
+  modelStore,
+  SessionMetaData,
+  uiStore,
+} from '../../store';
+import {Menu, RenameModal, Checkbox, LimiGhost} from '..';
 import {
   BenchmarkIcon,
   ChatIcon,
@@ -107,7 +112,10 @@ const SessionItem = React.memo<SessionItemProps>(
           <Drawer.Item
             active={isActive}
             label={session.title}
-            style={styles.sessionDrawerItem}
+            style={[
+              styles.sessionDrawerItem,
+              isActive && {backgroundColor: theme.colors.surfaceVariant},
+            ]}
             right={
               isPinned
                 ? () => (
@@ -549,6 +557,22 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
     const ListHeaderComponent = React.useMemo(
       () => (
         <View>
+          <View style={styles.drawerHeader}>
+            <LimiGhost size={26} state="default" label="Limi" />
+            <Text variant="titleMedium" style={styles.brandTitle}>
+              Limi
+            </Text>
+          </View>
+          <View style={styles.offlineCard}>
+            <View style={styles.offlineCardRow}>
+              <Text style={styles.offlineCardTitle}>Offline rejim</Text>
+              <Text style={styles.offlineCardRam} numberOfLines={1}>
+                {modelStore.activeModel
+                  ? modelStore.activeModel.name
+                  : 'Model yuklanmagan'}
+              </Text>
+            </View>
+          </View>
           <Drawer.Section showDivider={false}>
             <Drawer.Item
               label={l10n.components.sidebarContent.menuItems.chat}

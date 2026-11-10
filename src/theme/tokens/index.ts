@@ -60,6 +60,6 @@ export {
 } from './typography';
 
 export {lightColors, darkColors} from './colors';
-export {spacing} from './spacing';
-export {radius} from './radius';
+export {spacing, ROW_HEIGHT, MIN_TOUCH_TARGET} from './spacing';
+export {radius, radiusFull} from './radius';
 export {stroke} from './stroke';

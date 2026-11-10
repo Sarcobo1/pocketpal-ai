@@ -1,13 +1,12 @@
-import React, {useContext, useEffect, useRef, useState} from 'react';
-import {Animated, Text, View} from 'react-native';
+import React, {useContext, useEffect, useState} from 'react';
+import {Text, View} from 'react-native';
 
 import {useTheme} from '../../hooks';
 import {L10nContext} from '../../utils';
 import {t} from '../../locales';
+import {LimiOrb, type LimiOrbState} from '../LimiOrb';
 
 import {styles, createCountStyle} from './styles';
-
-import {Theme} from '../../utils/types';
 
 // Suppress the count for trivial in-progress calls so simple talents
 // don't trade a dot-row for "1 tokens" the moment they start. The
@@ -27,44 +26,6 @@ const TALENT_LABEL_KEYS: Record<
   render_html: 'buildingPage',
   calculate: 'calculating',
   datetime: 'lookingUpTime',
-};
-
-interface DotProps {
-  delay: number;
-  theme: Theme;
-}
-
-const Dot: React.FC<DotProps> = ({delay, theme}) => {
-  const opacity = useRef(new Animated.Value(0.3)).current;
-
-  useEffect(() => {
-    const animation = Animated.sequence([
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 500,
-        delay,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacity, {
-        toValue: 0.3,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-    ]);
-    Animated.loop(animation).start();
-  }, [opacity, delay]);
-
-  return (
-    <Animated.View
-      style={[
-        styles.dot,
-        {
-          backgroundColor: theme.colors.onSurfaceVariant,
-          opacity,
-        },
-      ]}
-    />
-  );
 };
 
 interface PendingIndicatorProps {
@@ -149,16 +110,27 @@ export const PendingIndicator: React.FC<PendingIndicatorProps> = ({
     suffix = parts.join(' · ');
   }
 
+  let orbState: LimiOrbState = 'composing';
+  let defaultLabel = 'O‘ylayapman…';
+  if (firstTalent === 'calculate') {
+    orbState = 'solving';
+    defaultLabel = 'Yechyapman…';
+  } else if (firstTalent?.includes('search')) {
+    orbState = 'searching';
+    defaultLabel = 'Qidiryapman…';
+  } else if (inToolCallMode) {
+    orbState = 'working';
+    defaultLabel = 'Ishlayapman…';
+  }
+
   return (
     <View style={styles.container} testID="pending-indicator">
-      <Dot delay={0} theme={theme} />
-      <Dot delay={200} theme={theme} />
-      <Dot delay={400} theme={theme} />
-      {suffix !== null && (
-        <Text style={countStyle} testID="pending-indicator-suffix">
-          {suffix}
-        </Text>
-      )}
+      <LimiOrb state={orbState} size={20} />
+      <Text
+        style={[countStyle, {marginLeft: 8}]}
+        testID="pending-indicator-suffix">
+        {suffix !== null ? suffix : defaultLabel}
+      </Text>
     </View>
   );
 };

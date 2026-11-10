@@ -4,8 +4,8 @@ import type {Theme} from '../../../utils/types';
 import {FONT_FAMILIES} from '../../../theme/tokens/typography';
 
 export const createStyles = (theme: Theme) => {
-  const isFraunces =
-    theme.typography.headlineH1.fontFamily === FONT_FAMILIES.FRAUNCES_MEDIUM;
+  const isGeist =
+    theme.typography.headlineH1.fontFamily === FONT_FAMILIES.GEIST_MEDIUM;
   return StyleSheet.create({
     header: {
       width: 369,
@@ -13,9 +13,9 @@ export const createStyles = (theme: Theme) => {
       gap: theme.spacing.sm,
     },
     title: {
-      // Figma `Headline/H2` — Fraunces Medium 24/28, centered.
-      fontFamily: isFraunces
-        ? FONT_FAMILIES.FRAUNCES_MEDIUM
+      // Limi heading — Geist Medium 24/28, centered.
+      fontFamily: isGeist
+        ? FONT_FAMILIES.GEIST_MEDIUM
         : FONT_FAMILIES.INTER_MEDIUM,
       fontSize: 24,
       lineHeight: 28,

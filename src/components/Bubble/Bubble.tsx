@@ -33,7 +33,7 @@ export const Bubble = ({
   const {contentContainer} = styles({
     currentUserIsAuthor,
     message,
-    roundBorder: true,
+    _roundBorder: true,
     theme,
   });
 

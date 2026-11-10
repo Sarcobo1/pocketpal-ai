@@ -8,7 +8,7 @@ export const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme.colors.surface,
+      backgroundColor: theme.colors.background,
     },
     listContainer: {
       paddingHorizontal: H_PADDING,

@@ -18,6 +18,7 @@ import {ChevronRightIcon, ChevronDownIcon} from '../../assets/icons';
 
 import {useTheme} from '../../hooks';
 import {L10nContext} from '../../utils';
+import {LimiOrb} from '../LimiOrb';
 
 import {createStyles} from './styles';
 
@@ -310,9 +311,13 @@ export const ThinkingBubble: React.FC<ThinkingBubbleProps> = ({
       <View style={containerStyle}>
         {/* Header */}
         <View style={styles.headerContainer}>
-          <Text variant="titleSmall" style={styles.headerText}>
-            {l10n.components.thinkingBubble.reasoning}
-          </Text>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+            <LimiOrb state="breathing" size={20} />
+            <Text variant="titleSmall" style={styles.headerText}>
+              {(l10n.components?.thinkingBubble as Record<string, string>)
+                ?.reasoningActive ?? 'Agent o‘ylayapti…'}
+            </Text>
+          </View>
           <Animated.View
             style={[
               styles.chevronContainer,

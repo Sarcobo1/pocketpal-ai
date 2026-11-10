@@ -57,11 +57,11 @@ describe('Theme builder — legacy surface preservation', () => {
   });
 
   describe('borders', () => {
-    it("matches today's pinned values (16 / 15 / 12)", () => {
+    it('matches Limi values (10 / 16 / 10)', () => {
       expect(lightTheme.borders).toEqual({
-        inputBorderRadius: 16,
-        messageBorderRadius: 15,
-        default: 12,
+        inputBorderRadius: 10,
+        messageBorderRadius: 16,
+        default: 10,
       });
     });
 
@@ -112,19 +112,17 @@ describe('Theme builder — legacy surface preservation', () => {
       expect(typeof lightTheme.fonts[key].fontSize).toBe('number');
     });
 
-    // All MD3 fonts use Inter (today's `fontStyles.regular`). The two
-    // overrides keyed in theme.ts (`displayMedium` → bold,
-    // `titleSmall` → medium) still resolve to a `Inter-*` family.
-    it('bodyMedium fontFamily is Inter-Regular (pinned to today)', () => {
-      expect(lightTheme.fonts.bodyMedium.fontFamily).toBe('Inter-Regular');
+    // All MD3 fonts use Geist.
+    it('bodyMedium fontFamily is Geist-Regular', () => {
+      expect(lightTheme.fonts.bodyMedium.fontFamily).toBe('Geist-Regular');
     });
 
-    it("displayMedium fontFamily is Inter-Bold (today's override)", () => {
-      expect(lightTheme.fonts.displayMedium.fontFamily).toBe('Inter-Bold');
+    it('displayMedium fontFamily is Geist-Medium', () => {
+      expect(lightTheme.fonts.displayMedium.fontFamily).toBe('Geist-Medium');
     });
 
-    it("titleSmall fontFamily is Inter-Medium (today's override)", () => {
-      expect(lightTheme.fonts.titleSmall.fontFamily).toBe('Inter-Medium');
+    it('titleSmall fontFamily is Geist-Medium', () => {
+      expect(lightTheme.fonts.titleSmall.fontFamily).toBe('Geist-Medium');
     });
 
     const customStyles = [
@@ -149,17 +147,15 @@ describe('Theme builder — legacy surface preservation', () => {
     });
   });
 
-  describe('legacy `fontStyles` Inter weight map (preserved for ChatInput)', () => {
-    // `src/components/ChatInput/styles.ts:4,145,152,157,162` imports
-    // this export. Removing or renaming any weight breaks that consumer.
-    it('exports the full Inter weight map', () => {
-      expect(fontStyles.regular).toEqual({fontFamily: 'Inter-Regular'});
-      expect(fontStyles.medium).toEqual({fontFamily: 'Inter-Medium'});
-      expect(fontStyles.bold).toEqual({fontFamily: 'Inter-Bold'});
-      expect(fontStyles.thin).toEqual({fontFamily: 'Inter-Thin'});
-      expect(fontStyles.light).toEqual({fontFamily: 'Inter-Light'});
-      expect(fontStyles.semibold).toEqual({fontFamily: 'Inter-SemiBold'});
-      expect(fontStyles.extraBold).toEqual({fontFamily: 'Inter-ExtraBold'});
+  describe('legacy `fontStyles` Geist weight map (preserved for ChatInput)', () => {
+    it('exports the full Geist weight map', () => {
+      expect(fontStyles.regular).toEqual({fontFamily: 'Geist-Regular'});
+      expect(fontStyles.medium).toEqual({fontFamily: 'Geist-Medium'});
+      expect(fontStyles.bold).toEqual({fontFamily: 'Geist-Medium'});
+      expect(fontStyles.thin).toEqual({fontFamily: 'Geist-Regular'});
+      expect(fontStyles.light).toEqual({fontFamily: 'Geist-Regular'});
+      expect(fontStyles.semibold).toEqual({fontFamily: 'Geist-Medium'});
+      expect(fontStyles.extraBold).toEqual({fontFamily: 'Geist-Medium'});
     });
   });
 });
@@ -186,9 +182,9 @@ describe('Theme builder — new token surface', () => {
 describe('Theme builder — locale-aware typography', () => {
   // buildTheme is a pure function. Direct invocation does not depend on
   // MobX / store mocks — this is the unit-level contract.
-  it('en locale leaves headlineH1 in Fraunces-Medium', () => {
+  it('en locale leaves headlineH1 in Geist-Medium', () => {
     const theme = buildTheme({mode: 'light', language: 'en'});
-    expect(theme.typography.headlineH1.fontFamily).toBe('Fraunces-Medium');
+    expect(theme.typography.headlineH1.fontFamily).toBe('Geist-Medium');
   });
 
   it('ja locale swaps headlineH1 to Inter-Medium', () => {

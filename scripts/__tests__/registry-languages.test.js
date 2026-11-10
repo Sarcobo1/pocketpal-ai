@@ -29,6 +29,7 @@ describe('extractRegistryLanguages', () => {
       'pt_BR',
       'ru',
       'uk',
+      'uz',
       'zh',
       'zh_Hant',
     ]);

@@ -7,15 +7,25 @@ export const styles = ({theme}: {theme: Theme}) =>
     container: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'space-between',
       paddingBottom: 12,
-      gap: 5,
+      marginTop: 4,
+      gap: 8,
+    },
+    actionsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
     },
     timing: {
       color: theme.colors.textSecondary,
-      fontSize: 10,
+      fontSize: 12,
+      fontFamily: 'GeistMono-Regular',
+      fontVariant: ['tabular-nums'],
     },
     interruptedStatus: {
       color: theme.colors.error,
-      fontSize: 10,
+      fontSize: 12,
+      fontFamily: 'GeistMono-Regular',
     },
   });

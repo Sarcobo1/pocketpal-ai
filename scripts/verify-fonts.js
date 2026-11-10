@@ -197,14 +197,14 @@ function localeLetters(localeJsonPath) {
 
 /**
  * Every wired locale NOT listed in NON_LATIN_LOCALES must have all of its
- * letters covered by the bundled Fraunces subset, because those locales
- * render headlines in Fraunces. Locales that ARE listed fall back to Inter
+ * letters covered by the bundled Geist subset, because those locales
+ * render headlines in Geist. Locales that ARE listed fall back to Inter
  * and are exempt.
  *
- * This exists because the Fraunces subset stops at Latin-1: Polish is Latin
+ * This exists because the Geist subset stops short of Latin Extended-A: Polish is Latin
  * script but needs Latin Extended-A, so "it's Latin, it's fine" is wrong.
  * Only letters are checked — shared punctuation (— • … → ✓) is absent from
- * Fraunces for every locale including `en`, and is not a regression.
+ * Geist for every locale including `en`, and is not a regression.
  *
  * Deliberately over-approximate: it scans the whole locale JSON, not just the
  * strings that land in headline slots. So one stray non-Latin-1 letter in a
@@ -218,15 +218,15 @@ function verifyHeadlineGlyphCoverage() {
   const indexPath = path.join(localesDir, 'index.ts');
   // Headlines use Regular, Medium and the italics, so require coverage in
   // every cut — a future re-cut of one weight would otherwise slip past.
-  const frauncesCuts = fs.existsSync(ASSETS_DIR)
+  const geistCuts = fs.existsSync(ASSETS_DIR)
     ? fs
         .readdirSync(ASSETS_DIR)
-        .filter(n => /^Fraunces-.*\.ttf$/.test(n))
+        .filter(n => /^Geist-.*\.ttf$/.test(n))
         .map(n => path.join(ASSETS_DIR, n))
     : [];
-  // A missing Fraunces asset is already reported by the bundling check;
+  // A missing Geist asset is already reported by the bundling check;
   // don't crash here and mask it.
-  if (!fs.existsSync(indexPath) || frauncesCuts.length === 0) {
+  if (!fs.existsSync(indexPath) || geistCuts.length === 0) {
     return [];
   }
   const indexSrc = fs.readFileSync(indexPath, 'utf-8');
@@ -251,8 +251,8 @@ function verifyHeadlineGlyphCoverage() {
   );
 
   // Intersection across cuts: a letter counts as covered only if every
-  // Fraunces weight can render it.
-  const perCut = frauncesCuts.map(fontCodepoints);
+  // Geist weight can render it.
+  const perCut = geistCuts.map(fontCodepoints);
   const covered = new Set(
     [...perCut[0]].filter(c => perCut.every(set => set.has(c))),
   );
@@ -272,7 +272,7 @@ function verifyHeadlineGlyphCoverage() {
         .map(c => String.fromCodePoint(c))
         .join('');
       errors.push(
-        `${lang}: ${missing.length} letter(s) not in the bundled Fraunces subset (${sample}) — ` +
+        `${lang}: ${missing.length} letter(s) not in the bundled Geist subset (${sample}) — ` +
           `add '${lang}' to NON_LATIN_LOCALES in src/theme/tokens/typography.ts so headlines fall back to Inter`,
       );
     }
@@ -331,7 +331,7 @@ function main() {
 
   console.log(
     '\nverify-fonts: OK — all families bundled on all platforms, ' +
-      'and every Fraunces-rendered locale is covered by the bundled subset.',
+      'and every Geist-rendered locale is covered by the bundled subset.',
   );
 }
 

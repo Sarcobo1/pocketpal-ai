@@ -6,6 +6,20 @@
     "emitDecoratorMetadata": true,
     "useDefineForClassFields": true,
     "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "bot-avatars": ["vendor/bot-avatars/src/rig.ts"],
+      "bot-avatars-native": ["vendor/bot-avatars-native/src/index.ts"],
+      "thinking-orbs-native": ["vendor/thinking-orbs-native/src/index.ts"]
+    }
   },
-  "exclude": ["node_modules", "e2e"]
+  "exclude": [
+    "node_modules",
+    "e2e",
+    "vendor/bot-avatars/demo",
+    "vendor/bot-avatars/scripts",
+    "vendor/bot-avatars/vite.config.ts",
+    "vendor/bot-avatars-native/example",
+    "vendor/thinking-orbs-native/scripts"
+  ]
 }

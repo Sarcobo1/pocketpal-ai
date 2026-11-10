@@ -42,11 +42,11 @@ export const StopButton = ({
       testID="stop-button"
       {...touchableOpacityProps}
       onPress={handlePress}
-      style={styles.stopButton}>
+      style={[styles.stopButton, {backgroundColor: theme.colors.primary}]}>
       <StopIcon
-        stroke={color ?? theme.colors.background}
-        width={24}
-        height={24}
+        stroke={color ?? theme.colors.onPrimary}
+        width={20}
+        height={20}
       />
     </TouchableOpacity>
   );
@@ -55,9 +55,9 @@ export const StopButton = ({
 const styles = StyleSheet.create({
   stopButton: {
     marginLeft: 16,
-    // Minimum 44pt touch target for accessibility
-    minHeight: 40,
-    minWidth: 40,
+    width: 44,
+    height: 44,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },

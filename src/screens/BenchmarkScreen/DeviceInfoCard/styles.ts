@@ -9,7 +9,7 @@ export const createStyles = (theme: Theme) =>
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.outline,
-      borderRadius: 15,
+      borderRadius: 16,
     },
     deviceInfoRow: {
       flexDirection: 'row',
@@ -24,6 +24,8 @@ export const createStyles = (theme: Theme) =>
     },
     deviceInfoValue: {
       color: theme.colors.onSurface,
+      fontFamily: 'GeistMono-Regular',
+      fontVariant: ['tabular-nums'],
       flex: 1,
       textAlign: 'right',
       flexWrap: 'wrap',
@@ -39,6 +41,9 @@ export const createStyles = (theme: Theme) =>
     },
     headerSummary: {
       color: theme.colors.onSurfaceVariant,
+      fontFamily: 'GeistMono-Regular',
+      fontVariant: ['tabular-nums'],
+      fontSize: 13,
       marginTop: 4,
     },
     section: {

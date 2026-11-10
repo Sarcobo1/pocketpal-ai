@@ -5,6 +5,7 @@ import {Text} from 'react-native-paper';
 
 import {ChevronRightIcon, SearchIcon} from '../../assets/icons';
 import {useTheme} from '../../hooks';
+import {LimiOrb} from '../LimiOrb';
 
 import {WebSearchResultsSheet} from './WebSearchResultsSheet';
 import {styles} from './styles';
@@ -30,15 +31,17 @@ export const WebSearchResultBubble: React.FC<WebSearchResultBubbleProps> = ({
 
   if (results.length === 0) {
     return (
-      <View style={componentStyles.row} testID="web-search-result-card">
-        <SearchIcon
-          width={14}
-          height={14}
-          stroke={theme.colors.textSecondary}
-        />
-        <Text style={componentStyles.label} numberOfLines={1}>
-          {t(l10n.chat.webSearch.noResultsFor, {query})}
-        </Text>
+      <View style={componentStyles.card} testID="web-search-result-card">
+        <View style={componentStyles.row}>
+          <SearchIcon
+            width={16}
+            height={16}
+            stroke={theme.colors.textSecondary}
+          />
+          <Text style={componentStyles.label} numberOfLines={1}>
+            {t(l10n.chat.webSearch.noResultsFor, {query})}
+          </Text>
+        </View>
       </View>
     );
   }
@@ -46,8 +49,7 @@ export const WebSearchResultBubble: React.FC<WebSearchResultBubbleProps> = ({
   return (
     <>
       <TouchableOpacity
-        style={componentStyles.row}
-        hitSlop={{top: 12, bottom: 12}}
+        style={componentStyles.card}
         onPress={() => setSheetVisible(true)}
         accessibilityRole="button"
         accessibilityLabel={t(
@@ -55,26 +57,32 @@ export const WebSearchResultBubble: React.FC<WebSearchResultBubbleProps> = ({
           {query},
         )}
         testID="web-search-result-trigger">
-        <SearchIcon
-          width={14}
-          height={14}
-          stroke={theme.colors.textSecondary}
-        />
-        {/* Split so a long query truncates but the count never does. */}
-        <Text style={componentStyles.label} numberOfLines={1}>
-          {t(l10n.chat.webSearch.searched, {query})}
-        </Text>
-        <Text style={componentStyles.count} numberOfLines={1}>
-          {'·  '}
-          {results.length === 1
-            ? l10n.chat.webSearch.resultsCountOne
-            : t(l10n.chat.webSearch.resultsCount, {count: results.length})}
-        </Text>
-        <ChevronRightIcon
-          width={14}
-          height={14}
-          stroke={theme.colors.textSecondary}
-        />
+        <View style={componentStyles.headerRow}>
+          <View style={componentStyles.row}>
+            <Text style={componentStyles.count} numberOfLines={1}>
+              {results.length} ta manba · «{query}»
+            </Text>
+          </View>
+          <ChevronRightIcon
+            width={16}
+            height={16}
+            stroke={theme.colors.textSecondary}
+          />
+        </View>
+
+        {/* Source chips */}
+        <View style={componentStyles.chipList}>
+          {results.slice(0, 3).map((item, idx) => (
+            <View key={idx} style={componentStyles.chip}>
+              <View style={componentStyles.orbCircle}>
+                <LimiOrb state="searching" size={20} paused={true} />
+              </View>
+              <Text style={componentStyles.chipText} numberOfLines={1}>
+                {item.title || item.url}
+              </Text>
+            </View>
+          ))}
+        </View>
       </TouchableOpacity>
 
       <WebSearchResultsSheet

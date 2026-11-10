@@ -20,6 +20,7 @@ import {REPO_URL} from '../../config/urls';
 
 import {CopyIcon, GithubIcon, ChevronRightIcon} from '../../assets/icons';
 
+import {LimiGhost} from '../../components/LimiGhost';
 import {Sheet, TextInput} from '../../components';
 import {useTheme} from '../../hooks';
 import {createStyles} from './styles';
@@ -175,12 +176,15 @@ export const AboutScreen: React.FC = () => {
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.card}>
           <View style={styles.header}>
+            <View style={styles.ghostContainer}>
+              <LimiGhost size={80} state="default" />
+            </View>
             <View style={styles.headerContent}>
               <Text variant="titleLarge" style={styles.title}>
-                PocketPal AI
+                Limi
               </Text>
               <Text variant="bodyMedium" style={styles.description}>
-                {l10n.about.description}
+                100% lokal, maxfiy, ochiq kodli
               </Text>
               <View style={styles.versionContainer}>
                 <TouchableOpacity
@@ -205,6 +209,24 @@ export const AboutScreen: React.FC = () => {
               <Text style={styles.llamaBuildText}>
                 llama.cpp {BuildInfo.number} ({BuildInfo.commit.substring(0, 7)}
                 )
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Mualliflar</Text>
+            <View style={styles.authorItem}>
+              <Text style={styles.authorName}>Jakub Antalik</Text>
+              <Text style={styles.authorRole}>bot-avatars, thinking-orbs</Text>
+            </View>
+            <View style={styles.authorItem}>
+              <Text style={styles.authorName}>PocketPal jamoasi</Text>
+              <Text style={styles.authorRole}>PocketPal AI asoslari</Text>
+            </View>
+            <View style={styles.authorItem}>
+              <Text style={styles.authorName}>OpenLimi</Text>
+              <Text style={styles.authorRole}>
+                Limi dizayni va mahalliylashtirish
               </Text>
             </View>
           </View>

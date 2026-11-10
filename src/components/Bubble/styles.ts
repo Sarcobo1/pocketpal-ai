@@ -5,31 +5,23 @@ import {MessageType, Theme} from '../../utils/types';
 export const styles = ({
   currentUserIsAuthor,
   message,
-  roundBorder,
+  _roundBorder,
   theme,
 }: {
   currentUserIsAuthor: boolean;
   message: MessageType.Any;
-  roundBorder: boolean;
+  _roundBorder?: boolean;
   theme: Theme;
 }) => {
   return StyleSheet.create({
     contentContainer: {
       backgroundColor:
         !currentUserIsAuthor || message.type === 'image'
-          ? 'transparent' //theme.colors.secondary
+          ? 'transparent'
           : theme.colors.authorBubbleBackground,
-      borderBottomLeftRadius:
-        currentUserIsAuthor || roundBorder
-          ? theme.borders.messageBorderRadius
-          : 0,
-      borderBottomRightRadius: currentUserIsAuthor
-        ? roundBorder
-          ? theme.borders.messageBorderRadius
-          : 0
-        : theme.borders.messageBorderRadius,
-      borderColor: 'transparent',
-      borderRadius: theme.borders.messageBorderRadius,
+      borderRadius: 16,
+      maxWidth: currentUserIsAuthor ? 292 : undefined,
+      alignSelf: currentUserIsAuthor ? 'flex-end' : 'flex-start',
       overflow: 'hidden',
     },
     dateHeader0: {

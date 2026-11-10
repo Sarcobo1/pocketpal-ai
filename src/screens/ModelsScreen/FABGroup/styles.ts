@@ -1,23 +1,24 @@
 import {StyleSheet} from 'react-native';
 
 import {Theme} from '../../../utils/types';
-import {uiStore} from '../../../store';
 
 export const createStyles = (theme: Theme) => {
-  const isDark = uiStore.colorScheme === 'dark';
-
   return StyleSheet.create({
     fab: {
       bottom: 0,
       right: 16,
-      backgroundColor: theme.colors.background,
-      borderColor: theme.colors.outline,
-      borderWidth: isDark ? 1 : 0,
+      backgroundColor: theme.colors.primary,
+      borderRadius: 16,
+      width: 56,
+      height: 56,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     actionButton: {
-      backgroundColor: theme.colors.background,
+      backgroundColor: theme.colors.surface,
       borderColor: theme.colors.outline,
-      borderWidth: isDark ? 1 : 0,
+      borderRadius: 16,
+      borderWidth: 1,
     },
     icon: {
       width: 24,

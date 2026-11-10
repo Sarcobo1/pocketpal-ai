@@ -7,7 +7,6 @@ import {
   UIManager,
   View,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import {
   Button,
   IconButton,
@@ -497,11 +496,12 @@ export const VoicePickerView: React.FC = observer(() => {
         key={engineId}
         style={styles.engineGroup}
         testID={`tts-engine-group-${engineId}`}>
-        <LinearGradient
-          colors={[meta.gradientFrom, meta.gradientTo]}
-          start={{x: 0, y: 0}}
-          end={{x: 1, y: 1}}
-          style={[StyleSheet.absoluteFill, styles.engineGroupGradientFill]}
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            styles.engineGroupGradientFill,
+            {backgroundColor: meta.gradientFrom + '1A'},
+          ]}
           pointerEvents="none"
         />
         <TouchableRipple

@@ -5,11 +5,11 @@ import {Theme} from '../../utils/types';
 export const createStyles = (theme: Theme) =>
   StyleSheet.create({
     menu: {
-      shadowColor: 'rgba(0, 0, 0, 0.05)',
-      shadowRadius: 70,
-      shadowOffset: {width: 0, height: 0},
-      elevation: 5,
-      borderRadius: 12,
+      shadowColor: 'rgba(0, 0, 0, 0.2)',
+      shadowRadius: 16,
+      shadowOffset: {width: 0, height: 4},
+      elevation: 4,
+      borderRadius: 16,
       maxWidth: '90%',
     },
     menuWithSubmenu: {
@@ -17,14 +17,15 @@ export const createStyles = (theme: Theme) =>
       shadowOpacity: 0,
     },
     content: {
-      paddingVertical: 0,
-      backgroundColor: theme.colors.menuBackground,
-      borderRadius: 12,
-      // overflow: 'hidden', This removes shadow
+      paddingVertical: 4,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.colors.outline,
       marginRight: 10,
     },
     contentWithSubmenu: {
-      backgroundColor: theme.colors.menuBackground,
+      backgroundColor: theme.colors.surface,
     },
     groupSeparator: {
       height: 6,

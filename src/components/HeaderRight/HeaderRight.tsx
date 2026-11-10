@@ -163,7 +163,23 @@ export const HeaderRight: React.FC = observer(() => {
         testID="reset-button"
         style={styles.chatBtn}
         onPress={() => {
-          chatSessionStore.resetActiveSession();
+          if (modelStore.inferencing || chatSessionStore.isGenerating) {
+            Alert.alert(
+              'Generatsiya to‘xtatilsinmi?',
+              'Yangi suhbat boshlashdan oldin joriy javob generatsiyasini to‘xtatishni xohlaysizmi?',
+              [
+                {text: l10n.common.cancel, style: 'cancel'},
+                {
+                  text: 'To‘xtatish',
+                  onPress: async () => {
+                    chatSessionStore.resetActiveSession();
+                  },
+                },
+              ],
+            );
+          } else {
+            chatSessionStore.resetActiveSession();
+          }
         }}
       />
       <Menu

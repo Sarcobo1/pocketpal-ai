@@ -87,6 +87,10 @@ const LANGUAGE_ASSERTIONS: Record<
     screenTitle: 'Налаштування',
     firstCardTitle: 'Налаштування ініціалізації моделі',
   },
+  uz: {
+    screenTitle: 'Sozlamalar',
+    firstCardTitle: 'Model ishga tushirish sozlamalari',
+  },
   zh: {
     screenTitle: '设置',
     firstCardTitle: '模型初始化设置',
@@ -98,7 +102,7 @@ const LANGUAGE_ASSERTIONS: Record<
 };
 
 // Order: start with non-English, end with English to restore default state
-const LANGUAGE_ORDER = ['ar', 'es', 'fa', 'he', 'id', 'ja', 'ko', 'ms', 'pl', 'pt', 'pt_BR', 'ru', 'uk', 'zh', 'zh_Hant', 'en'];
+const LANGUAGE_ORDER = ['ar', 'es', 'fa', 'he', 'id', 'ja', 'ko', 'ms', 'pl', 'pt', 'pt_BR', 'ru', 'uk', 'uz', 'zh', 'zh_Hant', 'en'];
 
 describe('Language Switching', () => {
   let chatPage: ChatPage;

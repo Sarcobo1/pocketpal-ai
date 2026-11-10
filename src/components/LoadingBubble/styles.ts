@@ -3,16 +3,16 @@ import {StyleSheet} from 'react-native';
 export const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    padding: 8,
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: 16,
     alignSelf: 'flex-start',
     marginVertical: 8,
-    marginHorizontal: 12,
-    gap: 4,
+    gap: 10,
   },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+  text: {
+    fontSize: 14,
+    fontFamily: 'Geist-Regular',
   },
 });

@@ -1,10 +1,15 @@
 /**
- * Tests for the design-token typography surface.
+ * Tests for the Limi typography surface.
  *
- * Locale-aware resolution scenarios:
- *   - Headline renders in Fraunces for Latin locales.
- *   - Headline falls back to Inter for non-Latin locales.
- *   - JetBrains Mono is locale-agnostic (no swap for code blocks).
+ * What this pins:
+ *   - The scale numbers the spec names (28/32 heading, 16/24 body, 14/20
+ *     secondary, 12/16 meta, 20/28 Speak).
+ *   - No letter-spacing anywhere.
+ *   - Geist for prose, Geist Mono for numbers, JetBrains Mono for code.
+ *   - The Uzbek Latin fallback: Geist has no U+02BB, so `uz` must resolve to
+ *     Inter. This is a real glyph-coverage gap, verified against the bundled
+ *     cmap — not a preference.
+ *   - Absolute px line-heights only.
  */
 import type {AvailableLanguage} from '../../../locales';
 
@@ -17,25 +22,50 @@ import {
 } from '../index';
 
 describe('typography tokens', () => {
-  describe('absolute line-heights', () => {
-    it('headlineH1 has lineHeight resolved to absolute px (36 × 1.4 = 50)', () => {
+  describe('the Limi scale', () => {
+    it('heading is 28/32 at weight 500', () => {
       expect(typography.headlineH1).toMatchObject({
-        fontFamily: FONT_FAMILIES.FRAUNCES_MEDIUM,
-        fontSize: 36,
-        lineHeight: 50,
+        fontFamily: FONT_FAMILIES.GEIST_MEDIUM,
+        fontSize: 28,
+        lineHeight: 32,
         fontWeight: '500',
       });
     });
 
-    it('styledXs has lineHeight === fontSize (100% multiplier resolved)', () => {
-      expect(typography.styledXs.lineHeight).toBe(typography.styledXs.fontSize);
-      expect(typography.styledXs.fontFamily).toBe(
-        FONT_FAMILIES.FRAUNCES_ITALIC,
-      );
-      expect(typography.styledXs.fontStyle).toBe('italic');
+    it('body is 16/24 at weight 400', () => {
+      expect(typography.bodyM).toMatchObject({
+        fontFamily: FONT_FAMILIES.GEIST_REGULAR,
+        fontSize: 16,
+        lineHeight: 24,
+        fontWeight: '400',
+      });
     });
 
-    it('every typography token has a numeric absolute lineHeight', () => {
+    it('secondary is 14/20', () => {
+      expect(typography.bodyS).toMatchObject({fontSize: 14, lineHeight: 20});
+    });
+
+    it('meta is 12/16', () => {
+      expect(typography.captionM).toMatchObject({fontSize: 12, lineHeight: 16});
+    });
+
+    it('Speak transcript is 20/28', () => {
+      expect(typography.speakM).toMatchObject({
+        fontFamily: FONT_FAMILIES.GEIST_REGULAR,
+        fontSize: 20,
+        lineHeight: 28,
+      });
+    });
+
+    it('has no letter-spacing on any token', () => {
+      for (const key of Object.keys(typography) as Array<
+        keyof typeof typography
+      >) {
+        expect(typography[key].letterSpacing).toBeUndefined();
+      }
+    });
+
+    it('every token has a numeric absolute lineHeight', () => {
       for (const key of Object.keys(typography) as Array<
         keyof typeof typography
       >) {
@@ -46,92 +76,96 @@ describe('typography tokens', () => {
     });
   });
 
-  describe('Latin locales render Fraunces', () => {
-    // pt / pt_BR are load-bearing here: Portuguese diacritics are all Latin-1
-    // and covered by the bundled Fraunces subset, so these locales must NOT
-    // fall back to Inter the way pl does.
-    const latinLocales: AvailableLanguage[] = ['en', 'id', 'ms', 'pt', 'pt_BR'];
+  describe('families', () => {
+    it('prose uses Geist', () => {
+      expect(typography.bodyM.fontFamily).toBe(FONT_FAMILIES.GEIST_REGULAR);
+      expect(typography.titleL.fontFamily).toBe(FONT_FAMILIES.GEIST_MEDIUM);
+    });
 
-    it.each(latinLocales)(
-      'headlineH1 in %s resolves to Fraunces-Medium at 36 / 50',
-      locale => {
-        const resolved = typographyForLocale('headlineH1', locale);
-        expect(resolved.fontFamily).toBe(FONT_FAMILIES.FRAUNCES_MEDIUM);
-        expect(resolved.fontSize).toBe(36);
-        expect(resolved.lineHeight).toBe(50);
-        expect(resolved.fontWeight).toBe('500');
-      },
-    );
+    it('numbers use Geist Mono with tabular figures', () => {
+      expect(typography.monoM.fontFamily).toBe(
+        FONT_FAMILIES.GEIST_MONO_REGULAR,
+      );
+      expect(typography.monoM.fontVariant).toEqual(['tabular-nums']);
+      expect(typography.monoS.fontVariant).toEqual(['tabular-nums']);
+    });
 
-    it('styledXs in en resolves to Fraunces-Italic', () => {
-      const resolved = typographyForLocale('styledXs', 'en');
-      expect(resolved.fontFamily).toBe(FONT_FAMILIES.FRAUNCES_ITALIC);
-      expect(resolved.fontStyle).toBe('italic');
+    it('code uses JetBrains Mono', () => {
+      expect(typography.codeM.fontFamily).toBe(
+        FONT_FAMILIES.JETBRAINS_MONO_REGULAR,
+      );
+    });
+
+    it('Inter and Fraunces are not the primary family of any token', () => {
+      for (const key of Object.keys(typography) as Array<
+        keyof typeof typography
+      >) {
+        const family = typography[key].fontFamily;
+        expect(family).not.toBe(FONT_FAMILIES.INTER_REGULAR);
+        expect(family).not.toBe(FONT_FAMILIES.INTER_MEDIUM);
+        expect(family).not.toMatch(/Fraunces/);
+      }
     });
   });
 
-  describe('non-Latin locales fall back to Inter', () => {
-    it.each(NON_LATIN_LOCALES)(
-      'headlineH1 in %s falls back to Inter-Medium at 36 / 50',
-      locale => {
-        const resolved = typographyForLocale('headlineH1', locale);
-        expect(resolved.fontFamily).toBe(FONT_FAMILIES.INTER_MEDIUM);
-        expect(resolved.fontSize).toBe(36);
-        expect(resolved.lineHeight).toBe(50);
-        expect(resolved.fontWeight).toBe('500');
-      },
-    );
-
-    it.each(NON_LATIN_LOCALES)(
-      'styledXs in %s falls back to Inter-Medium with synthesised italic',
-      locale => {
-        const resolved = typographyForLocale('styledXs', locale);
-        expect(resolved.fontFamily).toBe(FONT_FAMILIES.INTER_MEDIUM);
-        expect(resolved.fontStyle).toBe('italic');
-        expect(resolved.fontSize).toBe(typography.styledXs.fontSize);
-        expect(resolved.lineHeight).toBe(typography.styledXs.lineHeight);
-      },
-    );
-  });
-
-  describe('JetBrains Mono is locale-agnostic', () => {
-    it.each(NON_LATIN_LOCALES)(
-      'codeM in %s remains JetBrainsMono-Regular',
-      locale => {
-        const resolved = typographyForLocale('codeM', locale);
-        expect(resolved.fontFamily).toBe(FONT_FAMILIES.JETBRAINS_MONO_REGULAR);
-      },
-    );
-
-    it('codeS in en is JetBrainsMono-Regular', () => {
-      const resolved = typographyForLocale('codeS', 'en');
-      expect(resolved.fontFamily).toBe(FONT_FAMILIES.JETBRAINS_MONO_REGULAR);
+  describe('locale fallback', () => {
+    it('Latin locales keep Geist', () => {
+      const latinLocales: AvailableLanguage[] = ['en', 'id', 'ms', 'pt'];
+      for (const locale of latinLocales) {
+        expect(typographyForLocale('bodyM', locale).fontFamily).toBe(
+          FONT_FAMILIES.GEIST_REGULAR,
+        );
+      }
     });
 
-    it.each(['en', ...NON_LATIN_LOCALES] as AvailableLanguage[])(
-      'bodyM (Inter) in %s is unchanged',
+    it('Uzbek Latin falls back to Inter (Geist has no U+02BB)', () => {
+      // The whole reason `uz` is on the list: oʻ and gʻ are U+02BB, which the
+      // bundled Geist cmap does not cover. Inter does.
+      expect(NON_LATIN_LOCALES).toContain('uz');
+      expect(typographyForLocale('bodyM', 'uz').fontFamily).toBe(
+        FONT_FAMILIES.INTER_REGULAR,
+      );
+      expect(typographyForLocale('titleL', 'uz').fontFamily).toBe(
+        FONT_FAMILIES.INTER_MEDIUM,
+      );
+    });
+
+    it.each(NON_LATIN_LOCALES)(
+      '%s falls back to the Inter cut of the same weight',
       locale => {
-        const resolved = typographyForLocale('bodyM', locale);
-        expect(resolved.fontFamily).toBe(FONT_FAMILIES.INTER_REGULAR);
+        const body = typographyForLocale('bodyM', locale);
+        expect(body.fontFamily).toBe(FONT_FAMILIES.INTER_REGULAR);
+        expect(body.fontSize).toBe(typography.bodyM.fontSize);
+        expect(body.lineHeight).toBe(typography.bodyM.lineHeight);
+
+        const title = typographyForLocale('titleL', locale);
+        expect(title.fontFamily).toBe(FONT_FAMILIES.INTER_MEDIUM);
+        expect(title.fontSize).toBe(typography.titleL.fontSize);
       },
     );
+
+    it('Cyrillic locales keep Geist (Geist covers Cyrillic)', () => {
+      expect(NON_LATIN_LOCALES).not.toContain('ru');
+      expect(NON_LATIN_LOCALES).not.toContain('uk');
+      expect(typographyForLocale('bodyM', 'ru').fontFamily).toBe(
+        FONT_FAMILIES.GEIST_REGULAR,
+      );
+    });
   });
 
   describe('mode resolution', () => {
-    it('resolveTokens("light") returns lightColors bound', () => {
-      const t = resolveTokens('light');
-      expect(t.colors.background).toBe('#ffffff');
+    it('resolveTokens("dark") returns the Limi ground', () => {
+      expect(resolveTokens('dark').colors.background).toBe('#04110E');
     });
 
-    it('resolveTokens("dark") returns darkColors bound', () => {
-      const t = resolveTokens('dark');
-      expect(t.colors.background).toBe('#000000');
+    it('resolveTokens("light") returns the light ground', () => {
+      expect(resolveTokens('light').colors.background).toBe('#F7FBF9');
     });
 
-    it('typography binding is shared across modes (locale swap is in builder)', () => {
-      const l = resolveTokens('light');
-      const d = resolveTokens('dark');
-      expect(l.typography).toBe(d.typography);
+    it('typography binding is shared across modes', () => {
+      expect(resolveTokens('light').typography).toBe(
+        resolveTokens('dark').typography,
+      );
     });
   });
 });

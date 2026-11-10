@@ -98,5 +98,11 @@ module.exports = {
     '^@pocketpalai/react-native-speech-phonon$':
       '<rootDir>/__mocks__/external/@pocketpalai/react-native-speech-phonon.ts',
     '^react-native-iap$': '<rootDir>/__mocks__/external/react-native-iap.ts',
+    // Vendored Skia-based UI libraries: there is no native Skia under Jest,
+    // so both render as plain Views carrying the same props.
+    '^bot-avatars-native$':
+      '<rootDir>/__mocks__/external/bot-avatars-native.js',
+    '^thinking-orbs-native$':
+      '<rootDir>/__mocks__/external/thinking-orbs-native.js',
   },
 };

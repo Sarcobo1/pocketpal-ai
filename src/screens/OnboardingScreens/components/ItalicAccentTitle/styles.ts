@@ -4,12 +4,13 @@ import type {Theme} from '../../../../utils/types';
 import {FONT_FAMILIES} from '../../../../theme/tokens/typography';
 
 export const createStyles = (theme: Theme, align: 'left' | 'center') => {
-  // headlineH1 binds to Fraunces-Medium on Latin locales; non-Latin
-  // locales fall back to Inter-Medium via `typographyForLocale`. Use
-  // family identity to pick the right italic-run cut (Fraunces-Italic
-  // for Latin, Inter-Medium + fontStyle:'italic' for non-Latin).
-  const isFraunces =
-    theme.typography.headlineH1.fontFamily === FONT_FAMILIES.FRAUNCES_MEDIUM;
+  // headlineH1 binds to Geist-Medium on Latin locales; locales whose script
+  // Geist cannot cover (Uzbek Latin's U+02BB, Polish's Latin Extended-A, and
+  // the non-Latin scripts) fall back to Inter-Medium via
+  // `typographyForLocale`. Pick the italic run's family by identity so the
+  // fallback stays weight-matched.
+  const isGeist =
+    theme.typography.headlineH1.fontFamily === FONT_FAMILIES.GEIST_MEDIUM;
   return StyleSheet.create({
     // Stack one Text per line inside a centered column so each line
     // centers independently — RN's wrapped-Text centering anchors
@@ -22,8 +23,10 @@ export const createStyles = (theme: Theme, align: 'left' | 'center') => {
       color: theme.colors.onBackground,
       textAlign: align,
     },
-    italic: isFraunces
-      ? {fontFamily: FONT_FAMILIES.FRAUNCES_ITALIC, fontStyle: 'italic'}
+    // Neither Geist nor Inter ships an italic cut in this bundle, so the
+    // italic run is synthesised on the same family and weight.
+    italic: isGeist
+      ? {fontFamily: FONT_FAMILIES.GEIST_MEDIUM, fontStyle: 'italic'}
       : {fontFamily: FONT_FAMILIES.INTER_MEDIUM, fontStyle: 'italic'},
   });
 };

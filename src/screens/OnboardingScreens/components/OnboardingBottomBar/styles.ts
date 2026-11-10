@@ -27,23 +27,16 @@ export const createStyles = (theme: Theme, elevated: boolean) =>
       gap: theme.spacing.s,
     },
     backBtn: {
-      // Figma 888:33641: 48×48, radius ml=16, bg Color/Secondary/Default
-      // (#f3f2f2), border 0.5 Color/Border/Light-grey (#e5e3e1).
       width: 48,
       height: 48,
-      borderRadius: theme.radius.ml,
+      borderRadius: theme.radius.m,
       borderWidth: theme.stroke.sm,
-      borderColor: theme.colors.mutedLight,
-      backgroundColor: theme.colors.secondaryDefault,
+      borderColor: theme.colors.outline,
+      backgroundColor: theme.colors.surfaceVariant,
       alignItems: 'center',
       justifyContent: 'center',
     },
     primaryBtn: {
-      // Figma I888:33571: dark pill, radius ml=16, height 48,
-      // padding m/sm, gap xs. We approximate the Figma vertical
-      // gradient (from #2a2928 to #0e0d0c) with a solid
-      // `colors.primary` (#181715 light) since RN doesn't ship a
-      // gradient primitive in our DS layer.
       flex: 1,
       height: 48,
       flexDirection: 'row',
@@ -52,10 +45,10 @@ export const createStyles = (theme: Theme, elevated: boolean) =>
       gap: theme.spacing.xs,
       paddingHorizontal: theme.spacing.m,
       paddingVertical: theme.spacing.sm,
-      borderRadius: theme.radius.ml,
+      borderRadius: theme.radius.m,
       borderWidth: theme.stroke.sm,
       borderColor: theme.colors.outline,
-      backgroundColor: theme.colors.onBackground,
+      backgroundColor: theme.colors.primary,
     },
     primaryBtnDisabled: {
       backgroundColor: theme.colors.surfaceContainerLow,
@@ -63,7 +56,7 @@ export const createStyles = (theme: Theme, elevated: boolean) =>
     },
     primaryLabel: {
       ...theme.typography.titleS,
-      color: theme.colors.background,
+      color: theme.colors.onPrimary,
     },
     primaryLabelDisabled: {
       color: theme.colors.onSurfaceVariant,

@@ -28,6 +28,7 @@ const languageRegistry = {
   pt_BR: {displayName: 'Português (PT_BR)'},
   ru: {displayName: 'Русский (RU)'},
   uk: {displayName: 'Українська (UK)'},
+  uz: {displayName: "O'zbekcha (UZ)"},
   zh: {displayName: '中文 (ZH)'},
   zh_Hant: {displayName: '繁體中文 (ZH_HANT)'},
 } as const;
@@ -52,6 +53,7 @@ export const languageDisplayNames: Record<AvailableLanguage, string> = {
   pt_BR: languageRegistry.pt_BR.displayName,
   ru: languageRegistry.ru.displayName,
   uk: languageRegistry.uk.displayName,
+  uz: languageRegistry.uz.displayName,
   zh: languageRegistry.zh.displayName,
   zh_Hant: languageRegistry.zh_Hant.displayName,
 };
@@ -90,6 +92,8 @@ function requireLanguageData(lang: AvailableLanguage): object | null {
       return require('./ru.json');
     case 'uk':
       return require('./uk.json');
+    case 'uz':
+      return require('./uz.json');
     case 'zh':
       return require('./zh.json');
     case 'zh_Hant':
@@ -162,6 +166,9 @@ export const l10n = {
   get uk(): Translations {
     return getTranslations('uk');
   },
+  get uz(): Translations {
+    return getTranslations('uz');
+  },
   get zh(): Translations {
     return getTranslations('zh');
   },
@@ -205,6 +212,7 @@ export const initLocale = (locale?: AvailableLanguage) => {
     pt_BR: require('dayjs/locale/pt-br'),
     ru: require('dayjs/locale/ru'),
     uk: require('dayjs/locale/uk'),
+    uz: require('dayjs/locale/uz'),
     zh: require('dayjs/locale/zh'),
     zh_Hant: require('dayjs/locale/zh-tw'),
   };

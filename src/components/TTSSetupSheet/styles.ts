@@ -41,14 +41,14 @@ export const createStyles = (theme: Theme) =>
     // Engine groups (used by VoicePickerView)
     engineGroup: {
       marginBottom: 16,
-      borderRadius: 18,
+      borderRadius: 16,
       borderWidth: 1,
-      borderColor: theme.colors.outlineVariant,
+      borderColor: theme.colors.outline,
       backgroundColor: theme.colors.surface,
       overflow: 'hidden',
     },
     engineGroupGradientFill: {
-      borderRadius: 18,
+      borderRadius: 16,
     },
     engineGroupHeader: {
       flexDirection: 'row',

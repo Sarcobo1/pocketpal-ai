@@ -14,13 +14,18 @@ export const createStyles = (theme: Theme) =>
       marginHorizontal: 16,
       marginVertical: 8,
       backgroundColor: theme.colors.surface,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.colors.outline,
     },
     title: {
       marginBottom: 16,
+      fontFamily: 'Geist-Medium',
       color: theme.colors.onSurface,
     },
     description: {
       marginBottom: 16,
+      fontFamily: 'Geist-Regular',
       color: theme.colors.onSurfaceVariant,
     },
     buttonContainer: {
@@ -30,6 +35,7 @@ export const createStyles = (theme: Theme) =>
     },
     button: {
       marginLeft: 8,
+      borderRadius: 10,
     },
     divider: {
       marginVertical: 16,

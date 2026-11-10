@@ -69,12 +69,15 @@ export const createStyles = (theme: Theme) =>
     },
     resultValue: {
       fontSize: 16,
-      color: theme.colors.onSurface,
+      fontFamily: 'GeistMono-Medium',
+      fontVariant: ['tabular-nums'],
+      color: theme.colors.primary,
       fontWeight: '500',
       marginBottom: 2,
     },
     resultUnit: {
       fontSize: 13,
+      fontFamily: 'GeistMono-Regular',
       color: theme.colors.onSurfaceVariant,
       fontWeight: 'normal',
     },
@@ -86,6 +89,8 @@ export const createStyles = (theme: Theme) =>
     },
     resultStd: {
       fontSize: 10,
+      fontFamily: 'GeistMono-Regular',
+      fontVariant: ['tabular-nums'],
       color: theme.colors.onSurfaceVariant,
     },
     deleteButton: {
@@ -102,11 +107,13 @@ export const createStyles = (theme: Theme) =>
     },
     timestamp: {
       fontSize: 11,
+      fontFamily: 'GeistMono-Regular',
+      fontVariant: ['tabular-nums'],
       color: theme.colors.onSurfaceVariant,
     },
     submitButton: {
       borderColor: theme.colors.primary,
-      borderRadius: 16,
+      borderRadius: 10,
     },
     errorText: {
       color: theme.colors.error,

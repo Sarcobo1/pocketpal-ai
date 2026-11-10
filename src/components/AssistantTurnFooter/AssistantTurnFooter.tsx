@@ -122,35 +122,39 @@ export const AssistantTurnFooter: React.FC<AssistantTurnFooterProps> = observer(
 
     return (
       <View style={componentStyles.container} testID="assistant-turn-footer">
-        <PlayButton message={message} />
-        {copyable && (
-          <TouchableOpacity onPress={copyToClipboard} testID="footer-copy">
-            <CopyIcon
-              stroke={theme.colors.textSecondary}
-              width={16}
-              height={16}
-            />
-          </TouchableOpacity>
-        )}
-        {timings && fullTimingsString ? (
-          <Text style={componentStyles.timing} testID="footer-timing">
-            {fullTimingsString}
-          </Text>
-        ) : null}
-        {showDraft ? (
-          <Text style={componentStyles.timing} testID="message-draft-tokens">
-            {draftString}
-          </Text>
-        ) : null}
-        {interrupted ? (
-          <Text
-            style={componentStyles.interruptedStatus}
-            testID="footer-interrupted-status">
-            {truncationLikely && !suppressTruncated
-              ? l10n.components.bubble.truncated
-              : l10n.components.bubble.interrupted}
-          </Text>
-        ) : null}
+        <View style={componentStyles.actionsRow}>
+          <PlayButton message={message} />
+          {copyable && (
+            <TouchableOpacity onPress={copyToClipboard} testID="footer-copy">
+              <CopyIcon
+                stroke={theme.colors.textSecondary}
+                width={18}
+                height={18}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
+        <View style={componentStyles.actionsRow}>
+          {timings && fullTimingsString ? (
+            <Text style={componentStyles.timing} testID="footer-timing">
+              {fullTimingsString}
+            </Text>
+          ) : null}
+          {showDraft ? (
+            <Text style={componentStyles.timing} testID="message-draft-tokens">
+              {draftString}
+            </Text>
+          ) : null}
+          {interrupted ? (
+            <Text
+              style={componentStyles.interruptedStatus}
+              testID="footer-interrupted-status">
+              {truncationLikely && !suppressTruncated
+                ? l10n.components.bubble.truncated
+                : l10n.components.bubble.interrupted}
+            </Text>
+          ) : null}
+        </View>
       </View>
     );
   },

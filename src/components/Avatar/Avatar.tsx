@@ -3,6 +3,7 @@ import {Image, StyleSheet, Text, View} from 'react-native';
 
 import {MessageType, Theme} from '../../utils/types';
 import {getUserAvatarNameColor, getUserInitials} from '../../utils';
+import {LimiGhost} from '../LimiGhost';
 
 // TDOD: Add model name and the user's name?
 export const Avatar = React.memo(
@@ -20,6 +21,17 @@ export const Avatar = React.memo(
     theme: Theme;
   }) => {
     const renderAvatar = () => {
+      if (!currentUserIsAuthor) {
+        return (
+          <LimiGhost
+            size={36}
+            state="default"
+            label="Limi"
+            style={styles.ghost}
+          />
+        );
+      }
+
       const color = getUserAvatarNameColor(
         author,
         theme.colors.userAvatarNameColors,
@@ -54,6 +66,9 @@ export const Avatar = React.memo(
 );
 
 const styles = StyleSheet.create({
+  ghost: {
+    marginRight: 12,
+  },
   avatarBackground: {
     alignItems: 'center',
     borderRadius: 16,
@@ -71,6 +86,6 @@ const styles = StyleSheet.create({
     width: 32,
   },
   placeholder: {
-    width: 40,
+    width: 48,
   },
 });

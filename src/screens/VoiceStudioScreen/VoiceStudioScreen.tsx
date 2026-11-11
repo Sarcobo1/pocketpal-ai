@@ -64,8 +64,11 @@ export const VoiceStudioScreen: React.FC = observer(() => {
   // ----- Real ASR (Whisper) integration -----
   const voiceCapture = useVoiceCapture({
     onTranscript: useCallback((text: string) => {
-      setSttText(prev => (prev ? prev + ' ' + text : text));
+      setSttText(text);
       setIsRecordingState(false);
+    }, []),
+    onPartialTranscript: useCallback((partialText: string) => {
+      setSttText(partialText);
     }, []),
   });
 

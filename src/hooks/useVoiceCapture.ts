@@ -26,6 +26,8 @@ import {ensureMicPermission} from '../utils/asrMicPermission';
 interface UseVoiceCaptureOptions {
   /** Called with the final transcript; appended to the composer, never sent. */
   onTranscript: (text: string) => void;
+  /** Called incrementally as intermediate speech segments are transcribed. */
+  onPartialTranscript?: (text: string) => void;
 }
 
 interface UseVoiceCaptureReturn {
@@ -38,7 +40,7 @@ interface UseVoiceCaptureReturn {
 export function useVoiceCapture(
   options: UseVoiceCaptureOptions,
 ): UseVoiceCaptureReturn {
-  const {onTranscript} = options;
+  const {onTranscript, onPartialTranscript} = options;
 
   const recordingRef = useRef(false);
   // Bumped by start and cancel; work from an older session drops its result
@@ -54,6 +56,8 @@ export function useVoiceCapture(
   const noAudioTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onTranscriptRef = useRef(onTranscript);
   onTranscriptRef.current = onTranscript;
+  const onPartialTranscriptRef = useRef(onPartialTranscript);
+  onPartialTranscriptRef.current = onPartialTranscript;
 
   const enqueueEngine = useCallback((work: () => Promise<void>) => {
     engineQueueRef.current = engineQueueRef.current.then(work).catch(err => {
@@ -106,6 +110,7 @@ export function useVoiceCapture(
           );
           if (session === sessionRef.current && text.length > 0) {
             textsRef.current.push(text);
+            onPartialTranscriptRef.current?.(textsRef.current.join(' '));
             // Save only a detected language, so a reset during the decode holds.
             if (!fixedLanguage && !asrStore.spokenLanguage && language) {
               asrStore.setSpokenLanguage(language);

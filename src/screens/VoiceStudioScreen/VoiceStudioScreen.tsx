@@ -13,7 +13,7 @@ import Clipboard from '@react-native-clipboard/clipboard';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {observer} from 'mobx-react';
 
-import {useTheme} from '../../hooks';
+import {useTheme, useVoiceCapture} from '../../hooks';
 import {createStyles} from './styles';
 import {
   MenuIcon,
@@ -25,7 +25,7 @@ import {
   CheckBoldIcon,
 } from '../../assets/icons';
 import {ROUTES} from '../../utils/navigationConstants';
-import {chatSessionStore, ttsStore} from '../../store';
+import {chatSessionStore, ttsStore, asrStore} from '../../store';
 
 const hapticOptions = {
   enableVibrateFallback: true,
@@ -42,12 +42,9 @@ export const VoiceStudioScreen: React.FC = observer(() => {
   const [activeTab, setActiveTab] = useState<'stt' | 'tts'>('stt');
 
   // STT state
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordSeconds, setRecordSeconds] = useState(12);
-  const [sttText, setSttText] = useState(
-    "Bugun ob-havo qanday bo'ladi? Shamol kuchli bo'ladimi?",
-  );
+  const [sttText, setSttText] = useState('');
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [recordSeconds, setRecordSeconds] = useState(0);
 
   // TTS state
   const [ttsText, setTtsText] = useState(
@@ -59,19 +56,39 @@ export const VoiceStudioScreen: React.FC = observer(() => {
 
   // Voice cloning state
   const [isCloneRecording, setIsCloneRecording] = useState(false);
-  const [cloneSeconds, setCloneSeconds] = useState(14);
+  const [cloneSeconds, setCloneSeconds] = useState(0);
+  const cloneTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [consentChecked, setConsentChecked] = useState(true);
-  const [hasClonedVoice, setHasClonedVoice] = useState(true);
+  const [hasClonedVoice, setHasClonedVoice] = useState(false);
 
-  // Recording timer effect
+  // ----- Real ASR (Whisper) integration -----
+  const voiceCapture = useVoiceCapture({
+    onTranscript: useCallback((text: string) => {
+      setSttText(prev => (prev ? prev + ' ' + text : text));
+      setIsRecordingState(false);
+    }, []),
+  });
+
+  // We need a local flag since asrStore.captureState is the source of truth
+  const [isRecordingState, setIsRecordingState] = useState(false);
+  const isRecording =
+    asrStore.captureState === 'recording' ||
+    asrStore.captureState === 'transcribing' ||
+    isRecordingState;
+
+  // Recording timer — driven by asrStore.recordingStartedAt
   useEffect(() => {
     if (isRecording) {
       timerRef.current = setInterval(() => {
-        setRecordSeconds(prev => prev + 1);
-      }, 1000);
+        const startedAt = asrStore.recordingStartedAt ?? Date.now();
+        setRecordSeconds(Math.floor((Date.now() - startedAt) / 1000));
+      }, 500);
     } else {
       if (timerRef.current) {
         clearInterval(timerRef.current);
+      }
+      if (!isRecording) {
+        setRecordSeconds(0);
       }
     }
     return () => {
@@ -81,45 +98,118 @@ export const VoiceStudioScreen: React.FC = observer(() => {
     };
   }, [isRecording]);
 
+  // Clone recording timer
+  useEffect(() => {
+    if (isCloneRecording) {
+      cloneTimerRef.current = setInterval(() => {
+        setCloneSeconds(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (cloneTimerRef.current) {
+        clearInterval(cloneTimerRef.current);
+      }
+    }
+    return () => {
+      if (cloneTimerRef.current) {
+        clearInterval(cloneTimerRef.current);
+      }
+    };
+  }, [isCloneRecording]);
+
   const toggleRecording = () => {
     ReactNativeHapticFeedback.trigger('impactMedium', hapticOptions);
-    if (!isRecording) {
-      setRecordSeconds(0);
-      setIsRecording(true);
+    if (!asrStore.asrAvailable) {
+      Alert.alert(
+        'STT mavjud emas',
+        'Ovozdan matnga o\'chirish uchun avval Settings > Voice Input > Whisper modelini yuklab oling.',
+        [{text: 'OK'}],
+      );
+      return;
+    }
+    if (isRecording) {
+      voiceCapture.stop();
+      setIsRecordingState(false);
     } else {
-      setIsRecording(false);
+      setSttText('');
+      setRecordSeconds(0);
+      setIsRecordingState(true);
+      voiceCapture.start();
     }
   };
 
   const handleCopyStt = () => {
     ReactNativeHapticFeedback.trigger('impactLight', hapticOptions);
+    if (!sttText.trim()) {
+      return;
+    }
     Clipboard.setString(sttText);
     Alert.alert('Nusxalandi', 'Matn buferga nusxalandi.');
   };
 
   const handleSendToChat = async () => {
     ReactNativeHapticFeedback.trigger('impactLight', hapticOptions);
+    if (!sttText.trim()) {
+      return;
+    }
     chatSessionStore.saveDraft(chatSessionStore.activeSessionId ?? 'new_chat_draft', sttText);
     navigation.navigate(ROUTES.CHAT);
   };
 
   const handleSendToTts = () => {
     ReactNativeHapticFeedback.trigger('impactLight', hapticOptions);
+    if (!sttText.trim()) {
+      return;
+    }
     setTtsText(sttText);
     setActiveTab('tts');
   };
 
-  const handlePlayTts = () => {
+  // ----- Real TTS (Piper/Supertonic) integration -----
+  const handlePlayTts = async () => {
     ReactNativeHapticFeedback.trigger('impactMedium', hapticOptions);
+    if (!ttsText.trim()) {
+      return;
+    }
     if (isPlaying) {
       setIsPlaying(false);
-      ttsStore.stop?.();
+      await ttsStore.stop('voice-studio-user');
     } else {
+      if (!ttsStore.isTTSAvailable) {
+        Alert.alert(
+          'TTS mavjud emas',
+          'Matndan ovozga o\'chirish uchun avval Settings > Voice > TTS modelini yuklab oling.',
+          [{text: 'OK'}],
+        );
+        return;
+      }
       setIsPlaying(true);
-      // TTSStore exposes play(messageId, text) — use a synthetic message id
       const msgId = `voice-studio-${Date.now()}`;
-      (ttsStore as any).play(msgId, ttsText)
-        .finally(() => setIsPlaying(false));
+      try {
+        await ttsStore.play(msgId, ttsText);
+      } catch (e) {
+        console.warn('[VoiceStudio] TTS play error:', e);
+      } finally {
+        setIsPlaying(false);
+      }
+    }
+  };
+
+  // Sync isPlaying with store
+  useEffect(() => {
+    if (ttsStore.playbackState.mode === 'idle' && isPlaying) {
+      setIsPlaying(false);
+    }
+  }, [ttsStore.playbackState.mode, isPlaying]);
+
+  const handleCloneToggle = () => {
+    ReactNativeHapticFeedback.trigger('impactMedium', hapticOptions);
+    if (isCloneRecording) {
+      setIsCloneRecording(false);
+      setHasClonedVoice(true);
+      Alert.alert('Ovoz klonlandi!', '15 soniyalik ovoz namunasi saqlandi.');
+    } else {
+      setCloneSeconds(0);
+      setIsCloneRecording(true);
     }
   };
 
@@ -128,6 +218,9 @@ export const VoiceStudioScreen: React.FC = observer(() => {
     const remaining = sec % 60;
     return `${mins.toString().padStart(2, '0')}:${remaining.toString().padStart(2, '0')}`;
   };
+
+  const isTTSReady = ttsStore.isTTSAvailable;
+  const isSTTReady = asrStore.asrAvailable;
 
   return (
     <View style={styles.root}>
@@ -190,330 +283,294 @@ export const VoiceStudioScreen: React.FC = observer(() => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {activeTab === 'stt' ? (
-          /* ==================== STT TAB ==================== */
-          <>
-            {/* Chips Row */}
-            <View style={styles.chipsRow}>
-              <View style={styles.chip}>
-                <Text style={styles.chipText}>Whisper Tiny · 75 MB</Text>
+      <ScrollView
+        style={styles.scrollArea}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled">
+
+        {/* ===== STT TAB ===== */}
+        {activeTab === 'stt' && (
+          <View>
+            {/* Model info card */}
+            <View style={styles.modelCard}>
+              <View style={styles.modelCardRow}>
+                <View
+                  style={[
+                    styles.modelStatusDot,
+                    {backgroundColor: isSTTReady ? '#34D399' : '#6B7280'},
+                  ]}
+                />
+                <Text style={styles.modelCardTitle}>
+                  {isSTTReady ? 'Whisper — Tayyor' : 'Whisper — yuklanmagan'}
+                </Text>
               </View>
-              <View style={styles.chip}>
-                <Text style={styles.chipText}>O'zbek</Text>
-              </View>
+              <Text style={styles.modelCardSub}>
+                {isSTTReady
+                  ? 'Offline nutqni aniqlash modeli'
+                  : 'Settings > Voice Input da yuklab oling'}
+              </Text>
             </View>
 
-            {/* Recording Card */}
-            <View style={styles.recordingCard}>
-              {/* Waveform Bars */}
-              <View style={styles.waveformContainer}>
-                {[14, 28, 42, 34, 22, 38, 20, 26].map((h, i) => (
+            {/* Mic button */}
+            <View style={styles.micContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.micButton,
+                  isRecording && styles.micButtonActive,
+                  !isSTTReady && styles.micButtonDisabled,
+                ]}
+                onPress={toggleRecording}
+                activeOpacity={0.8}
+                accessibilityLabel={isRecording ? 'Yozishni to\'xtatish' : 'Ovoz yozishni boshlash'}
+                accessibilityRole="button">
+                {isRecording ? (
+                  <StopIcon stroke="#fff" width={36} height={36} />
+                ) : (
+                  <MicrophoneIcon stroke="#fff" width={36} height={36} />
+                )}
+              </TouchableOpacity>
+              <Text style={styles.timerText}>
+                {isRecording
+                  ? (asrStore.captureState === 'transcribing'
+                    ? 'Tahlil qilinmoqda...'
+                    : formatTimer(recordSeconds))
+                  : (isSTTReady ? 'Bosib gapiring' : 'Model yuklanmagan')}
+              </Text>
+            </View>
+
+            {/* Waveform placeholder */}
+            {isRecording && (
+              <View style={styles.waveformRow}>
+                {Array.from({length: 24}).map((_, i) => (
                   <View
                     key={i}
                     style={[
-                      styles.waveformBar,
+                      styles.waveBar,
                       {
-                        height: isRecording ? Math.max(8, (h * (i % 2 === 0 ? 1.2 : 0.8))) : h,
-                        opacity: isRecording ? 1 : 0.7,
+                        height: 8 + Math.floor(Math.random() * 24),
+                        opacity: 0.5 + Math.random() * 0.5,
                       },
                     ]}
                   />
                 ))}
               </View>
+            )}
 
-              {/* 88px Mic Button */}
-              <TouchableOpacity
-                style={styles.micButtonLarge}
-                onPress={toggleRecording}
-                activeOpacity={0.85}
-                accessibilityRole="button"
-                accessibilityLabel="Ovoz yozish">
-                <MicrophoneIcon width={36} height={36} color={theme.colors.onPrimary} />
-              </TouchableOpacity>
-
-              <Text style={styles.micStatusText}>
-                {isRecording
-                  ? `Gapiring... · ${formatTimer(recordSeconds)}`
-                  : `Bosib turing va gapiring · ${formatTimer(recordSeconds)}`}
+            {/* Transcript output */}
+            <View style={styles.transcriptBox}>
+              <Text style={styles.transcriptText}>
+                {sttText || (isRecording ? '...' : 'Bu yerda matn paydo bo\'ladi')}
               </Text>
             </View>
 
-            {/* Result Card */}
-            <View style={styles.card}>
-              <Text style={styles.resultCardHeader}>Matn</Text>
-              <TextInput
-                style={styles.resultText}
-                value={sttText}
-                onChangeText={setSttText}
-                multiline
-                placeholder="Bu yerda ovoz matni ko'rinadi"
-                placeholderTextColor={theme.colors.onSurfaceVariant}
-              />
-              <View style={styles.actionsRow}>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={handleCopyStt}
-                  activeOpacity={0.8}>
-                  <Text style={styles.actionButtonText}>Nusxa</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={handleSendToChat}
-                  activeOpacity={0.8}>
-                  <Text style={styles.actionButtonText}>Chatga yuborish</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={handleSendToTts}
-                  activeOpacity={0.8}>
-                  <Text style={styles.actionButtonText}>TTS ga</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Import Audio Card */}
-            <TouchableOpacity
-              style={styles.importCard}
-              activeOpacity={0.8}
-              onPress={() => Alert.alert('Fayl tanlash', 'Audio faylni (.mp3 .wav .m4a) tanlang.')}>
-              <Text style={styles.importCardText}>
-                Audio fayldan matnga (.mp3 .wav .m4a)
-              </Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          /* ==================== TTS TAB ==================== */
-          <>
-            {/* Chip */}
-            <View style={styles.chipsRow}>
-              <View style={styles.chip}>
-                <Text style={styles.chipText}>Piper + klon modeli</Text>
-              </View>
-            </View>
-
-            {/* Input Card */}
-            <View style={styles.card}>
-              <Text style={styles.resultCardHeader}>Matn</Text>
-              <TextInput
-                style={styles.ttsInput}
-                value={ttsText}
-                onChangeText={setTtsText}
-                multiline
-                maxLength={1000}
-                placeholder="O'qilishi kerak bo'lgan matnni kiriting..."
-                placeholderTextColor={theme.colors.onSurfaceVariant}
-              />
-              <Text style={styles.charCounter}>{ttsText.length} / 1000</Text>
-            </View>
-
-            {/* Voice Cards */}
-            <Text style={styles.sectionHeader}>Ovozlar</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.voicesScroll}>
+            {/* Action buttons */}
+            <View style={styles.actionRow}>
               <TouchableOpacity
-                style={[
-                  styles.voiceCard,
-                  selectedVoice === 'voice1' && styles.voiceCardSelected,
-                ]}
-                onPress={() => setSelectedVoice('voice1')}
-                activeOpacity={0.8}>
-                <Text style={styles.voiceCardName}>Ovoz 1</Text>
-                <Text style={styles.voiceCardMeta}>Erkak</Text>
+                style={[styles.actionBtn, !sttText && styles.actionBtnDisabled]}
+                onPress={handleCopyStt}
+                disabled={!sttText}>
+                <UploadIcon stroke={sttText ? theme.colors.text : '#6B7280'} width={18} height={18} />
+                <Text style={[styles.actionBtnText, !sttText && {color: '#6B7280'}]}>
+                  Nusxa
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[
-                  styles.voiceCard,
-                  selectedVoice === 'voice2' && styles.voiceCardSelected,
-                ]}
-                onPress={() => setSelectedVoice('voice2')}
-                activeOpacity={0.8}>
-                <Text style={styles.voiceCardName}>Ovoz 2</Text>
-                <Text style={styles.voiceCardMeta}>Ayol</Text>
+                style={[styles.actionBtn, !sttText && styles.actionBtnDisabled]}
+                onPress={handleSendToTts}
+                disabled={!sttText}>
+                <PlayIcon stroke={sttText ? theme.colors.text : '#6B7280'} width={18} height={18} />
+                <Text style={[styles.actionBtnText, !sttText && {color: '#6B7280'}]}>
+                  TTS ga
+                </Text>
               </TouchableOpacity>
 
-              {hasClonedVoice && (
-                <TouchableOpacity
+              <TouchableOpacity
+                style={[styles.actionBtn, !sttText && styles.actionBtnDisabled]}
+                onPress={handleSendToChat}
+                disabled={!sttText}>
+                <CheckBoldIcon fill={sttText ? theme.colors.text : '#6B7280'} width={18} height={18} />
+                <Text style={[styles.actionBtnText, !sttText && {color: '#6B7280'}]}>
+                  Chatga
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* ===== TTS TAB ===== */}
+        {activeTab === 'tts' && (
+          <View>
+            {/* Model info card */}
+            <View style={styles.modelCard}>
+              <View style={styles.modelCardRow}>
+                <View
                   style={[
-                    styles.voiceCard,
-                    selectedVoice === 'cloned' && styles.voiceCardSelected,
+                    styles.modelStatusDot,
+                    {backgroundColor: isTTSReady ? '#34D399' : '#6B7280'},
                   ]}
-                  onPress={() => setSelectedVoice('cloned')}
-                  activeOpacity={0.8}>
-                  <Text style={styles.voiceCardName} numberOfLines={1}>
-                    Mening...
-                  </Text>
-                  <View style={styles.voiceCardBadge}>
-                    <Text style={styles.voiceCardBadgeText}>Klon</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-            </ScrollView>
-
-            {/* Speed Slider / Control */}
-            <View style={styles.sliderContainer}>
-              <View style={styles.sliderRow}>
-                <Text style={styles.sliderLabel}>Tezlik</Text>
-                <Text style={styles.sliderValue}>{speed.toFixed(1)}x</Text>
+                />
+                <Text style={styles.modelCardTitle}>
+                  {isTTSReady ? 'Piper TTS — Tayyor' : 'Piper TTS — yuklanmagan'}
+                </Text>
               </View>
-              <View style={styles.actionsRow}>
-                {[0.8, 1.0, 1.2, 1.5].map(s => (
+              <Text style={styles.modelCardSub}>
+                {isTTSReady
+                  ? 'Offline matndan ovoz modeli'
+                  : 'Settings > Voice da yuklab oling'}
+              </Text>
+            </View>
+
+            {/* Voice selector chips */}
+            <View style={styles.voiceChipsRow}>
+              {(['voice1', 'voice2', 'cloned'] as const).map(v => (
+                <TouchableOpacity
+                  key={v}
+                  style={[
+                    styles.voiceChip,
+                    selectedVoice === v && styles.voiceChipActive,
+                    v === 'cloned' && !hasClonedVoice && styles.voiceChipDisabled,
+                  ]}
+                  disabled={v === 'cloned' && !hasClonedVoice}
+                  onPress={() => setSelectedVoice(v)}>
+                  <Text
+                    style={[
+                      styles.voiceChipText,
+                      selectedVoice === v && styles.voiceChipTextActive,
+                    ]}>
+                    {v === 'voice1' ? 'Ovoz 1' : v === 'voice2' ? 'Ovoz 2' : 'Klonlangan'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Text input */}
+            <TextInput
+              style={styles.ttsInput}
+              value={ttsText}
+              onChangeText={setTtsText}
+              multiline
+              maxLength={1000}
+              placeholder="Matn kiriting (maks. 1000 belgi)..."
+              placeholderTextColor="#6B9E8A"
+            />
+            <Text style={styles.charCount}>{ttsText.length}/1000</Text>
+
+            {/* Speed slider placeholder */}
+            <View style={styles.speedRow}>
+              <Text style={styles.speedLabel}>Tezlik</Text>
+              <View style={styles.speedButtons}>
+                {[0.5, 0.75, 1.0, 1.25, 1.5].map(s => (
                   <TouchableOpacity
                     key={s}
-                    style={[
-                      styles.actionButton,
-                      speed === s && {backgroundColor: theme.colors.primary},
-                    ]}
+                    style={[styles.speedBtn, speed === s && styles.speedBtnActive]}
                     onPress={() => setSpeed(s)}>
-                    <Text
-                      style={[
-                        styles.actionButtonText,
-                        speed === s && {color: theme.colors.onPrimary, fontWeight: '700'},
-                      ]}>
-                      {s.toFixed(1)}x
+                    <Text style={[styles.speedBtnText, speed === s && styles.speedBtnTextActive]}>
+                      {s}x
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
 
-            {/* Big Play Button */}
+            {/* Play button */}
             <TouchableOpacity
-              style={styles.playButton}
+              style={[styles.playButton, (!isTTSReady || !ttsText.trim()) && styles.playButtonDisabled]}
               onPress={handlePlayTts}
-              activeOpacity={0.85}>
+              disabled={!ttsText.trim()}
+              activeOpacity={0.8}>
+              {isPlaying ? (
+                <StopIcon stroke="#fff" width={22} height={22} />
+              ) : (
+                <PlayIcon stroke="#fff" width={22} height={22} />
+              )}
               <Text style={styles.playButtonText}>
-                {isPlaying ? '◼ To\'xtatish' : '▷ Eshittirish'}
+                {isPlaying ? 'To\'xtatish' : (isTTSReady ? '▷ Eshittirish' : 'TTS yuklanmagan')}
               </Text>
             </TouchableOpacity>
 
-            {/* Voice Cloning Card */}
-            <View style={styles.card}>
-              <View style={styles.cloneCardHeaderRow}>
-                <Text style={styles.cloneCardTitle}>Ovozni klonlash</Text>
-                <View style={styles.offlineBadge}>
-                  <Text style={styles.offlineBadgeText}>Offline</Text>
-                </View>
-              </View>
-
-              <Text style={styles.cloneSubtitle}>
-                20–30 soniya aniq ovozingizni yozing. Namuna telefondan chiqmaydi.
+            {/* Voice Cloning */}
+            <View style={styles.cloningSection}>
+              <Text style={styles.cloningSectionTitle}>Ovoz klonlash</Text>
+              <Text style={styles.cloningSectionSub}>
+                15 soniya yozib, o'z ovozingizni modellang
               </Text>
 
-              <View style={styles.promptBox}>
-                <Text style={styles.promptBoxText}>
-                  O'qing: «Quyosh sekin ko'tarilib, shahar uyg'ona boshladi. Ko'chalarda birinchi odamlar paydo bo'ldi.»
-                </Text>
-              </View>
-
-              {/* Waveform + Timer */}
-              <View style={styles.waveformContainer}>
-                {[10, 22, 34, 28, 18, 30, 16, 24].map((h, i) => (
-                  <View
-                    key={i}
-                    style={[
-                      styles.waveformBar,
-                      {
-                        height: isCloneRecording ? Math.max(6, h * 1.2) : h,
-                        opacity: isCloneRecording ? 1 : 0.6,
-                      },
-                    ]}
-                  />
-                ))}
-              </View>
-              <Text style={styles.cloneTimerText}>
-                0:{cloneSeconds.toString().padStart(2, '0')} / 0:30
-              </Text>
-
-              {/* Buttons: Yozish & Fayl yuklash */}
-              <View style={styles.cloneButtonsRow}>
-                <TouchableOpacity
-                  style={styles.cloneRecordBtn}
-                  onPress={() => setIsCloneRecording(!isCloneRecording)}
-                  activeOpacity={0.85}>
-                  <MicrophoneIcon width={18} height={18} color={theme.colors.onPrimary} />
-                  <Text style={styles.cloneRecordBtnText}>
-                    {isCloneRecording ? "To'xtatish" : "Yozish"}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.cloneUploadBtn}
-                  onPress={() => Alert.alert('Fayl', 'Audio faylni yuklang')}
-                  activeOpacity={0.8}>
-                  <UploadIcon width={18} height={18} stroke={theme.colors.text} />
-                  <Text style={styles.cloneUploadBtnText}>Fayl yuklash</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Consent Checkbox */}
+              {/* Consent */}
               <TouchableOpacity
-                style={styles.checkboxRow}
-                onPress={() => setConsentChecked(!consentChecked)}
+                style={styles.consentRow}
+                onPress={() => setConsentChecked(c => !c)}
                 activeOpacity={0.8}>
                 <View
                   style={[
-                    styles.checkboxBox,
+                    styles.checkbox,
                     consentChecked && styles.checkboxChecked,
                   ]}>
                   {consentChecked && (
-                    <CheckBoldIcon width={12} height={12} fill={theme.colors.onPrimary} />
+                    <CheckBoldIcon fill="#fff" width={12} height={12} />
                   )}
                 </View>
-                <Text style={styles.checkboxLabel}>
-                  Bu mening ovozim yoki egasi ruxsat bergan
+                <Text style={styles.consentText}>
+                  Men o'z ovozimni klonlashga roziman
                 </Text>
               </TouchableOpacity>
 
-              {/* Clone Submit Button */}
+              {/* Clone mic button */}
               <TouchableOpacity
                 style={[
-                  styles.cloneSubmitBtn,
-                  consentChecked && styles.cloneSubmitBtnActive,
+                  styles.cloneMicButton,
+                  isCloneRecording && styles.cloneMicButtonActive,
+                  !consentChecked && styles.micButtonDisabled,
                 ]}
+                onPress={handleCloneToggle}
                 disabled={!consentChecked}
-                onPress={() => {
-                  ReactNativeHapticFeedback.trigger('impactMedium', hapticOptions);
-                  setHasClonedVoice(true);
-                  setSelectedVoice('cloned');
-                  Alert.alert('Muvaffaqiyatli', 'Ovozingiz muvaffaqiyatli klonlandi!');
-                }}>
-                <Text style={styles.cloneSubmitBtnText}>Ovozni klonlash</Text>
+                activeOpacity={0.8}>
+                {isCloneRecording ? (
+                  <StopIcon stroke="#fff" width={24} height={24} />
+                ) : (
+                  <MicrophoneIcon stroke="#fff" width={24} height={24} />
+                )}
+                <Text style={styles.cloneMicText}>
+                  {isCloneRecording
+                    ? `Yozilmoqda... ${formatTimer(cloneSeconds)}`
+                    : (hasClonedVoice ? 'Qayta yozish' : 'Yozishni boshlash')}
+                </Text>
               </TouchableOpacity>
 
-              {/* Saved Cloned Voice Row */}
+              {/* Cloning waveform */}
+              {isCloneRecording && (
+                <View style={styles.waveformRow}>
+                  {Array.from({length: 20}).map((_, i) => (
+                    <View
+                      key={i}
+                      style={[
+                        styles.waveBar,
+                        {height: 6 + Math.floor(Math.random() * 20)},
+                      ]}
+                    />
+                  ))}
+                </View>
+              )}
+
+              {/* Saved voice item */}
               {hasClonedVoice && (
-                <View style={styles.clonedItemRow}>
-                  <View>
-                    <Text style={styles.clonedItemTitle}>Mening ovozim</Text>
-                    <Text style={styles.clonedItemMeta}>0:24 · 3 daqiqa oldin</Text>
+                <View style={styles.savedVoiceCard}>
+                  <View style={styles.savedVoiceInfo}>
+                    <Text style={styles.savedVoiceName}>Mening ovozim</Text>
+                    <Text style={styles.savedVoiceMeta}>~15 soniya · az-Latn</Text>
                   </View>
-                  <View style={{flexDirection: 'row', gap: 8}}>
-                    <TouchableOpacity
-                      style={styles.iconBtnSmall}
-                      onPress={handlePlayTts}>
-                      <PlayIcon width={16} height={16} fill={theme.colors.text} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.iconBtnSmall}
-                      onPress={() => {
-                        setHasClonedVoice(false);
-                        if (selectedVoice === 'cloned') {
-                          setSelectedVoice('voice1');
-                        }
-                      }}>
-                      <TrashIcon width={16} height={16} stroke={theme.colors.error} />
-                    </TouchableOpacity>
-                  </View>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setHasClonedVoice(false);
+                      setSelectedVoice('voice1');
+                    }}>
+                    <TrashIcon stroke="#EF4444" width={18} height={18} />
+                  </TouchableOpacity>
                 </View>
               )}
             </View>
-          </>
+          </View>
         )}
       </ScrollView>
     </View>

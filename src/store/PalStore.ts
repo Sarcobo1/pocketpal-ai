@@ -898,6 +898,8 @@ class PalStore {
         capabilities: {},
         color: ['#0E0D0C', '#FAFAFA'],
         source: 'local',
+        // Enable web_search and read_url talents so Pip can search out of the box
+        pact: {talents: [{name: 'web_search', necessity: 'optional'}, {name: 'read_url', necessity: 'optional'}]},
       };
 
       await this.addPal(palData);

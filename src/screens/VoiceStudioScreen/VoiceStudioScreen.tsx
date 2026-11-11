@@ -120,8 +120,16 @@ export const VoiceStudioScreen: React.FC = observer(() => {
     ReactNativeHapticFeedback.trigger('impactMedium', hapticOptions);
     if (!asrStore.asrAvailable) {
       Alert.alert(
-        'STT mavjud emas',
-        'Ovozdan matnga o\'chirish uchun avval Settings > Voice Input > Whisper modelini yuklab oling.',
+        'STT yoqilmagan',
+        'Settings > Voice Input > Voice Input yoqing.',
+        [{text: 'OK'}],
+      );
+      return;
+    }
+    if (!asrStore.isSelectedTierReady) {
+      Alert.alert(
+        'Whisper modeli yuklanmagan',
+        'Settings > Voice Input ga o\'ting va Whisper modelini yuklab oling.',
         [{text: 'OK'}],
       );
       return;
@@ -220,7 +228,7 @@ export const VoiceStudioScreen: React.FC = observer(() => {
   };
 
   const isTTSReady = ttsStore.isTTSAvailable;
-  const isSTTReady = asrStore.asrAvailable;
+  const isSTTReady = asrStore.asrAvailable && asrStore.isSelectedTierReady;
 
   return (
     <View style={styles.root}>
@@ -308,7 +316,9 @@ export const VoiceStudioScreen: React.FC = observer(() => {
               <Text style={styles.modelCardSub}>
                 {isSTTReady
                   ? 'Offline nutqni aniqlash modeli'
-                  : 'Settings > Voice Input da yuklab oling'}
+                  : asrStore.asrAvailable
+                    ? 'Settings > Voice Input da yuklab oling'
+                    : 'Settings > Voice Input da yoqing'}
               </Text>
             </View>
 

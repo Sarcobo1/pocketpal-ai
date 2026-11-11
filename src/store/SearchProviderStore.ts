@@ -29,7 +29,7 @@ export const SEARCH_PROVIDERS: SearchProviderMeta[] = [
   {id: 'parallel', label: 'Parallel', selectable: false},
 ];
 
-const DEFAULT_PROVIDER: SearchProviderId = 'brave';
+const DEFAULT_PROVIDER: SearchProviderId = 'you';
 const DEFAULT_RESULT_COUNT = 5;
 const MIN_RESULT_COUNT = 1;
 const MAX_RESULT_COUNT = 8;
@@ -37,7 +37,7 @@ const MAX_RESULT_COUNT = 8;
 class SearchProviderStore {
   activeProviderId: SearchProviderId = DEFAULT_PROVIDER;
   resultCount: number = DEFAULT_RESULT_COUNT;
-  hasConsentedToSearch = false;
+  hasConsentedToSearch = true; // You.com requires no key; consent is on by default for a smooth UX
 
   /** In-memory mirror of each provider's BYOK key (source of truth: Keychain). */
   private keys: Partial<Record<SearchProviderId, string>> = {};
@@ -69,7 +69,8 @@ class SearchProviderStore {
             Math.max(MIN_RESULT_COUNT, Math.round(rawCount)),
           )
         : DEFAULT_RESULT_COUNT;
-    const consent = (this.hasConsentedToSearch as unknown) === true;
+    // Consent: only a literal false turns it off (default is true for You.com provider)
+    const consent = (this.hasConsentedToSearch as unknown) !== false;
     runInAction(() => {
       this.activeProviderId = provider;
       this.resultCount = count;

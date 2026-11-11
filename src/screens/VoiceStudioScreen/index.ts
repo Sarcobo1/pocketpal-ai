@@ -1,0 +1,1 @@
+export {VoiceStudioScreen} from './VoiceStudioScreen';

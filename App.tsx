@@ -57,6 +57,7 @@ import {
   BenchmarkScreen,
   AboutScreen,
   DarsScreen,
+  VoiceStudioScreen,
 
   // Dev tools screen. Always in a debug build; in a release build after the
   // seven-tap unlock on the About screen.
@@ -208,18 +209,24 @@ const App = observer(() => {
                               }}
                             />
 
-                            {/* Dars (Lessons): feature-flagged, mock UI only */}
-                            {__DEV__ && (
-                              <Drawer.Screen
-                                name={ROUTES.DARS}
-                                component={gestureHandlerRootHOC(DarsScreen)}
-                                options={{
-                                  headerStyle: styles.headerWithoutDivider,
-                                  title: 'Dars',
-                                  drawerItemStyle: {display: 'none'},
-                                }}
-                              />
-                            )}
+                            <Drawer.Screen
+                              name={ROUTES.VOICE_STUDIO}
+                              component={gestureHandlerRootHOC(VoiceStudioScreen)}
+                              options={{
+                                headerStyle: styles.headerWithoutDivider,
+                                title: 'Ovoz studiyasi',
+                                headerShown: false,
+                              }}
+                            />
+                            <Drawer.Screen
+                              name={ROUTES.DARS}
+                              component={gestureHandlerRootHOC(DarsScreen)}
+                              options={{
+                                headerStyle: styles.headerWithoutDivider,
+                                title: 'Dars',
+                                headerShown: false,
+                              }}
+                            />
 
                             {/*
                       Dev Tools: always in a debug build, and in a release

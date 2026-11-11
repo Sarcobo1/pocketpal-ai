@@ -47,6 +47,7 @@ export * from './ModelsResetDialog';
 export * from './PalGenerationSettingsSheet';
 
 export * from './ModelSettingsSheet';
+export * from './ModeSelectorSheet';
 export * from './ModelTypeTag';
 export * from './ProjectionModelSelector';
 export * from './RenameModal';

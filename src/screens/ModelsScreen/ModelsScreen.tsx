@@ -1,5 +1,15 @@
 import React, {useState, useContext, useEffect} from 'react';
-import {FlatList, RefreshControl, Platform, Alert, View} from 'react-native';
+import {
+  FlatList,
+  RefreshControl,
+  Platform,
+  Alert,
+  View,
+  TextInput,
+  TouchableOpacity,
+  Text,
+  ScrollView,
+} from 'react-native';
 
 import {reaction, computed} from 'mobx';
 import {v4 as uuidv4} from 'uuid';
@@ -39,6 +49,8 @@ export const ModelsScreen: React.FC = observer(() => {
   const [isSearchingProjector, setIsSearchingProjector] = useState(false);
   const [selectedModel, setSelectedModel] = useState<Model | undefined>();
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<'hammasi' | 'chat' | 'kod' | 'rasm'>('hammasi');
 
   // Centralized error state tracking - derive directly from MobX stores
   const [activeError, setActiveError] = useState<ErrorState | null>(null);
@@ -453,6 +465,55 @@ export const ModelsScreen: React.FC = observer(() => {
     }))
     .filter(group => group.items.length > 0);
 
+  const CATEGORIES: {id: 'hammasi' | 'chat' | 'kod' | 'rasm'; label: string}[] = [
+    {id: 'hammasi', label: 'Hammasi'},
+    {id: 'chat', label: 'Chat'},
+    {id: 'kod', label: 'Kod'},
+    {id: 'rasm', label: 'Rasm'},
+  ];
+
+  const ListHeader = () => (
+    <View style={styles.headerSection}>
+      <Text style={styles.screenTitle}>Modellar</Text>
+      <Text style={styles.screenSubtitle}>Telefoningizda ishlaydigan ochiq modellar</Text>
+      {/* Search bar */}
+      <View style={styles.searchBar}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Model qidirish"
+          placeholderTextColor="#6B9E8A"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+      </View>
+      {/* Category chips */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContainer}>
+        {CATEGORIES.map(cat => {
+          const isActive = selectedCategory === cat.id;
+          return (
+            <TouchableOpacity
+              key={cat.id}
+              style={[styles.chip, isActive && styles.chipActive]}
+              onPress={() => setSelectedCategory(cat.id)}>
+              <Text style={isActive ? styles.chipTextActive : styles.chipText}>{cat.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+
+  const ListFooter = () => (
+    <View style={styles.footerRow}>
+      <TouchableOpacity style={styles.footerBtn} onPress={handleAddLocalModel}>
+        <Text style={styles.footerBtnText}>.gguf fayl tanlash</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.footerBtn} onPress={() => setHFSearchVisible(true)}>
+        <Text style={styles.footerBtnText}>Hugging Face</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <View style={styles.container} testID="models-screen">
       {/* Show Error Snackbar only if no dialog is visible */}
@@ -474,6 +535,8 @@ export const ModelsScreen: React.FC = observer(() => {
         keyExtractor={item => item.type}
         extraData={activeModelId}
         renderItem={renderGroupHeader}
+        ListHeaderComponent={<ListHeader />}
+        ListFooterComponent={<ListFooter />}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

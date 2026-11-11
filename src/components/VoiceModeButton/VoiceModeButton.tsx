@@ -1,5 +1,5 @@
 import React, {useContext} from 'react';
-import {Pressable, StyleSheet, View} from 'react-native';
+import {Pressable, StyleSheet, Text, View} from 'react-native';
 
 import {observer} from 'mobx-react';
 
@@ -8,9 +8,8 @@ import {modelStore, voiceModeStore} from '../../store';
 import {L10nContext} from '../../utils';
 import {SparkleFilledIcon, VoiceWaveformIcon} from '../../assets/icons';
 
-const SIZE = 40;
-const BADGE = 18;
 const HIT_SLOP = 2;
+const BADGE = 18;
 
 interface VoiceModeButtonProps {
   onPress: () => void;
@@ -18,7 +17,7 @@ interface VoiceModeButtonProps {
 
 /**
  * The composer's voice-mode button, shown in Send's place while the input
- * is empty. Locked, it steps back to a soft look with a Plus badge.
+ * is empty. Styled to canonical OpenLimi `[||| Speak]` spec.
  */
 export const VoiceModeButton: React.FC<VoiceModeButtonProps> = observer(
   ({onPress}) => {
@@ -57,7 +56,8 @@ export const VoiceModeButton: React.FC<VoiceModeButtonProps> = observer(
         accessibilityState={{disabled: loading}}
         testID="voice-mode-button"
         style={[styles.button, look.button, loading && styles.disabled]}>
-        <VoiceWaveformIcon width={22} height={22} color={look.icon} />
+        <VoiceWaveformIcon width={18} height={18} color={look.icon} />
+        <Text style={[styles.buttonText, {color: look.icon}]}>Speak</Text>
         {locked && (
           <View
             testID="voice-mode-lock"
@@ -82,12 +82,19 @@ export const VoiceModeButton: React.FC<VoiceModeButtonProps> = observer(
 
 const styles = StyleSheet.create({
   button: {
-    width: SIZE,
-    height: SIZE,
-    borderRadius: SIZE / 2,
-    marginLeft: 16,
+    height: 44,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    marginLeft: 12,
+  },
+  buttonText: {
+    fontSize: 15,
+    fontFamily: 'Geist-Medium',
+    fontWeight: '600',
   },
   disabled: {
     opacity: 0.4,

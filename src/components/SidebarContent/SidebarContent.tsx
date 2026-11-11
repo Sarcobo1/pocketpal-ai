@@ -1,5 +1,5 @@
 import React, {useContext, useEffect, useState} from 'react';
-import {TouchableOpacity, View, Alert, SectionList} from 'react-native';
+import {TouchableOpacity, View, Alert, SectionList, TextInput} from 'react-native';
 import {observer} from 'mobx-react';
 import {Divider, Drawer, Text} from 'react-native-paper';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
@@ -14,6 +14,7 @@ import {
   modelStore,
   SessionMetaData,
   uiStore,
+  voiceModeStore,
 } from '../../store';
 import {Menu, RenameModal, Checkbox, LimiGhost} from '..';
 import {
@@ -27,6 +28,14 @@ import {
   StarIcon,
   TrashIcon,
   AppInfoIcon,
+  MicrophoneIcon,
+  VoiceWaveformIcon,
+  ChevronDownIcon,
+  ArrowRightSmIcon,
+  MoonIcon,
+  SearchIcon,
+  PlusIcon,
+  CodeIcon,
 } from '../../assets/icons';
 import {L10nContext} from '../../utils';
 import {t} from '../../locales';
@@ -313,6 +322,7 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
     const [menuPosition, setMenuPosition] = useState({x: 0, y: 0});
     const [sessionToRename, setSessionToRename] =
       useState<SessionMetaData | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const theme = useTheme();
     const styles = createStyles(theme);
@@ -332,6 +342,19 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
         data: sessions,
       }),
     );
+
+    const filteredSections = React.useMemo(() => {
+      if (!searchQuery.trim()) {
+        return sections;
+      }
+      const q = searchQuery.toLowerCase();
+      return sections
+        .map(sec => ({
+          ...sec,
+          data: sec.data.filter(s => s.title.toLowerCase().includes(q)),
+        }))
+        .filter(sec => sec.data.length > 0);
+    }, [sections, searchQuery]);
 
     useEffect(() => {
       chatSessionStore.loadSessionList();
@@ -557,22 +580,45 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
     const ListHeaderComponent = React.useMemo(
       () => (
         <View>
-          <View style={styles.drawerHeader}>
-            <LimiGhost size={26} state="default" label="Limi" />
-            <Text variant="titleMedium" style={styles.brandTitle}>
-              Limi
-            </Text>
+          {/* Profile Header */}
+          <View style={styles.profileHeader}>
+            <View style={styles.profileLeft}>
+              <View style={styles.profileAvatar}>
+                <Text style={styles.profileAvatarText}>A</Text>
+              </View>
+              <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                <Text style={styles.profileName}>Mening profilim</Text>
+                <ChevronDownIcon
+                  width={14}
+                  height={14}
+                  stroke={theme.colors.onSurfaceVariant}
+                  style={styles.profileChevron}
+                />
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.profileArrowBtn}
+              onPress={() => navigateTo(ROUTES.SETTINGS)}
+              accessibilityLabel="Sozlamalar"
+              accessibilityRole="button">
+              <ArrowRightSmIcon stroke={theme.colors.onSurface} width={18} height={18} />
+            </TouchableOpacity>
           </View>
-          <View style={styles.offlineCard}>
-            <View style={styles.offlineCardRow}>
-              <Text style={styles.offlineCardTitle}>Offline rejim</Text>
-              <Text style={styles.offlineCardRam} numberOfLines={1}>
-                {modelStore.activeModel
-                  ? modelStore.activeModel.name
-                  : 'Model yuklanmagan'}
+
+          {/* OpenLimi Offline Card with Faol Badge */}
+          <View style={styles.openLimiOfflineCard}>
+            <View style={{flex: 1, marginRight: 12}}>
+              <Text style={styles.openLimiOfflineTitle}>Offline rejim</Text>
+              <Text style={styles.openLimiOfflineSubtitle} numberOfLines={1}>
+                RAM 5.2 / 8 GB · {modelStore.activeModel ? modelStore.activeModel.name : 'telefonda'}
               </Text>
             </View>
+            <View style={styles.openLimiFaolBadge}>
+              <Text style={styles.openLimiFaolBadgeText}>Faol</Text>
+            </View>
           </View>
+
+          {/* Navigation Menu Items */}
           <Drawer.Section showDivider={false}>
             <Drawer.Item
               label={l10n.components.sidebarContent.menuItems.chat}
@@ -582,24 +628,30 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
               testID="drawer-item-chat"
             />
             <Drawer.Item
-              label={l10n.components.sidebarContent.menuItems.pals}
-              icon={() => <PalIcon stroke={theme.colors.primary} />}
-              onPress={() => navigateTo(ROUTES.PALS)}
+              label="Ovoz studiyasi"
+              icon={() => <MicrophoneIcon width={22} height={22} color={theme.colors.primary} />}
+              onPress={() => navigateTo(ROUTES.VOICE_STUDIO)}
               style={styles.menuDrawerItem}
-              testID="drawer-item-pals"
+              testID="drawer-item-voice-studio"
             />
-            {/* Dars: feature flag — only in __DEV__ builds */}
-            {__DEV__ && (
-              <Drawer.Item
-                label="Dars"
-                icon={() => (
-                  <BenchmarkIcon stroke={theme.colors.onSurfaceVariant} />
-                )}
-                onPress={() => navigateTo(ROUTES.DARS)}
-                style={styles.menuDrawerItem}
-                testID="drawer-item-dars"
-              />
-            )}
+            <Drawer.Item
+              label="Speak"
+              icon={() => <VoiceWaveformIcon width={22} height={22} color={theme.colors.primary} />}
+              onPress={() => {
+                props.navigation.closeDrawer();
+                navigateTo(ROUTES.CHAT);
+                voiceModeStore.setPhase('listening');
+              }}
+              style={styles.menuDrawerItem}
+              testID="drawer-item-speak"
+            />
+            <Drawer.Item
+              label="Dars"
+              icon={() => <CodeIcon stroke={theme.colors.primary} width={22} height={22} />}
+              onPress={() => navigateTo(ROUTES.DARS)}
+              style={styles.menuDrawerItem}
+              testID="drawer-item-dars"
+            />
             <Drawer.Item
               label={l10n.components.sidebarContent.menuItems.models}
               icon={() => <ModelIcon stroke={theme.colors.primary} />}
@@ -697,7 +749,7 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
               />
               <Divider style={styles.selectAllDivider} />
               <SectionList
-                sections={sections}
+                sections={filteredSections}
                 keyExtractor={keyExtractor}
                 renderItem={renderItem}
                 renderSectionHeader={renderSectionHeader}
@@ -707,7 +759,7 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
             </>
           ) : (
             <SectionList
-              sections={sections}
+              sections={filteredSections}
               keyExtractor={keyExtractor}
               renderItem={renderItem}
               renderSectionHeader={renderSectionHeader}
@@ -716,6 +768,43 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
               contentContainerStyle={styles.scrollViewContent}
             />
           )}
+
+          {/* Bottom Bar: Theme toggle, Search box, New Chat button */}
+          <View style={styles.bottomBarContainer}>
+            <TouchableOpacity
+              style={styles.bottomThemeBtn}
+              onPress={() =>
+                uiStore.setColorScheme(
+                  uiStore.colorScheme === 'dark' ? 'light' : 'dark',
+                )
+              }
+              accessibilityLabel="Mavzu"
+              accessibilityRole="button">
+              <MoonIcon width={20} height={20} stroke={theme.colors.onSurface} />
+            </TouchableOpacity>
+
+            <View style={styles.bottomSearchBox}>
+              <SearchIcon width={16} height={16} stroke={theme.colors.onSurfaceVariant} />
+              <TextInput
+                style={styles.bottomSearchInput}
+                placeholder="Qidirish"
+                placeholderTextColor={theme.colors.onSurfaceVariant}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={styles.bottomPlusBtn}
+              onPress={async () => {
+                await chatSessionStore.resetActiveSession();
+                navigateTo(ROUTES.CHAT);
+              }}
+              accessibilityLabel="Yangi suhbat"
+              accessibilityRole="button">
+              <PlusIcon width={22} height={22} stroke={theme.colors.onPrimary} />
+            </TouchableOpacity>
+          </View>
         </View>
         <RenameModal
           visible={sessionToRename !== null}

@@ -7,6 +7,7 @@ export const ROUTES = {
   BENCHMARK: 'Benchmark',
   SETTINGS: 'Settings',
   APP_INFO: 'App Info',
+  VOICE_STUDIO: 'VoiceStudio',
 
   // Dars (Lessons) route. Feature-flagged, only shown when FEATURE_DARS is enabled.
   DARS: 'Dars',

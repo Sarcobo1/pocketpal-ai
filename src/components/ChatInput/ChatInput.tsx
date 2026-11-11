@@ -51,7 +51,9 @@ import {
   MicButton,
   VoiceRecordingBar,
   VoiceModeButton,
+  ModeSelectorSheet,
 } from '..';
+import {OpenLimiMode} from '../ModeSelectorSheet/ModeSelectorSheet';
 
 /**
  * Longest edge of a frame handed to the model. A projector re-samples to its
@@ -211,6 +213,9 @@ export const ChatInput = observer(
     const [showImageUploadMenu, setShowImageUploadMenu] = React.useState(false);
     // State for showing "model not loaded" helper text
     const [showModelWarning, setShowModelWarning] = React.useState(false);
+    // State for ModeSelectorSheet
+    const [modeSelectorVisible, setModeSelectorVisible] = React.useState(false);
+    const [selectedMode, setSelectedMode] = React.useState<OpenLimiMode>('fast');
     const isEditMode = chatSessionStore.isEditMode;
     const isStopping = chatSessionStore.isStopping;
 
@@ -706,6 +711,40 @@ export const ChatInput = observer(
 
               {/* Right Controls */}
               <View style={styles.rightControls}>
+                {/* Mode selector chip — Tez / Omni / etc */}
+                {!isCameraActive && !isVoiceCaptureActive && (
+                  <TouchableOpacity
+                    style={[
+                      styles.thinkingToggleLeft,
+                      {borderColor: onSurfaceColorVariant, marginRight: 2},
+                    ]}
+                    onPress={() => setModeSelectorVisible(true)}
+                    accessibilityLabel="Rejim tanlash"
+                    accessibilityRole="button">
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.thinkingToggleText,
+                        {color: onSurfaceColorVariant},
+                      ]}>
+                      {selectedMode === 'omni'
+                        ? 'Omni'
+                        : selectedMode === 'thinking'
+                          ? 'Fikrlash'
+                          : selectedMode === 'auto'
+                            ? 'Avto'
+                            : selectedMode === 'code'
+                              ? 'Kod'
+                              : 'Tez'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                <ModeSelectorSheet
+                  isVisible={modeSelectorVisible}
+                  onClose={() => setModeSelectorVisible(false)}
+                  selectedMode={selectedMode}
+                  onSelectMode={setSelectedMode}
+                />
                 {/* Helper text for model not loaded */}
                 {showModelWarning && !hasActiveModel && (
                   <View style={styles.helperTextContainer}>

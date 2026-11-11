@@ -313,6 +313,7 @@ export const ChatScreen: React.FC = observer(() => {
           sendButtonVisibilityMode="always"
           showImageUpload={true}
           isVisionEnabled={visionEnabled}
+          showUserAvatars={true}
           initialInputText={pendingMessage || undefined}
           onInitialTextConsumed={clearPendingMessage}
           onVoiceModePress={voiceMode.requestEntry}

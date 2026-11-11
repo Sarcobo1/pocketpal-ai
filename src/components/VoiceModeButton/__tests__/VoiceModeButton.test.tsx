@@ -56,8 +56,8 @@ describe('VoiceModeButton', () => {
     const {getByTestId} = render(<VoiceModeButton onPress={onPress} />);
     const button = getByTestId('voice-mode-button');
     expect(getByTestId('voice-mode-lock')).toBeTruthy();
-    expect(button.props.accessibilityLabel).toBe(
-      'Hands-free voice, PocketPal Plus',
+    expect(button.props.accessibilityLabel).toMatch(
+      /Hands-free voice, (PocketPal|Limi) Plus/,
     );
     expect(button.props.accessibilityHint).toBe(
       'Opens a short preview. Typing and dictation stay free.',

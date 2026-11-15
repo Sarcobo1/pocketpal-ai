@@ -79,21 +79,26 @@ export const VoiceBar: React.FC = observer(() => {
     [expand, lift, reduceMotion],
   );
 
+  const handleEnd = useCallback(() => {
+    end();
+    voiceModeStore.setPhase('closed');
+  }, [end]);
+
   return (
-    <GestureDetector gesture={swipeUp}>
-      <Animated.View
-        testID="voice-bar"
-        style={[
-          liftStyle,
-          styles.bar,
-          {
-            backgroundColor: theme.colors.secondaryDefault,
-            margin: theme.spacing.sm,
-            padding: theme.spacing.xs,
-            gap: theme.spacing.s,
-            shadowColor: theme.colors.shadow,
-          },
-        ]}>
+    <Animated.View
+      testID="voice-bar"
+      style={[
+        liftStyle,
+        styles.bar,
+        {
+          backgroundColor: theme.colors.secondaryDefault,
+          margin: theme.spacing.sm,
+          padding: theme.spacing.xs,
+          gap: theme.spacing.s,
+          shadowColor: theme.colors.shadow,
+        },
+      ]}>
+      <GestureDetector gesture={swipeUp}>
         <Pressable
           onPress={expand}
           accessibilityRole="button"
@@ -125,44 +130,46 @@ export const VoiceBar: React.FC = observer(() => {
             </Text>
           </View>
         </Pressable>
-        <Pressable
-          onPress={toggleMute}
-          accessibilityRole="switch"
-          accessibilityLabel={l10n.voiceMode.micSwitchLabel}
-          accessibilityState={{checked: !micMuted}}
-          testID="voice-bar-mute"
-          style={[
-            styles.control,
-            {
-              backgroundColor: micMuted
-                ? theme.colors.errorContainer
-                : theme.colors.surfaceContainerHighest,
-            },
-          ]}>
-          {micMuted ? (
-            <MicrophoneOffIcon
-              width={20}
-              height={20}
-              color={theme.colors.onErrorContainer}
-            />
-          ) : (
-            <MicrophoneIcon
-              width={20}
-              height={20}
-              color={theme.colors.onSurface}
-            />
-          )}
-        </Pressable>
-        <Pressable
-          onPress={end}
-          accessibilityRole="button"
-          accessibilityLabel={l10n.voiceMode.endLabel}
-          testID="voice-bar-end"
-          style={[styles.control, {backgroundColor: theme.colors.primary}]}>
-          <CloseIcon width={20} height={20} fill={theme.colors.onPrimary} />
-        </Pressable>
-      </Animated.View>
-    </GestureDetector>
+      </GestureDetector>
+      <Pressable
+        onPress={toggleMute}
+        hitSlop={16}
+        accessibilityRole="switch"
+        accessibilityLabel={l10n.voiceMode.micSwitchLabel}
+        accessibilityState={{checked: !micMuted}}
+        testID="voice-bar-mute"
+        style={[
+          styles.control,
+          {
+            backgroundColor: micMuted
+              ? theme.colors.errorContainer
+              : theme.colors.surfaceContainerHighest,
+          },
+        ]}>
+        {micMuted ? (
+          <MicrophoneOffIcon
+            width={20}
+            height={20}
+            color={theme.colors.onErrorContainer}
+          />
+        ) : (
+          <MicrophoneIcon
+            width={20}
+            height={20}
+            color={theme.colors.onSurface}
+          />
+        )}
+      </Pressable>
+      <Pressable
+        onPress={handleEnd}
+        hitSlop={16}
+        accessibilityRole="button"
+        accessibilityLabel={l10n.voiceMode.endLabel}
+        testID="voice-bar-end"
+        style={[styles.control, {backgroundColor: theme.colors.primary}]}>
+        <CloseIcon width={20} height={20} fill={theme.colors.onPrimary} />
+      </Pressable>
+    </Animated.View>
   );
 });
 

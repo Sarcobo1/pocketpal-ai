@@ -21,6 +21,7 @@ import {hasVideoCapability} from '../../utils/pal-capabilities';
 
 import {
   ChevronUpIcon,
+  ChevronDownIcon,
   VideoRecorderIcon,
   PlusIcon,
   AtomIcon,
@@ -215,7 +216,26 @@ export const ChatInput = observer(
     const [showModelWarning, setShowModelWarning] = React.useState(false);
     // State for ModeSelectorSheet
     const [modeSelectorVisible, setModeSelectorVisible] = React.useState(false);
-    const [selectedMode, setSelectedMode] = React.useState<OpenLimiMode>('fast');
+    const [selectedMode, setSelectedMode] = React.useState<OpenLimiMode>(
+      isThinkingEnabled ? 'thinking' : 'fast',
+    );
+
+    React.useEffect(() => {
+      if (isThinkingEnabled) {
+        setSelectedMode('thinking');
+      } else if (selectedMode === 'thinking') {
+        setSelectedMode('fast');
+      }
+    }, [isThinkingEnabled]);
+
+    const handleModeSelect = (mode: OpenLimiMode) => {
+      setSelectedMode(mode);
+      if (mode === 'thinking') {
+        onThinkingToggle?.(true);
+      } else if (mode === 'fast') {
+        onThinkingToggle?.(false);
+      }
+    };
     const isEditMode = chatSessionStore.isEditMode;
     const isStopping = chatSessionStore.isStopping;
 
@@ -650,100 +670,38 @@ export const ChatInput = observer(
                   )}
                 </View>
 
-                {/* Thinking Toggle Button. Graded models (axis-2) cycle
-                  off -> low -> medium -> high; effortless models toggle
-                  on/off. The label shows the current effort when graded. */}
-                {showThinkingToggle && !isCameraActive && (
-                  <TouchableOpacity
-                    testID="thinking-toggle"
-                    style={[
-                      styles.thinkingToggleLeft,
-                      isThinkingEnabled && {backgroundColor: onSurfaceColor},
-                      {borderColor: onSurfaceColorVariant},
-                    ]}
-                    onPress={() =>
-                      supportsEffort && effortValues.length > 0
-                        ? onEffortCycle?.()
-                        : onThinkingToggle?.(!isThinkingEnabled)
-                    }
-                    accessibilityLabel={
-                      supportsEffort && effortValues.length > 0
-                        ? t(
-                            l10n.components.chatInput.thinkingToggle
-                              .cycleEffort,
-                            {
-                              level: localizedEffort ?? '',
-                            },
-                          )
-                        : isThinkingEnabled
-                          ? l10n.components.chatInput.thinkingToggle
-                              .disableThinking
-                          : l10n.components.chatInput.thinkingToggle
-                              .enableThinking
-                    }
-                    accessibilityRole="button">
-                    <AtomIcon
-                      width={14}
-                      height={14}
-                      stroke={
-                        isThinkingEnabled
-                          ? inputBackgroundColor
-                          : onSurfaceColorVariant
-                      }
-                      strokeWidth={2}
-                    />
-                    <Text
-                      testID="thinking-toggle-label"
-                      numberOfLines={1}
-                      style={[
-                        styles.thinkingToggleText,
-                        isThinkingEnabled
-                          ? {color: inputBackgroundColor}
-                          : {color: onSurfaceColorVariant},
-                      ]}>
-                      {supportsEffort && isThinkingEnabled && reasoningEffort
-                        ? localizedEffort
-                        : l10n.components.chatInput.thinkingToggle.thinkText}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {/* Right Controls */}
-              <View style={styles.rightControls}>
-                {/* Mode selector chip — Tez / Omni / etc */}
+                {/* Mode selector chip — Tez / Omni / Fikrlash */}
                 {!isCameraActive && !isVoiceCaptureActive && (
                   <TouchableOpacity
-                    style={[
-                      styles.thinkingToggleLeft,
-                      {borderColor: onSurfaceColorVariant, marginRight: 2},
-                    ]}
+                    style={styles.modeChip}
                     onPress={() => setModeSelectorVisible(true)}
                     accessibilityLabel="Rejim tanlash"
                     accessibilityRole="button">
                     <Text
                       numberOfLines={1}
-                      style={[
-                        styles.thinkingToggleText,
-                        {color: onSurfaceColorVariant},
-                      ]}>
+                      style={styles.modeChipText}>
                       {selectedMode === 'omni'
                         ? 'Omni'
                         : selectedMode === 'thinking'
-                          ? 'Fikrlash'
+                          ? (supportsEffort && reasoningEffort ? `Fikr: ${localizedEffort}` : 'Fikrlash')
                           : selectedMode === 'auto'
                             ? 'Avto'
                             : selectedMode === 'code'
                               ? 'Kod'
                               : 'Tez'}
                     </Text>
+                    <ChevronDownIcon width={10} height={10} stroke={theme.colors.onSurfaceVariant} />
                   </TouchableOpacity>
                 )}
+              </View>
+
+              {/* Right Controls */}
+              <View style={styles.rightControls}>
                 <ModeSelectorSheet
                   isVisible={modeSelectorVisible}
                   onClose={() => setModeSelectorVisible(false)}
                   selectedMode={selectedMode}
-                  onSelectMode={setSelectedMode}
+                  onSelectMode={handleModeSelect}
                 />
                 {/* Helper text for model not loaded */}
                 {showModelWarning && !hasActiveModel && (

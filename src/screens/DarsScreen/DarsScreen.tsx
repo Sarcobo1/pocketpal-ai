@@ -2,10 +2,13 @@ import React, {useState} from 'react';
 import {View, ScrollView, TouchableOpacity, Pressable} from 'react-native';
 import {Text, Switch} from 'react-native-paper';
 import {observer} from 'mobx-react';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {useNavigation} from '@react-navigation/native';
 
 import {useTheme} from '../../hooks';
 import {LimiGhost} from '../../components/LimiGhost';
 import {createStyles} from './styles';
+import {ROUTES} from '../../utils/navigationConstants';
 
 interface LessonStep {
   title: string;
@@ -48,6 +51,8 @@ const SUBJECTS = [
 export const DarsScreen: React.FC = observer(() => {
   const theme = useTheme();
   const styles = createStyles(theme);
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
 
   const [activeSubject, setActiveSubject] = useState('Barchasi');
   const [inLesson, setInLesson] = useState(false);
@@ -78,7 +83,10 @@ export const DarsScreen: React.FC = observer(() => {
   return (
     <View style={styles.container} testID="dars-screen">
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {paddingTop: Math.max(insets.top, 16) + 8},
+        ]}
         showsVerticalScrollIndicator={false}>
         {inLesson ? (
           // Dars ichi (Lesson View)
@@ -217,6 +225,19 @@ export const DarsScreen: React.FC = observer(() => {
           // Mavzular sahifasi (Topics View)
           <>
             <View style={styles.headerRow}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (navigation.canGoBack()) {
+                    navigation.goBack();
+                  } else {
+                    navigation.navigate(ROUTES.CHAT);
+                  }
+                }}
+                style={styles.controlIconButton}
+                accessibilityLabel="Orqaga qaytish"
+                testID="dars-topics-back-button">
+                <Text style={styles.controlIconText}>←</Text>
+              </TouchableOpacity>
               <LimiGhost size={32} state="default" label="Limi Dars" />
               <Text style={styles.screenTitle}>Darslar</Text>
             </View>

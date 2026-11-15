@@ -63,6 +63,15 @@ import {
 } from '../services/voice/constants';
 import {toLocalMediaPath} from '../utils/multimodalPatterns';
 import {LLAMARN_ERROR_PATTERNS} from '../utils/llamaRnErrors';
+
+/**
+ * When web_search is active, remind the model it CAN search rather than refuse.
+ * This guards against models that were fine-tuned to disclaim internet access.
+ */
+const WEB_SEARCH_CAPABILITY_REMINDER =
+  'You have real-time web search capability enabled via the web_search tool. ' +
+  'Never say you cannot access the internet, search the web, or look up current information. ' +
+  'Always use web_search when asked about current events, prices, news, or any time-sensitive facts.';
 import {projectionGapCopy} from '../utils/multimodalHelpers';
 import {
   toApiCompletionParams,
@@ -311,6 +320,10 @@ const prepareCompletion = async ({
     // replacing the Pal's or the template's text.
     [
       ...systemPromptFragments,
+      // If web_search is in tools, remind the model it can search
+      ...(sessionToolNames.includes('web_search')
+        ? [WEB_SEARCH_CAPABILITY_REMINDER]
+        : []),
       ...(omniGuard ? [TEXT_MODE_INSTRUCTION] : []),
       ...(shortVoiceAnswer ? [VOICE_ANSWER_INSTRUCTION] : []),
     ],

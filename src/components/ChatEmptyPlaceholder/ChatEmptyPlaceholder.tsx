@@ -36,6 +36,8 @@ export const ChatEmptyPlaceholder = observer(
     const styles = createStyles({theme});
 
     const activeModel = modelStore.activeModel;
+    const isLoading = modelStore.isContextLoading;
+    const loadingModel = modelStore.loadingModel;
     const recentSessions = chatSessionStore.sessions.slice(0, 3);
 
     const handleSelectRecentSession = async (sessionId: string) => {
@@ -65,14 +67,18 @@ export const ChatEmptyPlaceholder = observer(
           }}
           activeOpacity={0.85}>
           <View style={styles.modelCardHeader}>
-            <View style={styles.greenDot} />
+            <View style={[styles.greenDot, isLoading && {backgroundColor: '#F59E0B'}]} />
             <Text style={styles.modelCardName}>
-              {activeModel ? activeModel.name : 'Model tanlanmagan'}
+              {isLoading
+                ? `Model yuklanmoqda... ${loadingModel ? '– ' + loadingModel.name : ''}`
+                : activeModel
+                ? activeModel.name
+                : 'Model tanlanmagan'}
             </Text>
           </View>
           <View style={styles.ghostWrapper}>
             <LimiGhost
-              state="sleeping"
+              state={isLoading ? 'working' : 'sleeping'}
               size={100}
               label="Limi mascot"
             />

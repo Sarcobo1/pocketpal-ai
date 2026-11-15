@@ -1,5 +1,6 @@
 import React, {useContext, useEffect, useState} from 'react';
 import {TouchableOpacity, View, Alert, SectionList, TextInput} from 'react-native';
+import DeviceInfo from 'react-native-device-info';
 import {observer} from 'mobx-react';
 import {Divider, Drawer, Text} from 'react-native-paper';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
@@ -323,11 +324,40 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
     const [sessionToRename, setSessionToRename] =
       useState<SessionMetaData | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [memoryStats, setMemoryStats] = useState<{usedGB: string; totalGB: string}>({
+      usedGB: '0.0',
+      totalGB: '0',
+    });
 
     const theme = useTheme();
     const styles = createStyles(theme);
     const l10n = useContext(L10nContext);
     const insets = useSafeAreaInsets();
+
+    useEffect(() => {
+      let isMounted = true;
+      const fetchRam = async () => {
+        try {
+          const [total, used] = await Promise.all([
+            DeviceInfo.getTotalMemory(),
+            DeviceInfo.getUsedMemory(),
+          ]);
+          if (isMounted) {
+            const usedGB = (used / (1024 * 1024 * 1024)).toFixed(1);
+            const totalGB = (total / (1024 * 1024 * 1024)).toFixed(0);
+            setMemoryStats({usedGB, totalGB});
+          }
+        } catch {
+          // ignore
+        }
+      };
+      fetchRam();
+      const interval = setInterval(fetchRam, 3000);
+      return () => {
+        isMounted = false;
+        clearInterval(interval);
+      };
+    }, []);
 
     // Read into a local: the drawer row is built inside a useMemo, and a store
     // field reached through a module import is not a dependency that array can
@@ -605,18 +635,44 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
             </TouchableOpacity>
           </View>
 
-          {/* OpenLimi Offline Card with Faol Badge */}
-          <View style={styles.openLimiOfflineCard}>
-            <View style={{flex: 1, marginRight: 12}}>
-              <Text style={styles.openLimiOfflineTitle}>Offline rejim</Text>
-              <Text style={styles.openLimiOfflineSubtitle} numberOfLines={1}>
-                RAM 5.2 / 8 GB · {modelStore.activeModel ? modelStore.activeModel.name : 'telefonda'}
-              </Text>
-            </View>
-            <View style={styles.openLimiFaolBadge}>
-              <Text style={styles.openLimiFaolBadgeText}>Faol</Text>
-            </View>
-          </View>
+          {/* OpenLimi Offline Card with Dynamic RAM & Active Badge */}
+          {(() => {
+            const isContextLoading = modelStore.isContextLoading;
+            const activeModel = modelStore.activeModel;
+            const isModelActive = Boolean(activeModel || modelStore.context);
+            const statusLabel = isContextLoading
+              ? 'Yuklanmoqda'
+              : isModelActive
+              ? 'Faol'
+              : "O'chiq";
+            const badgeColor = isContextLoading
+              ? '#F59E0B'
+              : isModelActive
+              ? theme.colors.primary
+              : theme.colors.onSurfaceVariant;
+
+            const modelLabel = isContextLoading
+              ? 'Yuklanmoqda...'
+              : activeModel
+              ? activeModel.name
+              : 'telefonda';
+
+            return (
+              <View style={styles.openLimiOfflineCard}>
+                <View style={{flex: 1, marginRight: 12}}>
+                  <Text style={styles.openLimiOfflineTitle}>Offline rejim</Text>
+                  <Text style={styles.openLimiOfflineSubtitle} numberOfLines={1}>
+                    {`RAM ${memoryStats.usedGB} / ${memoryStats.totalGB} GB · ${modelLabel}`}
+                  </Text>
+                </View>
+                <View style={[styles.openLimiFaolBadge, {borderColor: badgeColor}]}>
+                  <Text style={[styles.openLimiFaolBadgeText, {color: badgeColor}]}>
+                    {statusLabel}
+                  </Text>
+                </View>
+              </View>
+            );
+          })()}
 
           {/* Navigation Menu Items */}
           <Drawer.Section showDivider={false}>
@@ -716,7 +772,18 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
           <Divider style={styles.divider} />
         </View>
       ),
-      [l10n, theme, styles, navigateTo, props.navigation, devToolsVisible],
+      [
+        l10n,
+        theme,
+        styles,
+        navigateTo,
+        props.navigation,
+        devToolsVisible,
+        memoryStats,
+        modelStore.activeModel?.name,
+        modelStore.context,
+        modelStore.isContextLoading,
+      ],
     );
 
     return (

@@ -871,14 +871,24 @@ class PalStore {
    */
   private async initializePipPal(): Promise<void> {
     try {
-      if ((await AsyncStorage.getItem(PIP_SEEDED_KEY)) === 'true') {
-        return;
-      }
-
       const existing = this.pals.find(
         p => p.name === 'Pip' && p.source === 'local',
       );
       if (existing) {
+        // Patch web_search / read_url if the pal predates the talent system
+        const hasTalents = existing.pact?.talents?.some(
+          t => t.name === 'web_search',
+        );
+        if (!hasTalents) {
+          await this.updatePal(existing.id, {
+            pact: {
+              talents: [
+                {name: 'web_search', necessity: 'optional'},
+                {name: 'read_url', necessity: 'optional'},
+              ],
+            },
+          });
+        }
         await AsyncStorage.setItem(PIP_SEEDED_KEY, 'true');
         return;
       }

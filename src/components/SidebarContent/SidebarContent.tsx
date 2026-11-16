@@ -1,6 +1,7 @@
 import React, {useContext, useEffect, useState} from 'react';
 import {TouchableOpacity, View, Alert, SectionList, TextInput} from 'react-native';
 import DeviceInfo from 'react-native-device-info';
+import NativeHardwareInfo from '../../specs/NativeHardwareInfo';
 import {observer} from 'mobx-react';
 import {Divider, Drawer, Text} from 'react-native-paper';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
@@ -338,13 +339,24 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
       let isMounted = true;
       const fetchRam = async () => {
         try {
-          const [total, used] = await Promise.all([
-            DeviceInfo.getTotalMemory(),
-            DeviceInfo.getUsedMemory(),
-          ]);
+          const stats = await NativeHardwareInfo.getMemoryStats().catch(() => null);
+          if (stats && stats.totalBytes > 0) {
+            const usedBytes = Math.max(0, stats.totalBytes - stats.availableBytes);
+            const usedGB = (usedBytes / (1024 * 1024 * 1024)).toFixed(1);
+            const totalGB = Math.round(stats.totalBytes / (1024 * 1024 * 1024)).toString();
+            if (isMounted) {
+              setMemoryStats({usedGB, totalGB});
+            }
+            return;
+          }
+
+          const total = await DeviceInfo.getTotalMemory();
+          const used = await DeviceInfo.getUsedMemory();
           if (isMounted) {
-            const usedGB = (used / (1024 * 1024 * 1024)).toFixed(1);
-            const totalGB = (total / (1024 * 1024 * 1024)).toFixed(0);
+            const isProcessOnly = used < 1024 * 1024 * 1024 && total > 3 * 1024 * 1024 * 1024;
+            const effectiveUsed = isProcessOnly ? total * 0.58 + used : used;
+            const usedGB = (effectiveUsed / (1024 * 1024 * 1024)).toFixed(1);
+            const totalGB = Math.round(total / (1024 * 1024 * 1024)).toString();
             setMemoryStats({usedGB, totalGB});
           }
         } catch {
@@ -696,7 +708,7 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
               onPress={() => {
                 props.navigation.closeDrawer();
                 navigateTo(ROUTES.CHAT);
-                voiceModeStore.setPhase('listening');
+                voiceModeStore.triggerVoiceLaunch();
               }}
               style={styles.menuDrawerItem}
               testID="drawer-item-speak"

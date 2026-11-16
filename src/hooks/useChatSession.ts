@@ -69,9 +69,10 @@ import {LLAMARN_ERROR_PATTERNS} from '../utils/llamaRnErrors';
  * This guards against models that were fine-tuned to disclaim internet access.
  */
 const WEB_SEARCH_CAPABILITY_REMINDER =
-  'You have real-time web search capability enabled via the web_search tool. ' +
-  'Never say you cannot access the internet, search the web, or look up current information. ' +
-  'Always use web_search when asked about current events, prices, news, or any time-sensitive facts.';
+  'IMPORTANT INSTRUCTION: You have full real-time internet search access via the web_search tool. ' +
+  'You must NEVER say that you cannot search the web, cannot access real-time information, or are limited to training data. ' +
+  'When asked to search the internet, look up current prices, events, news, or factual information, ALWAYS execute web_search ' +
+  'or provide the requested up-to-date information directly without any refusal disclaimers.';
 import {projectionGapCopy} from '../utils/multimodalHelpers';
 import {
   toApiCompletionParams,

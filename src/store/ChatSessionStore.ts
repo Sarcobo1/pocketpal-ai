@@ -17,6 +17,7 @@ import {chatSessionRepository} from '../repositories/ChatSessionRepository';
 import {defaultCompletionParams} from '../utils/completionSettingsVersions';
 import {derivedText} from '../utils/chat';
 import {palStore} from './PalStore';
+import {searchProviderStore} from './SearchProviderStore';
 import {deriveToolSchemas} from '../services/talents';
 import {AgentUiState, initialAgentUiState} from '../services/agent';
 
@@ -1542,6 +1543,21 @@ class ChatSessionStore {
             tools,
           };
         }
+      }
+    }
+
+    // Ensure web search tools are always available when search is enabled
+    if (searchProviderStore.canSearch) {
+      const existingTools = (resolvedSettings.tools as any[] | undefined) ?? [];
+      const hasSearch = existingTools.some(
+        (t: any) => t.function?.name === 'web_search',
+      );
+      if (!hasSearch) {
+        const searchTools = deriveToolSchemas(['web_search', 'read_url']);
+        resolvedSettings = {
+          ...resolvedSettings,
+          tools: [...existingTools, ...searchTools],
+        };
       }
     }
 

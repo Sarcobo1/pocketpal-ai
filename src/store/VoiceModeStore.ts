@@ -37,6 +37,8 @@ export class VoiceModeStore {
   unlockOverride: boolean | null = null;
   /** The Settings switch; null follows the device gate. */
   userVoiceModeOverride: boolean | null = null;
+  /** Transient trigger to launch voice mode via useVoiceMode from other screens */
+  pendingVoiceLaunch = false;
 
   constructor() {
     makeAutoObservable(this, {}, {autoBind: true});
@@ -102,6 +104,14 @@ export class VoiceModeStore {
 
   setCameraOn(cameraOn: boolean): void {
     this.cameraOn = cameraOn;
+  }
+
+  triggerVoiceLaunch(): void {
+    this.pendingVoiceLaunch = true;
+  }
+
+  clearPendingVoiceLaunch(): void {
+    this.pendingVoiceLaunch = false;
   }
 
   setUserVoiceModeOverride(enabled: boolean): void {

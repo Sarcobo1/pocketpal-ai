@@ -106,6 +106,15 @@ export const ChatScreen: React.FC = observer(() => {
       end();
     }
   }, [isVideoPal, end]);
+  React.useEffect(() => {
+    if (voiceModeStore.pendingVoiceLaunch) {
+      voiceModeStore.clearPendingVoiceLaunch();
+      voiceMode.requestEntry({
+        openModelPicker: () => setIsPalSheetVisible(true),
+        focusInput: () => {},
+      });
+    }
+  }, [voiceMode]);
   const voiceControls = useMemo(
     () => ({tapCloud, toggleMute, end}),
     [tapCloud, toggleMute, end],

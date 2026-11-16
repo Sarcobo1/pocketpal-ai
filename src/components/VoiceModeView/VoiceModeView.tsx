@@ -73,6 +73,11 @@ export const VoiceModeView: React.FC = observer(() => {
   const l10n = useContext(L10nContext);
   const insets = useSafeAreaInsets();
   const {tapCloud, toggleMute, end} = useVoiceModeControls();
+  const handleEnd = useCallback(() => {
+    end();
+    voiceModeStore.setPhase('closed');
+    voiceModeStore.setPresentation('bar');
+  }, [end]);
   const {phase, micMuted, lastError, cameraOn} = voiceModeStore;
   const visual = voiceVisual(phase, micMuted);
   const status = voiceStatus(
@@ -224,155 +229,160 @@ export const VoiceModeView: React.FC = observer(() => {
       };
 
   return (
-    <GestureDetector gesture={pullDown}>
-      <Animated.View
-        style={[
-          dragStyle,
-          styles.root,
-          {
-            backgroundColor: theme.colors.background,
-            paddingTop: insets.top,
-            paddingBottom: insets.bottom + theme.spacing.xl,
-          },
-        ]}
-        accessibilityViewIsModal
-        onAccessibilityEscape={collapse}
-        testID="voice-view">
-        <Pressable
-          onPress={collapse}
-          accessibilityRole="button"
-          accessibilityLabel={l10n.voiceMode.showChatLabel}
-          accessibilityHint={l10n.voiceMode.pullDownHint}
-          testID="voice-view-collapse"
-          style={[styles.top, {gap: theme.spacing.xs}]}>
-          <View
-            style={[
-              styles.handle,
-              {backgroundColor: theme.colors.outlineVariant},
-            ]}
-          />
-          <Text
-            style={[
-              theme.typography.captionM,
-              {color: theme.colors.onSurfaceVariant},
-            ]}>
-            {l10n.voiceMode.pullDownHint}
-          </Text>
-        </Pressable>
-
-        {showPreview && device ? (
-          <View
-            testID="voice-camera-preview"
-            accessibilityLabel={l10n.voiceMode.cameraPreviewLabel}
-            style={[
-              styles.preview,
-              {top: HANDLE_ROW_HEIGHT + 8, right: theme.spacing.m},
-            ]}>
-            <Camera
-              ref={camera}
-              device={device}
-              format={frameFormat}
-              photoQualityBalance="speed"
-              photo={true}
-              isActive={true}
-              style={StyleSheet.absoluteFill}
-            />
-          </View>
-        ) : null}
-
-        <View style={[styles.center, {gap: theme.spacing.xl}]}>
+    <Animated.View
+      style={[
+        dragStyle,
+        styles.root,
+        {
+          backgroundColor: theme.colors.background,
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom + theme.spacing.xl,
+        },
+      ]}
+      accessibilityViewIsModal
+      onAccessibilityEscape={collapse}
+      testID="voice-view">
+      <GestureDetector gesture={pullDown}>
+        <View style={{flex: 1, width: '100%'}}>
           <Pressable
-            onPress={tapCloud}
+            onPress={collapse}
             accessibilityRole="button"
-            accessibilityLabel={l10n.voiceMode.cloudLabel}
-            accessibilityHint={hint}
-            testID="voice-cloud">
-            <View testID={`voice-cloud-${visual}`}>
-              <LimiOrb
-                state={
-                  phase === 'thinking'
-                    ? 'composing'
-                    : phase === 'speaking'
-                      ? 'breathing'
-                      : 'listening'
-                }
-                size={220}
+            accessibilityLabel={l10n.voiceMode.showChatLabel}
+            accessibilityHint={l10n.voiceMode.pullDownHint}
+            testID="voice-view-collapse"
+            style={[styles.top, {gap: theme.spacing.xs}]}>
+            <View
+              style={[
+                styles.handle,
+                {backgroundColor: theme.colors.outlineVariant},
+              ]}
+            />
+            <Text
+              style={[
+                theme.typography.captionM,
+                {color: theme.colors.onSurfaceVariant},
+              ]}>
+              {l10n.voiceMode.pullDownHint}
+            </Text>
+          </Pressable>
+
+          {showPreview && device ? (
+            <View
+              testID="voice-camera-preview"
+              accessibilityLabel={l10n.voiceMode.cameraPreviewLabel}
+              style={[
+                styles.preview,
+                {top: HANDLE_ROW_HEIGHT + 8, right: theme.spacing.m},
+              ]}>
+              <Camera
+                ref={camera}
+                device={device}
+                format={frameFormat}
+                photoQualityBalance="speed"
+                photo={true}
+                isActive={true}
+                style={StyleSheet.absoluteFill}
               />
             </View>
-          </Pressable>
-          <View style={[styles.status, {gap: theme.spacing.xs}]}>
-            <Text style={[theme.typography.titleL, {color: theme.colors.text}]}>
-              {title}
-            </Text>
-            <Text
-              testID="voice-status-hint"
-              style={[
-                theme.typography.bodyS,
-                {
-                  color: status.isError
-                    ? theme.colors.error
-                    : theme.colors.onSurfaceVariant,
-                },
-              ]}>
-              {hint}
-            </Text>
+          ) : null}
+
+          <View style={[styles.center, {gap: theme.spacing.xl}]}>
+            <Pressable
+              onPress={tapCloud}
+              accessibilityRole="button"
+              accessibilityLabel={l10n.voiceMode.cloudLabel}
+              accessibilityHint={hint}
+              testID="voice-cloud">
+              <View testID={`voice-cloud-${visual}`}>
+                <LimiOrb
+                  state={
+                    phase === 'thinking'
+                      ? 'composing'
+                      : phase === 'speaking'
+                        ? 'breathing'
+                        : 'listening'
+                  }
+                  size={220}
+                />
+              </View>
+            </Pressable>
+            <View style={[styles.status, {gap: theme.spacing.xs}]}>
+              <Text style={[theme.typography.titleL, {color: theme.colors.text}]}>
+                {title}
+              </Text>
+              <Text
+                testID="voice-status-hint"
+                style={[
+                  theme.typography.bodyS,
+                  {
+                    color: status.isError
+                      ? theme.colors.error
+                      : theme.colors.onSurfaceVariant,
+                  },
+                ]}>
+                {hint}
+              </Text>
+            </View>
           </View>
         </View>
+      </GestureDetector>
 
-        <View style={[styles.controls, {gap: theme.spacing.xxl}]}>
-          <Pressable
-            onPress={toggleMute}
-            accessibilityRole="switch"
-            accessibilityLabel={l10n.voiceMode.micSwitchLabel}
-            accessibilityState={{checked: !micMuted}}
-            testID="voice-mute"
-            style={[
-              styles.control,
-              {backgroundColor: muteColors.backgroundColor},
-            ]}>
-            {micMuted ? (
-              <MicrophoneOffIcon
-                width={24}
-                height={24}
-                color={muteColors.icon}
-              />
-            ) : (
-              <MicrophoneIcon width={24} height={24} color={muteColors.icon} />
-            )}
-          </Pressable>
-          <Pressable
-            onPress={toggleCamera}
-            accessibilityRole="switch"
-            accessibilityLabel={l10n.voiceMode.cameraSwitchLabel}
-            accessibilityState={{checked: cameraOn}}
-            testID="voice-camera"
-            style={[
-              styles.control,
-              {
-                backgroundColor: cameraOn
-                  ? theme.colors.primary
-                  : theme.colors.surfaceContainerHighest,
-              },
-            ]}>
-            <CameraIcon
+      <View style={[styles.controls, {gap: theme.spacing.xxl}]}>
+        <Pressable
+          onPress={toggleMute}
+          hitSlop={16}
+          accessibilityRole="switch"
+          accessibilityLabel={l10n.voiceMode.micSwitchLabel}
+          accessibilityState={{checked: !micMuted}}
+          testID="voice-mute"
+          style={[
+            styles.control,
+            {backgroundColor: muteColors.backgroundColor},
+          ]}>
+          {micMuted ? (
+            <MicrophoneOffIcon
               width={24}
               height={24}
-              stroke={
-                cameraOn ? theme.colors.onPrimary : theme.colors.onSurface
-              }
+              color={muteColors.icon}
             />
-          </Pressable>
-          <Pressable
-            onPress={end}
-            accessibilityRole="button"
-            accessibilityLabel={l10n.voiceMode.endLabel}
-            testID="voice-end"
-            style={[styles.control, {backgroundColor: theme.colors.error}]}>
-            <CloseIcon width={24} height={24} fill={theme.colors.onError} />
-          </Pressable>
-        </View>
-      </Animated.View>
-    </GestureDetector>
+          ) : (
+            <MicrophoneIcon width={24} height={24} color={muteColors.icon} />
+          )}
+        </Pressable>
+        <Pressable
+          onPress={toggleCamera}
+          hitSlop={16}
+          accessibilityRole="switch"
+          accessibilityLabel={l10n.voiceMode.cameraSwitchLabel}
+          accessibilityState={{checked: cameraOn}}
+          testID="voice-camera"
+          style={[
+            styles.control,
+            {
+              backgroundColor: cameraOn
+                ? theme.colors.primary
+                : theme.colors.surfaceContainerHighest,
+            },
+          ]}>
+          <CameraIcon
+            width={24}
+            height={24}
+            stroke={
+              cameraOn ? theme.colors.onPrimary : theme.colors.onSurface
+            }
+          />
+        </Pressable>
+        <Pressable
+          onPress={handleEnd}
+          hitSlop={16}
+          accessibilityRole="button"
+          accessibilityLabel={l10n.voiceMode.endLabel}
+          testID="voice-end"
+          style={[styles.control, {backgroundColor: theme.colors.error}]}>
+          <CloseIcon width={24} height={24} fill={theme.colors.onError} />
+        </Pressable>
+      </View>
+    </Animated.View>
   );
 });
 

@@ -15,7 +15,7 @@ import {useCameraPermission} from 'react-native-vision-camera';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 
 import {observer} from 'mobx-react';
-import {IconButton, Text} from 'react-native-paper';
+import {Divider, IconButton, Text} from 'react-native-paper';
 
 import {hasVideoCapability} from '../../utils/pal-capabilities';
 
@@ -36,6 +36,8 @@ import {
   chatSessionStore,
   modelStore,
   palStore,
+  searchProviderStore,
+  ttsStore,
   uiStore,
   voiceModeStore,
 } from '../../store';
@@ -48,7 +50,6 @@ import {
   SendButton,
   StopButton,
   Menu,
-  VoiceChip,
   MicButton,
   VoiceRecordingBar,
   VoiceModeButton,
@@ -445,11 +446,6 @@ export const ChatInput = observer(
       !isVoiceCaptureActive;
     const sendButtonOpacity = isSendButtonEnabled ? 1 : 0.4;
 
-    const rotateInterpolate = iconRotation.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['0deg', '180deg'],
-    });
-
     const onSurfaceColor = currentActivePal?.color?.[0] || theme.colors.text;
     const onSurfaceColorVariant = onSurfaceColor + '55'; // for disabled state or placeholder text
     // // Plus button state
@@ -607,68 +603,58 @@ export const ChatInput = observer(
                       </TouchableOpacity>
                     }>
                     <Menu.Item
-                      label={l10n.camera?.takePhoto || 'Camera'}
+                      label={l10n.camera?.takePhoto || 'Kamera'}
                       icon="camera"
                       onPress={handleTakePhoto}
                     />
                     <Menu.Item
-                      label={l10n.common?.gallery || 'Gallery'}
+                      label={l10n.common?.gallery || 'Galereya'}
                       icon="image"
                       onPress={handleSelectImages}
                     />
+                    <Divider />
+                    <Menu.Item
+                      label={
+                        currentActivePal?.name
+                          ? `Pal: ${currentActivePal.name}`
+                          : 'Pal tanlash'
+                      }
+                      icon="account-outline"
+                      onPress={() => {
+                        setShowImageUploadMenu(false);
+                        onPalBtnPress?.();
+                      }}
+                    />
+                    <Menu.Item
+                      label={
+                        ttsStore.autoSpeakEnabled
+                          ? "Ovozli o'qish: Yoqilgan"
+                          : "Ovozli o'qish: O'chiq"
+                      }
+                      icon={
+                        ttsStore.autoSpeakEnabled
+                          ? 'volume-high'
+                          : 'volume-off'
+                      }
+                      onPress={() => {
+                        ttsStore.setAutoSpeak(!ttsStore.autoSpeakEnabled);
+                      }}
+                    />
+                    <Menu.Item
+                      label={
+                        searchProviderStore.canSearch
+                          ? 'Internet qidiruvi: Yoqilgan'
+                          : "Internet qidiruvi: O'chiq"
+                      }
+                      icon="web"
+                      onPress={() => {
+                        searchProviderStore.setConsent(
+                          !searchProviderStore.hasConsentedToSearch,
+                        );
+                      }}
+                    />
                   </Menu>
                 )}
-
-                {/* Pal Selector */}
-                <View testID="pal-selector" style={styles.palSelector}>
-                  <TouchableOpacity
-                    style={[
-                      styles.palBtn,
-                      {
-                        backgroundColor:
-                          uiStore.colorScheme === 'dark'
-                            ? theme.colors.inverseOnSurface
-                            : theme.colors.inverseSurface,
-                      },
-                      currentActivePal?.color && {
-                        backgroundColor: currentActivePal?.color?.[0],
-                      },
-                    ]}
-                    onPress={onPalBtnPress}
-                    accessibilityLabel="Select Pal"
-                    accessibilityRole="button">
-                    <Animated.View
-                      style={{
-                        transform: [{rotate: rotateInterpolate}],
-                      }}>
-                      <ChevronUpIcon stroke={inputBackgroundColor} />
-                    </Animated.View>
-                  </TouchableOpacity>
-
-                  {/* Pal Name Display */}
-                  {currentActivePal?.name && hasActiveModel && (
-                    <Text
-                      testID="active-pal-name"
-                      numberOfLines={1}
-                      style={[
-                        styles.palNameCompact,
-                        {
-                          color: onSurfaceColor,
-                        },
-                      ]}>
-                      Pal:{' '}
-                      <Text
-                        style={[
-                          styles.palNameValueCompact,
-                          {
-                            color: onSurfaceColor,
-                          },
-                        ]}>
-                        {currentActivePal?.name}
-                      </Text>
-                    </Text>
-                  )}
-                </View>
 
                 {/* Mode selector chip — Tez / Omni / Fikrlash */}
                 {!isCameraActive && !isVoiceCaptureActive && (
@@ -711,11 +697,6 @@ export const ChatInput = observer(
                     </Text>
                   </View>
                 )}
-
-                {/* Voice chip (TTS) — always present so users can stop
-                  audio independently of text generation. Self-gates:
-                  returns null when TTS is unavailable. */}
-                <VoiceChip />
 
                 {/* Voice input (ASR) mic. Self-gates: returns null when voice
                   input is unavailable. */}

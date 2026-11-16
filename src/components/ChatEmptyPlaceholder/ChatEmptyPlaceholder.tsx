@@ -92,7 +92,7 @@ export const ChatEmptyPlaceholder = observer(
             style={styles.quickNavItem}
             onPress={() => {
               ReactNativeHapticFeedback.trigger('impactLight', hapticOptions);
-              voiceModeStore.setPhase('listening');
+              voiceModeStore.triggerVoiceLaunch();
             }}
             activeOpacity={0.75}>
             <View style={styles.quickNavLeft}>

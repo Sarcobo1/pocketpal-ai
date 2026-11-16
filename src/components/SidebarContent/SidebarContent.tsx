@@ -1,5 +1,11 @@
 import React, {useContext, useEffect, useState} from 'react';
-import {TouchableOpacity, View, Alert, SectionList, TextInput} from 'react-native';
+import {
+  TouchableOpacity,
+  View,
+  Alert,
+  SectionList,
+  TextInput,
+} from 'react-native';
 import DeviceInfo from 'react-native-device-info';
 import NativeHardwareInfo from '../../specs/NativeHardwareInfo';
 import {observer} from 'mobx-react';
@@ -325,7 +331,10 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
     const [sessionToRename, setSessionToRename] =
       useState<SessionMetaData | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const [memoryStats, setMemoryStats] = useState<{usedGB: string; totalGB: string}>({
+    const [memoryStats, setMemoryStats] = useState<{
+      usedGB: string;
+      totalGB: string;
+    }>({
       usedGB: '0.0',
       totalGB: '0',
     });
@@ -339,11 +348,18 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
       let isMounted = true;
       const fetchRam = async () => {
         try {
-          const stats = await NativeHardwareInfo.getMemoryStats().catch(() => null);
+          const stats = await NativeHardwareInfo.getMemoryStats().catch(
+            () => null,
+          );
           if (stats && stats.totalBytes > 0) {
-            const usedBytes = Math.max(0, stats.totalBytes - stats.availableBytes);
+            const usedBytes = Math.max(
+              0,
+              stats.totalBytes - stats.availableBytes,
+            );
             const usedGB = (usedBytes / (1024 * 1024 * 1024)).toFixed(1);
-            const totalGB = Math.round(stats.totalBytes / (1024 * 1024 * 1024)).toString();
+            const totalGB = Math.round(
+              stats.totalBytes / (1024 * 1024 * 1024),
+            ).toString();
             if (isMounted) {
               setMemoryStats({usedGB, totalGB});
             }
@@ -353,7 +369,8 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
           const total = await DeviceInfo.getTotalMemory();
           const used = await DeviceInfo.getUsedMemory();
           if (isMounted) {
-            const isProcessOnly = used < 1024 * 1024 * 1024 && total > 3 * 1024 * 1024 * 1024;
+            const isProcessOnly =
+              used < 1024 * 1024 * 1024 && total > 3 * 1024 * 1024 * 1024;
             const effectiveUsed = isProcessOnly ? total * 0.58 + used : used;
             const usedGB = (effectiveUsed / (1024 * 1024 * 1024)).toFixed(1);
             const totalGB = Math.round(total / (1024 * 1024 * 1024)).toString();
@@ -643,7 +660,11 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
               onPress={() => navigateTo(ROUTES.SETTINGS)}
               accessibilityLabel="Sozlamalar"
               accessibilityRole="button">
-              <ArrowRightSmIcon stroke={theme.colors.onSurface} width={18} height={18} />
+              <ArrowRightSmIcon
+                stroke={theme.colors.onSurface}
+                width={18}
+                height={18}
+              />
             </TouchableOpacity>
           </View>
 
@@ -655,30 +676,34 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
             const statusLabel = isContextLoading
               ? 'Yuklanmoqda'
               : isModelActive
-              ? 'Faol'
-              : "O'chiq";
+                ? 'Faol'
+                : "O'chiq";
             const badgeColor = isContextLoading
               ? '#F59E0B'
               : isModelActive
-              ? theme.colors.primary
-              : theme.colors.onSurfaceVariant;
+                ? theme.colors.primary
+                : theme.colors.onSurfaceVariant;
 
             const modelLabel = isContextLoading
               ? 'Yuklanmoqda...'
               : activeModel
-              ? activeModel.name
-              : 'telefonda';
+                ? activeModel.name
+                : 'telefonda';
 
             return (
               <View style={styles.openLimiOfflineCard}>
                 <View style={{flex: 1, marginRight: 12}}>
                   <Text style={styles.openLimiOfflineTitle}>Offline rejim</Text>
-                  <Text style={styles.openLimiOfflineSubtitle} numberOfLines={1}>
+                  <Text
+                    style={styles.openLimiOfflineSubtitle}
+                    numberOfLines={1}>
                     {`RAM ${memoryStats.usedGB} / ${memoryStats.totalGB} GB · ${modelLabel}`}
                   </Text>
                 </View>
-                <View style={[styles.openLimiFaolBadge, {borderColor: badgeColor}]}>
-                  <Text style={[styles.openLimiFaolBadgeText, {color: badgeColor}]}>
+                <View
+                  style={[styles.openLimiFaolBadge, {borderColor: badgeColor}]}>
+                  <Text
+                    style={[styles.openLimiFaolBadgeText, {color: badgeColor}]}>
                     {statusLabel}
                   </Text>
                 </View>
@@ -697,14 +722,26 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
             />
             <Drawer.Item
               label="Ovoz studiyasi"
-              icon={() => <MicrophoneIcon width={22} height={22} color={theme.colors.primary} />}
+              icon={() => (
+                <MicrophoneIcon
+                  width={22}
+                  height={22}
+                  color={theme.colors.primary}
+                />
+              )}
               onPress={() => navigateTo(ROUTES.VOICE_STUDIO)}
               style={styles.menuDrawerItem}
               testID="drawer-item-voice-studio"
             />
             <Drawer.Item
               label="Speak"
-              icon={() => <VoiceWaveformIcon width={22} height={22} color={theme.colors.primary} />}
+              icon={() => (
+                <VoiceWaveformIcon
+                  width={22}
+                  height={22}
+                  color={theme.colors.primary}
+                />
+              )}
               onPress={() => {
                 props.navigation.closeDrawer();
                 navigateTo(ROUTES.CHAT);
@@ -715,7 +752,13 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
             />
             <Drawer.Item
               label="Dars"
-              icon={() => <CodeIcon stroke={theme.colors.primary} width={22} height={22} />}
+              icon={() => (
+                <CodeIcon
+                  stroke={theme.colors.primary}
+                  width={22}
+                  height={22}
+                />
+              )}
               onPress={() => navigateTo(ROUTES.DARS)}
               style={styles.menuDrawerItem}
               testID="drawer-item-dars"
@@ -859,11 +902,19 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
               }
               accessibilityLabel="Mavzu"
               accessibilityRole="button">
-              <MoonIcon width={20} height={20} stroke={theme.colors.onSurface} />
+              <MoonIcon
+                width={20}
+                height={20}
+                stroke={theme.colors.onSurface}
+              />
             </TouchableOpacity>
 
             <View style={styles.bottomSearchBox}>
-              <SearchIcon width={16} height={16} stroke={theme.colors.onSurfaceVariant} />
+              <SearchIcon
+                width={16}
+                height={16}
+                stroke={theme.colors.onSurfaceVariant}
+              />
               <TextInput
                 style={styles.bottomSearchInput}
                 placeholder="Qidirish"
@@ -881,7 +932,11 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
               }}
               accessibilityLabel="Yangi suhbat"
               accessibilityRole="button">
-              <PlusIcon width={22} height={22} stroke={theme.colors.onPrimary} />
+              <PlusIcon
+                width={22}
+                height={22}
+                stroke={theme.colors.onPrimary}
+              />
             </TouchableOpacity>
           </View>
         </View>

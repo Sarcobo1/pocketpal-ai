@@ -632,9 +632,7 @@ export const ChatInput = observer(
                           : "Ovozli o'qish: O'chiq"
                       }
                       icon={
-                        ttsStore.autoSpeakEnabled
-                          ? 'volume-high'
-                          : 'volume-off'
+                        ttsStore.autoSpeakEnabled ? 'volume-high' : 'volume-off'
                       }
                       onPress={() => {
                         ttsStore.setAutoSpeak(!ttsStore.autoSpeakEnabled);
@@ -663,20 +661,24 @@ export const ChatInput = observer(
                     onPress={() => setModeSelectorVisible(true)}
                     accessibilityLabel="Rejim tanlash"
                     accessibilityRole="button">
-                    <Text
-                      numberOfLines={1}
-                      style={styles.modeChipText}>
+                    <Text numberOfLines={1} style={styles.modeChipText}>
                       {selectedMode === 'omni'
                         ? 'Omni'
                         : selectedMode === 'thinking'
-                          ? (supportsEffort && reasoningEffort ? `Fikr: ${localizedEffort}` : 'Fikrlash')
+                          ? supportsEffort && reasoningEffort
+                            ? `Fikr: ${localizedEffort}`
+                            : 'Fikrlash'
                           : selectedMode === 'auto'
                             ? 'Avto'
                             : selectedMode === 'code'
                               ? 'Kod'
                               : 'Tez'}
                     </Text>
-                    <ChevronDownIcon width={10} height={10} stroke={theme.colors.onSurfaceVariant} />
+                    <ChevronDownIcon
+                      width={10}
+                      height={10}
+                      stroke={theme.colors.onSurfaceVariant}
+                    />
                   </TouchableOpacity>
                 )}
               </View>

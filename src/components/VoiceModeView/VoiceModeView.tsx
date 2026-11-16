@@ -307,7 +307,8 @@ export const VoiceModeView: React.FC = observer(() => {
               </View>
             </Pressable>
             <View style={[styles.status, {gap: theme.spacing.xs}]}>
-              <Text style={[theme.typography.titleL, {color: theme.colors.text}]}>
+              <Text
+                style={[theme.typography.titleL, {color: theme.colors.text}]}>
                 {title}
               </Text>
               <Text
@@ -340,11 +341,7 @@ export const VoiceModeView: React.FC = observer(() => {
             {backgroundColor: muteColors.backgroundColor},
           ]}>
           {micMuted ? (
-            <MicrophoneOffIcon
-              width={24}
-              height={24}
-              color={muteColors.icon}
-            />
+            <MicrophoneOffIcon width={24} height={24} color={muteColors.icon} />
           ) : (
             <MicrophoneIcon width={24} height={24} color={muteColors.icon} />
           )}
@@ -367,9 +364,7 @@ export const VoiceModeView: React.FC = observer(() => {
           <CameraIcon
             width={24}
             height={24}
-            stroke={
-              cameraOn ? theme.colors.onPrimary : theme.colors.onSurface
-            }
+            stroke={cameraOn ? theme.colors.onPrimary : theme.colors.onSurface}
           />
         </Pressable>
         <Pressable

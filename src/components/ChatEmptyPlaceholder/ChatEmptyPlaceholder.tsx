@@ -67,13 +67,18 @@ export const ChatEmptyPlaceholder = observer(
           }}
           activeOpacity={0.85}>
           <View style={styles.modelCardHeader}>
-            <View style={[styles.greenDot, isLoading && {backgroundColor: '#F59E0B'}]} />
+            <View
+              style={[
+                styles.greenDot,
+                isLoading && {backgroundColor: '#F59E0B'},
+              ]}
+            />
             <Text style={styles.modelCardName}>
               {isLoading
                 ? `Model yuklanmoqda... ${loadingModel ? '– ' + loadingModel.name : ''}`
                 : activeModel
-                ? activeModel.name
-                : 'Model tanlanmagan'}
+                  ? activeModel.name
+                  : 'Model tanlanmagan'}
             </Text>
           </View>
           <View style={styles.ghostWrapper}>
@@ -96,12 +101,20 @@ export const ChatEmptyPlaceholder = observer(
             }}
             activeOpacity={0.75}>
             <View style={styles.quickNavLeft}>
-              <VoiceWaveformIcon width={20} height={20} color={theme.colors.primary} />
+              <VoiceWaveformIcon
+                width={20}
+                height={20}
+                color={theme.colors.primary}
+              />
               <Text style={styles.quickNavTitle}>Speak</Text>
             </View>
             <View style={styles.quickNavRight}>
               <Text style={styles.quickNavSubtitle}>Ovoz va kamera</Text>
-              <ChevronRightIcon width={16} height={16} stroke={theme.colors.onSurfaceVariant} />
+              <ChevronRightIcon
+                width={16}
+                height={16}
+                stroke={theme.colors.onSurfaceVariant}
+              />
             </View>
           </TouchableOpacity>
 
@@ -120,7 +133,11 @@ export const ChatEmptyPlaceholder = observer(
             </View>
             <View style={styles.quickNavRight}>
               <Text style={styles.quickNavSubtitle}>Matn</Text>
-              <ChevronRightIcon width={16} height={16} stroke={theme.colors.onSurfaceVariant} />
+              <ChevronRightIcon
+                width={16}
+                height={16}
+                stroke={theme.colors.onSurfaceVariant}
+              />
             </View>
           </TouchableOpacity>
 
@@ -140,7 +157,11 @@ export const ChatEmptyPlaceholder = observer(
             </View>
             <View style={styles.quickNavRight}>
               <Text style={styles.quickNavSubtitle}>Kod, matematika</Text>
-              <ChevronRightIcon width={16} height={16} stroke={theme.colors.onSurfaceVariant} />
+              <ChevronRightIcon
+                width={16}
+                height={16}
+                stroke={theme.colors.onSurfaceVariant}
+              />
             </View>
           </TouchableOpacity>
 
@@ -160,7 +181,11 @@ export const ChatEmptyPlaceholder = observer(
             </View>
             <View style={styles.quickNavRight}>
               <Text style={styles.quickNavSubtitle}>Yuklash</Text>
-              <ChevronRightIcon width={16} height={16} stroke={theme.colors.onSurfaceVariant} />
+              <ChevronRightIcon
+                width={16}
+                height={16}
+                stroke={theme.colors.onSurfaceVariant}
+              />
             </View>
           </TouchableOpacity>
         </View>

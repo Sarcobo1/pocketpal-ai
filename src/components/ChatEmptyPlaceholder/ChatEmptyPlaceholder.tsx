@@ -1,4 +1,4 @@
-import React, {useContext} from 'react';
+import React from 'react';
 import {View, Text, TouchableOpacity, ScrollView} from 'react-native';
 import {observer} from 'mobx-react';
 import {useNavigation, NavigationProp} from '@react-navigation/native';
@@ -7,7 +7,6 @@ import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {useTheme} from '../../hooks';
 import {createStyles} from './styles';
 import {chatSessionStore, modelStore, voiceModeStore} from '../../store';
-import {L10nContext} from '../../utils';
 import {LimiGhost} from '../LimiGhost';
 import {ROUTES} from '../../utils/navigationConstants';
 import {
@@ -32,7 +31,6 @@ export const ChatEmptyPlaceholder = observer(
   ({onSelectModel, bottomComponentHeight = 0}: ChatEmptyPlaceholderProps) => {
     const theme = useTheme();
     const navigation = useNavigation<NavigationProp<any>>();
-    const l10n = useContext(L10nContext);
     const styles = createStyles({theme});
 
     const activeModel = modelStore.activeModel;

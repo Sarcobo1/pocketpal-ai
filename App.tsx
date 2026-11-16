@@ -211,7 +211,9 @@ const App = observer(() => {
 
                             <Drawer.Screen
                               name={ROUTES.VOICE_STUDIO}
-                              component={gestureHandlerRootHOC(VoiceStudioScreen)}
+                              component={gestureHandlerRootHOC(
+                                VoiceStudioScreen,
+                              )}
                               options={{
                                 headerStyle: styles.headerWithoutDivider,
                                 title: 'Ovoz studiyasi',

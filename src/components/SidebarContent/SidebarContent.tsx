@@ -24,13 +24,12 @@ import {
   uiStore,
   voiceModeStore,
 } from '../../store';
-import {Menu, RenameModal, Checkbox, LimiGhost} from '..';
+import {Menu, RenameModal, Checkbox} from '..';
 import {
   BenchmarkIcon,
   ChatIcon,
   EditIcon,
   ModelIcon,
-  PalIcon,
   SettingsIcon,
   ShareIcon,
   StarIcon,
@@ -835,9 +834,6 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
         props.navigation,
         devToolsVisible,
         memoryStats,
-        modelStore.activeModel?.name,
-        modelStore.context,
-        modelStore.isContextLoading,
       ],
     );
 

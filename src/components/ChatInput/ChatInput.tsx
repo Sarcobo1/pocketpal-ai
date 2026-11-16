@@ -19,13 +19,7 @@ import {Divider, IconButton, Text} from 'react-native-paper';
 
 import {hasVideoCapability} from '../../utils/pal-capabilities';
 
-import {
-  ChevronUpIcon,
-  ChevronDownIcon,
-  VideoRecorderIcon,
-  PlusIcon,
-  AtomIcon,
-} from '../../assets/icons';
+import {ChevronDownIcon, VideoRecorderIcon, PlusIcon} from '../../assets/icons';
 
 import {useTheme, useVoiceCapture} from '../../hooks';
 
@@ -38,13 +32,11 @@ import {
   palStore,
   searchProviderStore,
   ttsStore,
-  uiStore,
   voiceModeStore,
 } from '../../store';
 
 import {MessageType} from '../../utils/types';
 import {L10nContext, UserContext} from '../../utils';
-import {t} from '../../locales';
 
 import {
   SendButton,
@@ -161,7 +153,7 @@ export const ChatInput = observer(
     sendButtonVisibilityMode,
     textInputProps,
     isPickerVisible,
-    inputBackgroundColor,
+    inputBackgroundColor: _inputBackgroundColor,
     isCameraActive = false,
     onStartCamera,
     promptText,
@@ -170,15 +162,15 @@ export const ChatInput = observer(
     isVisionEnabled = false,
     defaultImages,
     onDefaultImagesChange,
-    showThinkingToggle = false,
+    showThinkingToggle: _showThinkingToggle,
     isThinkingEnabled = false,
     onThinkingToggle,
     appendTranscript,
     onVoicePress,
     supportsEffort = false,
-    effortValues = [],
+    effortValues: _effortValues = [],
     reasoningEffort,
-    onEffortCycle,
+    onEffortCycle: _onEffortCycle,
   }: ChatInputProps) => {
     const l10n = React.useContext(L10nContext);
     const theme = useTheme();
@@ -227,6 +219,7 @@ export const ChatInput = observer(
       } else if (selectedMode === 'thinking') {
         setSelectedMode('fast');
       }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isThinkingEnabled]);
 
     const handleModeSelect = (mode: OpenLimiMode) => {

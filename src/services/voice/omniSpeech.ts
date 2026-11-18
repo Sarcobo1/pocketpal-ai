@@ -74,6 +74,9 @@ export const modelCanVoiceReplies = async (): Promise<boolean> => {
   if (!ctx) {
     return refuse('no-context');
   }
+  if (typeof ctx.generateSpeech !== 'function') {
+    return refuse('no-method');
+  }
   if (probe?.contextId === ctx.id && probe.audioGen) {
     return true;
   }

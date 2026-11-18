@@ -37,8 +37,6 @@ import {
   AppInfoIcon,
   MicrophoneIcon,
   VoiceWaveformIcon,
-  ChevronDownIcon,
-  ArrowRightSmIcon,
   MoonIcon,
   SearchIcon,
   PlusIcon,
@@ -638,35 +636,6 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
     const ListHeaderComponent = React.useMemo(
       () => (
         <View>
-          {/* Profile Header */}
-          <View style={styles.profileHeader}>
-            <View style={styles.profileLeft}>
-              <View style={styles.profileAvatar}>
-                <Text style={styles.profileAvatarText}>A</Text>
-              </View>
-              <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                <Text style={styles.profileName}>Mening profilim</Text>
-                <ChevronDownIcon
-                  width={14}
-                  height={14}
-                  stroke={theme.colors.onSurfaceVariant}
-                  style={styles.profileChevron}
-                />
-              </View>
-            </View>
-            <TouchableOpacity
-              style={styles.profileArrowBtn}
-              onPress={() => navigateTo(ROUTES.SETTINGS)}
-              accessibilityLabel="Sozlamalar"
-              accessibilityRole="button">
-              <ArrowRightSmIcon
-                stroke={theme.colors.onSurface}
-                width={18}
-                height={18}
-              />
-            </TouchableOpacity>
-          </View>
-
           {/* OpenLimi Offline Card with Dynamic RAM & Active Badge */}
           {(() => {
             const isContextLoading = modelStore.isContextLoading;

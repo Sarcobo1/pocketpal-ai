@@ -162,6 +162,28 @@ class PalStore {
       // Initialize Pip pal (idempotent — see initializePipPal).
       await this.initializePipPal();
 
+      // Ensure all local pals have web_search and read_url talents
+      for (const pal of this.pals) {
+        if (pal.source === 'local') {
+          const hasSearch = pal.pact?.talents?.some(
+            t => t.name === 'web_search',
+          );
+          if (!hasSearch) {
+            const existingTalents = pal.pact?.talents ?? [];
+            await this.updatePal(pal.id, {
+              pact: {
+                ...pal.pact,
+                talents: [
+                  ...existingTalents,
+                  {name: 'web_search', necessity: 'optional'},
+                  {name: 'read_url', necessity: 'optional'},
+                ],
+              },
+            });
+          }
+        }
+      }
+
       // Register talent engines (idempotent)
       registerDefaultTalents();
 

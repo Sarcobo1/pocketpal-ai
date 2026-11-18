@@ -144,7 +144,12 @@ async function executeOne(
   const fnName = call.function?.name ?? '';
   const callId = call.id;
 
-  if (!fnName || !allowedTalentNames.includes(fnName)) {
+  const isBuiltinSearchTalent =
+    fnName === 'web_search' || fnName === 'read_url';
+  if (
+    !fnName ||
+    (!allowedTalentNames.includes(fnName) && !isBuiltinSearchTalent)
+  ) {
     const summary = fnName
       ? `Talent "${fnName}" is not enabled for this Pal`
       : NO_FUNCTION_NAME;

@@ -11,6 +11,7 @@ import {
   modelStore,
   NEW_SESSION_TITLE,
   palStore,
+  searchProviderStore,
   serverStore,
   ttsStore,
   uiStore,
@@ -1318,25 +1319,26 @@ export const useChatSession = (
     currentMessageInfo.current = messageInfo;
     opts.onTurnCreated?.(messageInfo.id);
 
+    const tools =
+      (cleanCompletionParams.tools as ToolDefinition[] | undefined) ?? [];
+    const toolNames = tools
+      .map((t: any) => t.function?.name ?? t.name)
+      .filter(Boolean);
+
     // Allowed talent names for this Pal. The runner rejects any
     // tool call whose function.name isn't in this list.
-    const palTalents = (pal?.pact?.talents ?? []).map(t => t.name);
+    const palTalents = Array.from(
+      new Set([
+        ...(pal?.pact?.talents ?? []).map(t => t.name),
+        ...toolNames,
+        ...(searchProviderStore.canSearch ? ['web_search', 'read_url'] : []),
+      ]),
+    );
 
     const completionStartTime = Date.now();
     const timeToFirstTokenMs: {value: number | null} = {value: null};
     const refused: {reason: string | null} = {reason: null};
     let uiState: AgentUiState = initialAgentUiState;
-
-    // Precompute trigger markers via the per-hook cache. We use the
-    // CLOSURE form of `getFormattedChat` (NOT `.bind(...)`) because the
-    // method is multi-arg and requires `params: {tools, jinja: true}`
-    // to populate `grammar_triggers`. A bare bind would call the
-    // method with no arguments and silently return empty markers,
-    // defeating marker detection. Failure is non-fatal: we fall back
-    // to `[]` and let `tool_call_started` drive the UX flip (one beat
-    // later) instead of `marker_seen`.
-    const tools =
-      (cleanCompletionParams.tools as ToolDefinition[] | undefined) ?? [];
     const tts: TtsRunState = {
       enabled: ttsStore.streamsReplies,
       started: false,

@@ -247,7 +247,12 @@ class VoiceModeController {
     // one to a context that is already running. The session-start cost belongs
     // in the same report as the per-turn numbers.
     const lap = startPerf();
-    const omni = await isOmniVoiceModel();
+    const isOmni = await isOmniVoiceModel();
+    const canVoice = await modelCanVoiceReplies();
+    const hasAudioInput = Boolean(modelStore.activeMediaSupport.audioInput);
+    // Only use omni audio-to-audio when the model can both receive audio directly
+    // and generate speech natively. Otherwise, use reliable cascade (Whisper ASR + TTS).
+    const omni = isOmni && hasAudioInput && canVoice;
     this.engine = omni ? this.omni : this.cascade;
     lap('engine.pick', {omni});
     if (this.engine.id === 'cascade') {

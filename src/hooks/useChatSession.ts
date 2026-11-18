@@ -73,7 +73,9 @@ const WEB_SEARCH_CAPABILITY_REMINDER =
   'IMPORTANT INSTRUCTION: You have full real-time internet search access via the web_search tool. ' +
   'You must NEVER say that you cannot search the web, cannot access real-time information, or are limited to training data. ' +
   'When asked to search the internet, look up current prices, events, news, or factual information, ALWAYS execute web_search ' +
-  'or provide the requested up-to-date information directly without any refusal disclaimers.';
+  'or provide the requested up-to-date information directly without any refusal disclaimers. ' +
+  'When writing or debugging code, you can search for latest documentation and community discussions. ' +
+  'When the user asks to build, create, or preview a website, web page, or HTML component, ALWAYS execute the render_html tool with complete HTML/CSS/JS for an interactive Canvas preview.';
 import {projectionGapCopy} from '../utils/multimodalHelpers';
 import {
   toApiCompletionParams,
@@ -1319,8 +1321,42 @@ export const useChatSession = (
     currentMessageInfo.current = messageInfo;
     opts.onTurnCreated?.(messageInfo.id);
 
-    const tools =
+    const existingTools =
       (cleanCompletionParams.tools as ToolDefinition[] | undefined) ?? [];
+    const builtinTools: ToolDefinition[] = [];
+    if (searchProviderStore.canSearch) {
+      const searchDef = talentRegistry.get('web_search')?.toToolDefinition();
+      const readUrlDef = talentRegistry.get('read_url')?.toToolDefinition();
+      if (
+        searchDef &&
+        !existingTools.some(
+          t => ((t as any).function?.name ?? (t as any).name) === 'web_search',
+        )
+      ) {
+        builtinTools.push(searchDef);
+      }
+      if (
+        readUrlDef &&
+        !existingTools.some(
+          t => ((t as any).function?.name ?? (t as any).name) === 'read_url',
+        )
+      ) {
+        builtinTools.push(readUrlDef);
+      }
+    }
+    const renderHtmlDef = talentRegistry.get('render_html')?.toToolDefinition();
+    if (
+      renderHtmlDef &&
+      !existingTools.some(
+        t => ((t as any).function?.name ?? (t as any).name) === 'render_html',
+      )
+    ) {
+      builtinTools.push(renderHtmlDef);
+    }
+    const tools = [...existingTools, ...builtinTools];
+    if (tools.length > 0) {
+      cleanCompletionParams.tools = tools;
+    }
     const toolNames = tools
       .map((t: any) => t.function?.name ?? t.name)
       .filter(Boolean);
@@ -1331,6 +1367,7 @@ export const useChatSession = (
       new Set([
         ...(pal?.pact?.talents ?? []).map(t => t.name),
         ...toolNames,
+        'render_html',
         ...(searchProviderStore.canSearch ? ['web_search', 'read_url'] : []),
       ]),
     );

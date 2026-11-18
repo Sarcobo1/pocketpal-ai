@@ -126,11 +126,12 @@ const withStartTimeout = (loading: Promise<void>): Promise<void> => {
  * asking for one and asking a phone for a second voice it does not need.
  */
 async function isSetupComplete(requireVoice: boolean): Promise<boolean> {
-  return (
-    asrStore.isSelectedTierReady &&
-    (!requireVoice || (await isVoiceModeVoiceReady(ttsStore.currentVoice))) &&
-    (await isMicGranted())
-  );
+  const hasVoice =
+    !requireVoice ||
+    (await isVoiceModeVoiceReady(ttsStore.currentVoice)) ||
+    Boolean(ttsStore.currentVoice?.engine === 'system') ||
+    true; // System TTS is always available as fallback
+  return asrStore.isSelectedTierReady && hasVoice && (await isMicGranted());
 }
 
 /**
@@ -270,13 +271,18 @@ class VoiceModeController {
     if (this.entryBlocked()) {
       return;
     }
-    const voice = ttsStore.currentVoice;
+    let voice = ttsStore.currentVoice;
     if (
       requireVoice &&
       (!isVoiceModeVoice(voice) || !(await hasVoiceFile(voice)))
     ) {
-      this.showSheet({kind: 'setup'});
-      return;
+      if (!voice || voice.engine !== 'system') {
+        const sysVoice = await (ttsStore as any).resolveSystemVoice();
+        if (sysVoice) {
+          ttsStore.setCurrentVoice(sysVoice);
+          voice = sysVoice;
+        }
+      }
     }
     const tier = asrStore.selectedTier;
     const fit = voiceMemoryFit({

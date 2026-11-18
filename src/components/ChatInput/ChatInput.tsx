@@ -46,6 +46,7 @@ import {
   VoiceRecordingBar,
   VoiceModeButton,
   ModeSelectorSheet,
+  SearchConsentSheet,
 } from '..';
 import {OpenLimiMode} from '../ModeSelectorSheet/ModeSelectorSheet';
 
@@ -209,6 +210,8 @@ export const ChatInput = observer(
     const [showModelWarning, setShowModelWarning] = React.useState(false);
     // State for ModeSelectorSheet
     const [modeSelectorVisible, setModeSelectorVisible] = React.useState(false);
+    const [searchConsentVisible, setSearchConsentVisible] =
+      React.useState(false);
     const [selectedMode, setSelectedMode] = React.useState<OpenLimiMode>(
       isThinkingEnabled ? 'thinking' : 'fast',
     );
@@ -639,9 +642,12 @@ export const ChatInput = observer(
                       }
                       icon="web"
                       onPress={() => {
-                        searchProviderStore.setConsent(
-                          !searchProviderStore.hasConsentedToSearch,
-                        );
+                        setShowImageUploadMenu(false);
+                        if (!searchProviderStore.hasConsentedToSearch) {
+                          setSearchConsentVisible(true);
+                        } else {
+                          searchProviderStore.setConsent(false);
+                        }
                       }}
                     />
                   </Menu>
@@ -683,6 +689,11 @@ export const ChatInput = observer(
                   onClose={() => setModeSelectorVisible(false)}
                   selectedMode={selectedMode}
                   onSelectMode={handleModeSelect}
+                />
+                <SearchConsentSheet
+                  isVisible={searchConsentVisible}
+                  onClose={() => setSearchConsentVisible(false)}
+                  onConsent={() => searchProviderStore.setConsent(true)}
                 />
                 {/* Helper text for model not loaded */}
                 {showModelWarning && !hasActiveModel && (

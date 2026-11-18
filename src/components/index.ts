@@ -64,6 +64,7 @@ export * from './TextDivider';
 export * from './TextInput';
 export * from './TalentSurface';
 export * from './TextMessage';
+export * from './SearchConsentSheet';
 export * from './TTSSetupSheet';
 export * from './DownloadOverlay';
 export * from './DownloadProgressCard';

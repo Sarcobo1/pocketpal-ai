@@ -447,6 +447,15 @@ export class TTSStore {
         this.pendingVoiceRestore[engineId] = this.currentVoice.id;
         this.currentVoice = null;
       }
+      if (this.currentVoice == null) {
+        this.resolveSystemVoice().then(sysVoice => {
+          if (sysVoice && !this.currentVoice) {
+            runInAction(() => {
+              this.currentVoice = sysVoice;
+            });
+          }
+        });
+      }
     });
 
     this.appStateSubscription = AppState.addEventListener(
@@ -954,10 +963,13 @@ export class TTSStore {
     text: string,
     opts?: {hadReasoning?: boolean; voiceOverride?: Voice},
   ): Promise<void> {
-    if (!this.isTTSAvailable) {
+    if (!this.isTTSAvailable && !this.voiceOutputActive) {
       return;
     }
-    const voice = opts?.voiceOverride ?? this.currentVoice;
+    const voice =
+      opts?.voiceOverride ??
+      this.currentVoice ??
+      (await this.resolveSystemVoice());
     if (!voice) {
       return;
     }
@@ -1104,7 +1116,18 @@ export class TTSStore {
     }
     const sink = this.usesModelVoice ? this.modelVoice : null;
     if (sink == null && this.currentVoice == null) {
-      return;
+      if (this.systemVoice) {
+        this.currentVoice = this.systemVoice;
+      } else {
+        this.resolveSystemVoice().then(sysVoice => {
+          if (sysVoice && !this.currentVoice) {
+            runInAction(() => {
+              this.currentVoice = sysVoice;
+            });
+          }
+        });
+        return;
+      }
     }
     // Stop ANY prior playback before opening the new session. The stop
     // promise is passed to the streaming handle so it waits for the old
@@ -1545,11 +1568,7 @@ export class TTSStore {
     }
 
     const sink = this.usesModelVoice ? this.modelVoice : null;
-    if (
-      !this.streamsReplies ||
-      messageId === this.lastSpokenMessageId ||
-      (sink == null && this.currentVoice == null)
-    ) {
+    if (!this.streamsReplies || messageId === this.lastSpokenMessageId) {
       return;
     }
     this.lastSpokenMessageId = messageId;

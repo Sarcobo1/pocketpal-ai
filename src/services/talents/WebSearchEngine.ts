@@ -153,13 +153,13 @@ export class WebSearchEngine implements TalentEngine {
     const budget = ctx.maxToolTurns - 1;
     // Mention read_url only when that talent is also enabled for this Pal.
     const readUrl = ctx.activeTalents.has('read_url')
-      ? ' and open pages with read_url'
+      ? ' and read target pages with read_url'
       : '';
     return (
       `Today's date is ${today}. You can search the web with web_search${readUrl}. ` +
-      `For time-sensitive or factual questions, search first; usually one or two searches suffice — ` +
-      `you have a budget of ${budget} tool calls. Answer using the facts in the results and cite ` +
-      'source URLs. If the results do not contain the answer, say so rather than guessing.'
+      'Only search when live information, current news, dates, or prices are required. Do NOT search for code, website building, or standard knowledge. ' +
+      'When searching, inspect the single most relevant page first with read_url. Do not open multiple sites in parallel unless the first result is insufficient. ' +
+      `You have a budget of ${budget} tool calls. Answer using the facts in the results and cite source URLs.`
     );
   }
 
@@ -169,7 +169,7 @@ export class WebSearchEngine implements TalentEngine {
       function: {
         name: 'web_search',
         description:
-          'Search the web for current information. Use this for any question about news, current events, prices, releases, sports, weather, or any fact that may have changed since your training data or that you are unsure about. Write short keyword queries (2-6 words), like a search engine user, not full sentences. Returns result titles, source URLs, and text snippets.',
+          'Search the web for current real-time information (e.g. today news, live currency rates, weather, current event dates). Write short keyword queries (2-5 words). Do NOT use web_search for coding tasks, generating websites/HTML, creative writing, or general knowledge.',
         parameters: {
           type: 'object',
           properties: {

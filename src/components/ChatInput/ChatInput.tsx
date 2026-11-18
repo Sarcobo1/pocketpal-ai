@@ -9,6 +9,7 @@ import {
   Alert,
   ScrollView,
   Image,
+  Keyboard,
 } from 'react-native';
 import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
 import {useCameraPermission} from 'react-native-vision-camera';
@@ -212,22 +213,12 @@ export const ChatInput = observer(
     const [modeSelectorVisible, setModeSelectorVisible] = React.useState(false);
     const [searchConsentVisible, setSearchConsentVisible] =
       React.useState(false);
-    const [selectedMode, setSelectedMode] = React.useState<OpenLimiMode>(
-      isThinkingEnabled ? 'thinking' : 'fast',
-    );
-
-    React.useEffect(() => {
-      if (isThinkingEnabled) {
-        setSelectedMode('thinking');
-      } else if (selectedMode === 'thinking') {
-        setSelectedMode('fast');
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isThinkingEnabled]);
+    const selectedMode = chatSessionStore.activeChatMode;
 
     const handleModeSelect = (mode: OpenLimiMode) => {
-      setSelectedMode(mode);
-      if (mode === 'thinking') {
+      Keyboard.dismiss();
+      chatSessionStore.setActiveChatMode(mode);
+      if (mode === 'thinking' || mode === 'code') {
         onThinkingToggle?.(true);
       } else if (mode === 'fast') {
         onThinkingToggle?.(false);
@@ -657,7 +648,10 @@ export const ChatInput = observer(
                 {!isCameraActive && !isVoiceCaptureActive && (
                   <TouchableOpacity
                     style={styles.modeChip}
-                    onPress={() => setModeSelectorVisible(true)}
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setModeSelectorVisible(true);
+                    }}
                     accessibilityLabel="Rejim tanlash"
                     accessibilityRole="button">
                     <Text numberOfLines={1} style={styles.modeChipText}>

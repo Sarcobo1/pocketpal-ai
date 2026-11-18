@@ -14,6 +14,8 @@ import type {ReasoningCapability} from './reasoningCapability';
 import type {ServerType} from './serverTypes';
 import type {Samplers} from './samplerParams';
 
+export type OpenLimiMode = 'omni' | 'thinking' | 'auto' | 'code' | 'fast';
+
 /**
  * One model-emitted tool call within an `AgentStep`. The `arguments` field
  * is `string` on the wire (what the OpenAI/llama.rn API expects) but

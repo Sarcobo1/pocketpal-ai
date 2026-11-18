@@ -1,5 +1,5 @@
-import React from 'react';
-import {View, Text, TouchableOpacity} from 'react-native';
+import React, {useEffect} from 'react';
+import {View, Text, TouchableOpacity, Keyboard} from 'react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {observer} from 'mobx-react';
 
@@ -78,6 +78,12 @@ export const ModeSelectorSheet: React.FC<ModeSelectorSheetProps> = observer(
   ({isVisible, onClose, selectedMode, onSelectMode}) => {
     const theme = useTheme();
     const styles = createStyles(theme);
+
+    useEffect(() => {
+      if (isVisible) {
+        Keyboard.dismiss();
+      }
+    }, [isVisible]);
 
     // Model capability check for Omni
     const mediaSupport = modelStore.activeMediaSupport;

@@ -16,9 +16,13 @@ type WritableUrl = URL & {hash: string; hostname: string};
 
 // The RN URL polyfill does not lowercase hosts, so ASCII case is folded here.
 const canonicalize = (raw: string): URL | null => {
+  let cleaned = raw.trim();
+  if (!/^https?:\/\//i.test(cleaned)) {
+    cleaned = 'https://' + cleaned;
+  }
   let parsed: WritableUrl;
   try {
-    parsed = new URL(raw.trim()) as WritableUrl;
+    parsed = new URL(cleaned) as WritableUrl;
   } catch {
     return null;
   }
@@ -50,6 +54,7 @@ export function allowReadUrls(urls: Iterable<string>): void {
     const canonical = canonicalize(url);
     if (canonical && !canonical.username && !canonical.password) {
       allowed.set(matchKey(canonical), canonical.toString());
+      userSites.add(siteKey(canonical.hostname));
     }
   }
 }

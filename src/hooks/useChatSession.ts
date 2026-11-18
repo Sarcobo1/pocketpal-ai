@@ -71,12 +71,11 @@ import {LLAMARN_ERROR_PATTERNS} from '../utils/llamaRnErrors';
  * This guards against models that were fine-tuned to disclaim internet access.
  */
 const WEB_SEARCH_CAPABILITY_REMINDER =
-  'IMPORTANT INSTRUCTION: You have full real-time internet search access via the web_search tool. ' +
-  'You must NEVER say that you cannot search the web, cannot access real-time information, or are limited to training data. ' +
-  'When asked to search the internet, look up current prices, events, news, or factual information, ALWAYS execute web_search ' +
-  'or provide the requested up-to-date information directly without any refusal disclaimers. ' +
-  'When writing or debugging code, you can search for latest documentation and community discussions. ' +
-  'When the user asks to build, create, or preview a website, web page, or HTML component, ALWAYS execute the render_html tool with complete HTML/CSS/JS for an interactive Canvas preview.';
+  'SEARCH & CAPABILITY GUIDELINES:\n' +
+  '- WEB SEARCH: You have access to real-time internet search via the web_search tool. ONLY execute web_search when the user explicitly asks to search the web/internet, or when answering questions about current events, live exchange rates, weather, or recent news that requires external real-time data.\n' +
+  '- DO NOT search the web for coding tasks, writing code, creating websites/landing pages, math, creative writing, or general knowledge. Answer directly using your own intelligence!\n' +
+  '- BUILDING WEBSITES / UI: When the user asks to build, create, or preview a website, landing page, HTML component, or canvas, NEVER search the web for it. Instead, write complete, production-ready HTML/CSS/JavaScript and immediately call the render_html tool with your code for an interactive Canvas preview.\n' +
+  '- TARGETED READING: When you do search the web, inspect the single top relevant result first with read_url. Do not flood with multiple tool calls. If the first page answers the question, synthesize your final response immediately.';
 import {projectionGapCopy} from '../utils/multimodalHelpers';
 import {
   toApiCompletionParams,
@@ -336,6 +335,21 @@ const prepareCompletion = async ({
   // only, and the setting leaves room for a Pal that needs to be long.
   const shortVoiceAnswer = spoken && ttsStore.voiceShortAnswers;
 
+  const chatMode = chatSessionStore.activeChatMode;
+  let modeInstruction: string | undefined;
+  if (!spoken) {
+    if (chatMode === 'thinking') {
+      modeInstruction =
+        'THINKING MODE ACTIVE: You must think step-by-step through the problem first. Write your complete internal reasoning process inside <think> and </think> tags. After </think>, write your final answer.';
+    } else if (chatMode === 'fast') {
+      modeInstruction =
+        'FAST MODE ACTIVE: Provide a direct, concise answer immediately without any internal monologue or <think> tags.';
+    } else if (chatMode === 'code') {
+      modeInstruction =
+        'CODE MODE ACTIVE: You are an expert software engineer. Break down every coding task step-by-step. Analyze architecture and edge cases inside <think> and </think> tags. Write clean, complete, robust code. DO NOT search the web for code unless asked. When building websites or UI components, ALWAYS use the render_html tool with full HTML/CSS/JS for an interactive Canvas preview.';
+    }
+  }
+
   const messages = assembleMessages(
     systemMessages,
     // The card appends the mode instruction to whatever system prompt already
@@ -347,6 +361,7 @@ const prepareCompletion = async ({
       ...(sessionToolNames.includes('web_search')
         ? [WEB_SEARCH_CAPABILITY_REMINDER]
         : []),
+      ...(modeInstruction ? [modeInstruction] : []),
       ...(omniGuard ? [TEXT_MODE_INSTRUCTION] : []),
       ...(shortVoiceAnswer ? [VOICE_ANSWER_INSTRUCTION] : []),
     ],
@@ -449,17 +464,23 @@ const prepareCompletion = async ({
     serverStore.remoteReasoning,
   );
   cleanCompletionParams.reasoning_format = 'auto';
-  // Thinking off. It used to be sent only to reasoning-capable models, on the
-  // assumption that a model without reasoning ignores it — but llama.rn defaults
-  // enable_thinking to true, and a template that branches on it (LFM3-Omni ends
-  // the generation prompt with an unclosed <think> unless told off) hands that
-  // model a state it cannot finish. Set at the top level too, because llama.rn
-  // reads params.enable_thinking before it merges chat_template_kwargs.
-  if (!cleanCompletionParams.enable_thinking) {
+
+  const shouldThink =
+    chatMode === 'thinking' ||
+    chatMode === 'code' ||
+    (chatMode !== 'fast' && cleanCompletionParams.enable_thinking !== false);
+
+  if (!shouldThink || spoken) {
     cleanCompletionParams.enable_thinking = false;
     cleanCompletionParams.chat_template_kwargs = {
       ...cleanCompletionParams.chat_template_kwargs,
       enable_thinking: false,
+    };
+  } else {
+    cleanCompletionParams.enable_thinking = true;
+    cleanCompletionParams.chat_template_kwargs = {
+      ...cleanCompletionParams.chat_template_kwargs,
+      enable_thinking: true,
     };
   }
   // Graded effort (gpt-oss-style): carried by the resolver-populated intent.

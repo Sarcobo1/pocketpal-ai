@@ -1,4 +1,4 @@
-import {TalentEngine, TalentResult, ToolDefinition} from './types';
+import {TalentEngine, TalentResult, ToolDefinition, SystemPromptContext} from './types';
 
 /**
  * Engine for the `render_html` talent.
@@ -39,13 +39,23 @@ Reply with at most one short sentence what you build`,
     };
   }
 
+  systemPromptFragment(_ctx: SystemPromptContext): string {
+    return (
+      'CANVAS / HTML PREVIEW: You have the render_html tool. ' +
+      'When the user asks to BUILD, CREATE, DESIGN, or PREVIEW a website, landing page, HTML component, game, form, or any visual content — ' +
+      'write complete, self-contained HTML+CSS+JavaScript and call render_html immediately. ' +
+      'NEVER search the web to build HTML. NEVER just print the code without calling render_html. ' +
+      'The Canvas renders inside the app with full JS support.'
+    );
+  }
+
   toToolDefinition(): ToolDefinition {
     return {
       type: 'function',
       function: {
         name: 'render_html',
         description:
-          'Render an HTML document inline as a visual preview in the chat.',
+          'Render an HTML document inline as a visual interactive Canvas preview in the chat. ALWAYS use this tool when the user asks to build, create, design, or preview a website, landing page, HTML page, UI component, game, or any visual/interactive content. Write complete self-contained HTML+CSS+JS and call this tool immediately — do NOT search the web for it.',
         parameters: {
           type: 'object',
           properties: {

@@ -30,7 +30,7 @@ export const SEARCH_PROVIDERS: SearchProviderMeta[] = [
 ];
 
 const DEFAULT_PROVIDER: SearchProviderId = 'you';
-const DEFAULT_RESULT_COUNT = 5;
+const DEFAULT_RESULT_COUNT = 3;
 const MIN_RESULT_COUNT = 1;
 const MAX_RESULT_COUNT = 8;
 

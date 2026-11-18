@@ -7,6 +7,7 @@ import {
   AgentToolCall,
   AgentToolOutcome,
   MessageType,
+  OpenLimiMode,
 } from '../utils/types';
 import {
   BannerVariant,
@@ -94,6 +95,20 @@ class ChatSessionStore {
   // graded pill round-trips before the first message creates a session; cleared
   // alongside newChatThinkingOverride.
   newChatReasoningEffort: string | undefined = undefined;
+  activeChatMode: OpenLimiMode = 'auto';
+
+  setActiveChatMode(mode: OpenLimiMode) {
+    runInAction(() => {
+      this.activeChatMode = mode;
+      if (mode === 'thinking' || mode === 'code') {
+        this.newChatThinkingOverride = true;
+      } else if (mode === 'fast') {
+        this.newChatThinkingOverride = false;
+      } else {
+        this.newChatThinkingOverride = undefined;
+      }
+    });
+  }
   // Store localized date group names
   dateGroupNames: typeof DEFAULT_GROUP_NAMES = DEFAULT_GROUP_NAMES;
   // Migration status

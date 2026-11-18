@@ -1087,10 +1087,10 @@ export const ChatView = observer(
               ref={list}
               renderItem={renderMessage}
               maintainVisibleContentPosition={
-                isStreaming // || hasHiddenContentState
+                Platform.OS === 'ios' && isStreaming
                   ? {
                       autoscrollToTopThreshold: 20,
-                      minIndexForVisible: 1, //isStreaming ? 1 : 0,
+                      minIndexForVisible: 0,
                     }
                   : undefined
               }

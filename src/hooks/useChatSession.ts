@@ -255,12 +255,35 @@ const prepareCompletion = async ({
   // which is worse than a placeholder — the model would find its own last
   // reply answering a question nobody asked, and fall back to introducing
   // itself.
+  // A row marked `echoExcluded` is a repeat of the question that produced it.
+  // It stays in the chat the user reads; it does not go into the next prompt,
+  // because a history of restated questions is a history of examples that say
+  // restating the question is how you answer.
+  const unEchoedMessages = excludeEchoedAssistantTurns(currentMessages);
+
+  // In spoken mode, no images are kept. In text mode, only the most recent
+  // message with images retains its media; older historical images are replaced
+  // with '[image]' placeholder to prevent accumulating 512+ tokens per image on
+  // every turn, keeping KV cache and RAM growth bounded.
+  let lastImageMsgId: string | undefined;
+  if (!spoken) {
+    for (let i = unEchoedMessages.length - 1; i >= 0; i--) {
+      const m = unEchoedMessages[i];
+      if (m.type === 'text' && m.imageUris && m.imageUris.length > 0) {
+        lastImageMsgId = m.id;
+        break;
+      }
+    }
+  }
+
   const stripHistoryMedia = (msg: MessageType.Any): MessageType.Any => {
     if (msg.type !== 'text') {
       return msg;
     }
     const dropAudio = !!msg.audioUri;
-    const dropImages = spoken && !!msg.imageUris?.length;
+    const dropImages = spoken
+      ? !!msg.imageUris?.length
+      : !!msg.imageUris?.length && msg.id !== lastImageMsgId;
     if (!dropAudio && !dropImages) {
       return msg;
     }
@@ -275,12 +298,7 @@ const prepareCompletion = async ({
     return next;
   };
 
-  // A row marked `echoExcluded` is a repeat of the question that produced it.
-  // It stays in the chat the user reads; it does not go into the next prompt,
-  // because a history of restated questions is a history of examples that say
-  // restating the question is how you answer.
-  const historyMessages =
-    excludeEchoedAssistantTurns(currentMessages).map(stripHistoryMedia);
+  const historyMessages = unEchoedMessages.map(stripHistoryMedia);
 
   let chatMessages = convertToChatMessages(
     historyMessages.filter(msg => msg.type !== 'image'),

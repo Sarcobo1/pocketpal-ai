@@ -47,13 +47,27 @@ function calculateKVCacheMemory(
     : undefined;
 
   const {n_ctx, cache_type_k, cache_type_v} = contextSettings;
-
-  // For SWA (Sliding Window Attention) models like Gemma
-  const effectiveCtx = sliding_window ? Math.min(n_ctx, sliding_window) : n_ctx;
+  const arch = (metadata.architecture || '').toLowerCase();
 
   // Calculate key and value cache separately (may have different quantization)
   const bytesPerK = getKVCacheTypeBytes(cache_type_k || 'f16');
   const bytesPerV = getKVCacheTypeBytes(cache_type_v || 'f16');
+  const bytesPerToken = (n_embd_head_k * bytesPerK) + (n_embd_head_v * bytesPerV);
+
+  // LFM3 tri-hybrid architecture:
+  // Total 24 layers: 13 short convolutions (0 KV cache), 5 SWA layers (window ~256), 6 global attention layers.
+  if (arch.includes('lfm3')) {
+    const swaWindow = sliding_window || 256;
+    const globalLayers = 6;
+    const swaLayers = 5;
+    const effectiveSwaCtx = Math.min(n_ctx, swaWindow);
+
+    const totalTokenLayers = (globalLayers * n_ctx) + (swaLayers * effectiveSwaCtx);
+    return totalTokenLayers * n_head_kv * bytesPerToken;
+  }
+
+  // For pure SWA (Sliding Window Attention) models like Gemma
+  const effectiveCtx = sliding_window ? Math.min(n_ctx, sliding_window) : n_ctx;
 
   const keyCacheSize =
     n_layers * effectiveCtx * n_embd_head_k * n_head_kv * bytesPerK;

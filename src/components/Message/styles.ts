@@ -25,10 +25,10 @@ const styles = ({
       alignItems: 'flex-end',
       alignSelf: currentUserIsAuthor ? 'flex-end' : 'flex-start',
       justifyContent: !currentUserIsAuthor ? 'flex-end' : 'flex-start',
-      flex: 1,
       flexDirection: 'row',
       marginBottom: message.type === 'dateHeader' ? 0 : 4 + message.offset,
-      marginLeft: 20,
+      marginLeft: currentUserIsAuthor ? 0 : 16,
+      marginRight: currentUserIsAuthor ? 16 : 0,
     },
     contentContainer: {
       backgroundColor:

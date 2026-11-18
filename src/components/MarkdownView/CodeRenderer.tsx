@@ -1,10 +1,12 @@
 import React from 'react';
-import {View} from 'react-native';
+import {ScrollView, Text, View} from 'react-native';
 
+import {observer} from 'mobx-react';
 import CodeHighlighter from 'react-native-code-highlighter';
 import {atomOneDark} from 'react-syntax-highlighter/dist/esm/styles/hljs';
 
 import {useTheme} from '../../hooks';
+import {modelStore} from '../../store';
 import {CodeBlockHeader} from '../CodeBlockHeader';
 
 import {codeHighlighterPreOverride, createStyles} from './styles';
@@ -39,8 +41,13 @@ function decodeHTMLEntities(text: string): string {
  *
  * `useTheme()` is read at render time, so theme switches still work; only
  * the renderer-function identity needs to be stable.
+ *
+ * During active token streaming (`modelStore.isStreaming`), CodeHighlighter
+ * regex parsing is bypassed in favor of a raw monospaced text scroll view.
+ * This prevents locking the JS thread with hundreds of styled Text spans on
+ * every token emission, maintaining normal chat streaming speeds.
  */
-export const CodeRenderer = ({TDefaultRenderer, ...props}: any) => {
+export const CodeRenderer = observer(({TDefaultRenderer, ...props}: any) => {
   const theme = useTheme();
   const styles = createStyles(theme);
   const isCodeBlock = props?.tnode?.parent?.tagName === 'pre';
@@ -64,16 +71,28 @@ export const CodeRenderer = ({TDefaultRenderer, ...props}: any) => {
   return (
     <View>
       <CodeBlockHeader language={language} content={content} />
-      <CodeHighlighter
-        hljsStyle={atomOneDark}
-        language={language}
-        textStyle={styles.codeHighlighterText}
-        scrollViewProps={{
-          contentContainerStyle: styles.codeHighlighterScrollContent,
-        }}
-        customStyle={codeHighlighterPreOverride}>
-        {content}
-      </CodeHighlighter>
+      {modelStore.isStreaming ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.codeHighlighterScrollContent}
+          style={codeHighlighterPreOverride}>
+          <Text style={styles.codeHighlighterText} selectable={false}>
+            {content}
+          </Text>
+        </ScrollView>
+      ) : (
+        <CodeHighlighter
+          hljsStyle={atomOneDark}
+          language={language}
+          textStyle={styles.codeHighlighterText}
+          scrollViewProps={{
+            contentContainerStyle: styles.codeHighlighterScrollContent,
+          }}
+          customStyle={codeHighlighterPreOverride}>
+          {content}
+        </CodeHighlighter>
+      )}
     </View>
   );
-};
+});

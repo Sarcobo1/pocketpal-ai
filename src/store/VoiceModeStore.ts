@@ -17,6 +17,9 @@ export type VoicePhase =
   | 'thinking'
   | 'speaking';
 
+/** Fine-grained agent sub-status shown while phase === 'thinking'. */
+export type VoiceAgentStatus = 'preparing' | 'thinking' | 'searching' | null;
+
 export type VoiceError = 'transcribe_failed' | 'reply_failed' | 'speech_failed';
 
 export type VoicePresentation = 'full' | 'bar';
@@ -39,6 +42,11 @@ export class VoiceModeStore {
   userVoiceModeOverride: boolean | null = null;
   /** Transient trigger to launch voice mode via useVoiceMode from other screens */
   pendingVoiceLaunch = false;
+  /**
+   * Fine-grained agent sub-status while phase === 'thinking'.
+   * Updated by useChatSession tool_call events; null otherwise.
+   */
+  agentStatus: VoiceAgentStatus = null;
 
   constructor() {
     makeAutoObservable(this, {}, {autoBind: true});
@@ -85,7 +93,17 @@ export class VoiceModeStore {
       this.micMuted = false;
       this.presentation = 'full';
       this.cameraOn = false;
+      this.agentStatus = null;
     }
+    // Reset agentStatus whenever we leave the thinking phase
+    if (phase !== 'thinking') {
+      this.agentStatus = null;
+    }
+  }
+
+  /** Set by useChatSession on tool_call events during a voice turn. */
+  setAgentStatus(status: VoiceAgentStatus): void {
+    this.agentStatus = status;
   }
 
   /** `useVoiceMode` only. */

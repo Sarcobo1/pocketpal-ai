@@ -82,13 +82,13 @@ export const ASR_BITS_PER_SAMPLE = 16;
  * frames is treated as silence and never decoded — Whisper is autoregressive
  * and hallucinates text on silence. See energyVad.ts.
  */
-export const ASR_VAD_RMS_FLOOR = 0.01;
+export const ASR_VAD_RMS_FLOOR = 0.003;
 
 /** Energy-VAD frame length (ms). */
 export const ASR_VAD_FRAME_MS = 30;
 
 /** Minimum voiced duration (ms) required before a buffer is decoded. */
-export const ASR_MIN_SPEECH_MS = 300;
+export const ASR_MIN_SPEECH_MS = 150;
 
 /** Subdirectory (relative to the platform model root) for ASR model files. */
 export const ASR_PARENT_SUBDIR = 'asr';

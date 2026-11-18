@@ -15,6 +15,7 @@ import {
   serverStore,
   ttsStore,
   uiStore,
+  voiceModeStore,
 } from '../store';
 import type {GenerationLease} from '../store/generationLease';
 import type {PersistedTurnTimings} from '../utils/completionTypes';
@@ -830,6 +831,15 @@ async function applyEventToStore(
     case 'tool_call_started':
       // Reducer handles status flip; the call payload is already on
       // the active step from the preceding `token` event with toolCalls.
+      // Also update voice mode agent status so the UI shows what's happening.
+      if (voiceModeStore.phase === 'thinking') {
+        const calledTool = (event as any).call?.function?.name ?? '';
+        if (calledTool === 'web_search' || calledTool === 'read_url') {
+          voiceModeStore.setAgentStatus('searching');
+        } else {
+          voiceModeStore.setAgentStatus('preparing');
+        }
+      }
       return;
     case 'tool_call_finished':
       await chatSessionStore.appendToolOutcome(
@@ -837,6 +847,10 @@ async function applyEventToStore(
         ctx.sessionId,
         event.outcome,
       );
+      // Reset to plain thinking after tool completes
+      if (voiceModeStore.phase === 'thinking') {
+        voiceModeStore.setAgentStatus('thinking');
+      }
       return;
     case 'step_finished':
       if (

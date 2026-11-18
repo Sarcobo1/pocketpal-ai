@@ -78,7 +78,7 @@ export const VoiceModeView: React.FC = observer(() => {
     voiceModeStore.setPhase('closed');
     voiceModeStore.setPresentation('bar');
   }, [end]);
-  const {phase, micMuted, lastError, cameraOn} = voiceModeStore;
+  const {phase, micMuted, lastError, cameraOn, agentStatus} = voiceModeStore;
   const visual = voiceVisual(phase, micMuted);
   const status = voiceStatus(
     phase,
@@ -87,7 +87,17 @@ export const VoiceModeView: React.FC = observer(() => {
     l10n.voiceMode,
     ttsStore.speechReason,
   );
-  const {title, hint} = status;
+  // Override the hint with a fine-grained agent sub-status while thinking
+  const agentHint =
+    phase === 'thinking' && !status.isError
+      ? agentStatus === 'searching'
+        ? 'Searching...'
+        : agentStatus === 'preparing'
+          ? 'Preparing...'
+          : null
+      : null;
+  const {title, hint: rawHint} = status;
+  const hint = agentHint ?? rawHint;
   useAnnounceVoiceStatus(status, true);
 
   const {hasPermission, requestPermission} = useCameraPermission();

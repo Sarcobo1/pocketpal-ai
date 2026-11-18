@@ -574,6 +574,10 @@ class VoiceModeController {
       this.listenReason = reason;
     }
     voiceModeStore.setPhase(phase);
+    // Set initial agent sub-status when entering thinking phase
+    if (phase === 'thinking') {
+      voiceModeStore.setAgentStatus('thinking');
+    }
   }
 
   private isListening(session: number): boolean {

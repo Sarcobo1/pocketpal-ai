@@ -59,7 +59,7 @@ export const VOICE_MIC_AUDIO_SOURCE = 7;
  * a cough, a key, or the tail of the model's own voice. A dip of up to
  * `VOICE_VAD_RUN_GAP_MS` inside it is the speaker's own, not a break.
  */
-export const VOICE_VAD_MIN_SPEECH_MS = 400;
+export const VOICE_VAD_MIN_SPEECH_MS = 200;
 
 /**
  * A pause this short (ms) does not end a run of speech. Quiet and whispered
@@ -76,14 +76,14 @@ export const VOICE_VAD_RUN_GAP_MS = 150;
  * a single level makes a consonant at the end of a word look like the pause
  * that closes it.
  */
-export const VOICE_VAD_ONSET_FACTOR = 3;
-export const VOICE_VAD_HOLD_FACTOR = 1.8;
+export const VOICE_VAD_ONSET_FACTOR = 1.6;
+export const VOICE_VAD_HOLD_FACTOR = 1.2;
 
 /**
  * Voice activity sensitivity: 1 is the tuned default, a higher number accepts
  * quieter speech by lowering both floors, a lower one demands louder.
  */
-export const VOICE_VAD_SENSITIVITY = 1;
+export const VOICE_VAD_SENSITIVITY = 1.8;
 
 /**
  * The quietest onset the floor will ever trust (~-44 dBFS).
@@ -95,7 +95,7 @@ export const VOICE_VAD_SENSITIVITY = 1;
  * a hand at a desk actually gets, AGC or not — never opened an utterance, and
  * the session reported the person's whole sentence as a key or a cough.
  */
-export const VOICE_VAD_FLOOR_MIN_RMS = 0.006;
+export const VOICE_VAD_FLOOR_MIN_RMS = 0.002;
 
 /** ...the loudest (~-24 dBFS), so loud room tone cannot make the mic deaf. */
 export const VOICE_VAD_FLOOR_MAX_RMS = 0.06;
@@ -128,7 +128,7 @@ export const VOICE_VAD_TAIL_MS = 120;
  * never costs a model turn. Deliberately far under the speech floors: the
  * endpointer owns the adaptive call, this one only refuses obvious nothing.
  */
-export const VOICE_CLIP_MIN_RMS = 0.004;
+export const VOICE_CLIP_MIN_RMS = 0.0015;
 
 /**
  * A started mic that delivers no audio within this long (ms) is restarted
@@ -153,8 +153,12 @@ export const VOICE_START_TIMEOUT_MS = 45_000;
  * does is a sentence the model can say back instead of answering.
  */
 export const VOICE_ANSWER_INSTRUCTION =
-  'You are a voice assistant. Answer the person directly, in first person, ' +
-  'in one or two short sentences.';
+  'You are a voice assistant in voice mode. Answer the user directly, naturally, and concisely in 1-2 spoken sentences. ' +
+  'IMPORTANT: DO NOT use web_search for greetings, casual conversation, general knowledge, definitions, explanations, math, or advice. ' +
+  'ONLY use the web_search tool if the user EXPLICITLY asks to search the internet, OR needs CURRENT real-time data: ' +
+  "live prices, today's weather, breaking news, current events, latest sports scores. " +
+  'When you do search, use a short precise query that EXACTLY matches what was asked — do NOT broaden the query. ' +
+  'Never search for things you already know. Answer directly without searching whenever possible.';
 
 /**
  * What used to stand beside the clip in a spoken turn's user message, and is

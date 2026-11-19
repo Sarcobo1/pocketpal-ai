@@ -322,9 +322,13 @@ const prepareCompletion = async ({
 
   // Talent-contributed system-prompt fragments (e.g. search grounding). Kept on
   // the initial messages array so they persist across every follow-up tool turn.
-  const sessionToolNames = (
-    (sessionCompletionSettings?.tools as ToolDefinition[] | undefined) ?? []
-  ).map(tool => tool.function?.name ?? '');
+  // In spoken (voice) mode, tool calls are disabled: voice mode must respond
+  // instantly without web search delays or code rendering delays.
+  const sessionToolNames = spoken
+    ? []
+    : (
+        (sessionCompletionSettings?.tools as ToolDefinition[] | undefined) ?? []
+      ).map(tool => tool.function?.name ?? '');
   const systemPromptFragments = collectSystemPromptFragments(sessionToolNames, {
     now: new Date(),
     maxToolTurns: DEFAULT_MAX_TURNS,
@@ -335,19 +339,21 @@ const prepareCompletion = async ({
   // only, and the setting leaves room for a Pal that needs to be long.
   const shortVoiceAnswer = spoken && ttsStore.voiceShortAnswers;
 
-  const chatMode = chatSessionStore.activeChatMode;
+  // In spoken (voice) mode, ALWAYS force fast mode: no code, no thinking, no auto.
+  const chatMode = spoken ? 'fast' : chatSessionStore.activeChatMode;
   let modeInstruction: string | undefined;
-  if (!spoken) {
-    if (chatMode === 'thinking') {
-      modeInstruction =
-        'THINKING MODE ACTIVE: You must think step-by-step through the problem first. Write your complete internal reasoning process inside <think> and </think> tags. After </think>, write your final answer.';
-    } else if (chatMode === 'fast') {
-      modeInstruction =
-        'FAST MODE ACTIVE: Provide a direct, concise answer immediately without any internal monologue or <think> tags.';
-    } else if (chatMode === 'code') {
-      modeInstruction =
-        'CODE MODE ACTIVE: You are an expert software engineer. Break down every coding task step-by-step. Analyze architecture and edge cases inside <think> and </think> tags. Write clean, complete, robust code. DO NOT search the web for code unless asked. When building websites or UI components, ALWAYS use the render_html tool with full HTML/CSS/JS for an interactive Canvas preview.';
-    }
+  if (spoken) {
+    modeInstruction =
+      'VOICE FAST MODE ACTIVE: You are conversing in live voice mode. Provide concise, direct, spoken answers in 1-3 conversational sentences. DO NOT use <think> tags, DO NOT think out loud, DO NOT write code, DO NOT use markdown headers or bullet points. Respond immediately in conversational speech.';
+  } else if (chatMode === 'fast') {
+    modeInstruction =
+      'FAST MODE ACTIVE: Provide a direct, concise answer immediately without any internal monologue or <think> tags.';
+  } else if (chatMode === 'thinking') {
+    modeInstruction =
+      'THINKING MODE ACTIVE: You must think step-by-step through the problem first. Write your complete internal reasoning process inside <think> and </think> tags. After </think>, write your final answer.';
+  } else if (chatMode === 'code') {
+    modeInstruction =
+      'CODE MODE ACTIVE: You are an expert software engineer. Break down every coding task step-by-step. Analyze architecture and edge cases inside <think> and </think> tags. Write clean, complete, robust code. DO NOT search the web for code unless asked. When building websites or UI components, ALWAYS use the render_html tool with full HTML/CSS/JS for an interactive Canvas preview.';
   }
 
   const messages = assembleMessages(
@@ -407,8 +413,14 @@ const prepareCompletion = async ({
 
   const completionParamsWithAppProps = {
     ...sessionCompletionSettings,
-    // A spoken reply must start talking at once, not after a reasoning pass.
-    ...(spoken ? {enable_thinking: false, reasoning: {enabled: false}} : {}),
+    // A spoken reply must start talking at once, not after a reasoning pass or tool search.
+    ...(spoken
+      ? {
+          tools: undefined,
+          enable_thinking: false,
+          reasoning: {enabled: false},
+        }
+      : {}),
     messages,
     // The mode tokens stop the turn as well as being banned at sampling: a
     // token that arrives anyway, from a cache an earlier turn left behind, ends
@@ -476,6 +488,9 @@ const prepareCompletion = async ({
       ...cleanCompletionParams.chat_template_kwargs,
       enable_thinking: false,
     };
+    if (spoken) {
+      delete (cleanCompletionParams as any).tools;
+    }
   } else {
     cleanCompletionParams.enable_thinking = true;
     cleanCompletionParams.chat_template_kwargs = {

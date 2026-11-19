@@ -391,6 +391,7 @@ class VoiceModeController {
       modelVoice,
     });
     this.releaseAwake = acquireKeepAwake();
+    chatSessionStore.setActiveChatMode('fast');
     this.setPhase('starting', 'enter');
     voiceModeStore.setPresentation('full');
     try {

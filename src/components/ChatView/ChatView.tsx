@@ -1268,6 +1268,7 @@ export const ChatView = observer(
                       onVoiceModePress &&
                       ((focusInput: () => void) => {
                         Keyboard.dismiss();
+                        chatSessionStore.setActiveChatMode('fast');
                         onVoiceModePress({
                           openModelPicker: () => setIsPickerVisible(true),
                           focusInput,

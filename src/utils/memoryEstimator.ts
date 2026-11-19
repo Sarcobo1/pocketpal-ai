@@ -153,8 +153,13 @@ export function getModelMemoryRequirement(
     const computeBuffer = calculateComputeBuffer(metadata, contextSettings);
 
     const baseMemory = weightsSize + kvCacheSize + computeBuffer;
+    // LFM3 tri-hybrid: checkpoint (state cache) is for conv/SWA layers only,
+    // NOT global attention. The UI slider uses state_cache_budget_mb but for
+    // LFM3 this is a fixed small overhead, not a function of n_ctx.
+    // For pure SWA models (Gemma etc.) the checkpoint grows with context.
+    const isLfm3 = (metadata.architecture || '').toLowerCase().includes('lfm3');
     const checkpointBytes =
-      Number(metadata.sliding_window) > 0
+      !isLfm3 && Number(metadata.sliding_window) > 0
         ? contextSettings.state_cache_budget_mb * 1024 * 1024
         : 0;
     const totalMemory =

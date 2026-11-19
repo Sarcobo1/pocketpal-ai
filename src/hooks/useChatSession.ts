@@ -71,11 +71,11 @@ import {LLAMARN_ERROR_PATTERNS} from '../utils/llamaRnErrors';
  * This guards against models that were fine-tuned to disclaim internet access.
  */
 const WEB_SEARCH_CAPABILITY_REMINDER =
-  'SEARCH & CAPABILITY GUIDELINES:\n' +
-  '- WEB SEARCH: You have access to real-time internet search via the web_search tool. ONLY execute web_search when the user explicitly asks to search the web/internet, or when answering questions about current events, live exchange rates, weather, or recent news that requires external real-time data.\n' +
-  '- DO NOT search the web for coding tasks, writing code, creating websites/landing pages, math, creative writing, or general knowledge. Answer directly using your own intelligence!\n' +
-  '- BUILDING WEBSITES / UI: When the user asks to build, create, or preview a website, landing page, HTML component, or canvas, NEVER search the web for it. Instead, write complete, production-ready HTML/CSS/JavaScript and immediately call the render_html tool with your code for an interactive Canvas preview.\n' +
-  '- TARGETED READING: When you do search the web, inspect the single top relevant result first with read_url. Do not flood with multiple tool calls. If the first page answers the question, synthesize your final response immediately.';
+  'TOOL USE RULES (follow strictly):\n' +
+  '1. DO NOT call web_search for: greetings, casual chat, coding, math, creative writing, website/HTML building, or any topic you already know.\n' +
+  '2. ONLY call web_search when the user EXPLICITLY asks to search, OR the question is about CURRENT/LIVE data (today\'s news, live prices, real-time weather, recent sports results) that changes daily and you cannot answer from training.\n' +
+  '3. For building websites/pages/UI: write HTML+CSS+JS directly and call render_html immediately. NEVER search for this.\n' +
+  '4. If you do search: read only 1 page at a time with read_url. Stop after getting the answer.';
 import {projectionGapCopy} from '../utils/multimodalHelpers';
 import {
   toApiCompletionParams,

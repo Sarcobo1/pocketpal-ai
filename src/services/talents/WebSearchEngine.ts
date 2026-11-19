@@ -151,15 +151,14 @@ export class WebSearchEngine implements TalentEngine {
   systemPromptFragment(ctx: SystemPromptContext): string {
     const today = ctx.now.toISOString().slice(0, 10);
     const budget = ctx.maxToolTurns - 1;
-    // Mention read_url only when that talent is also enabled for this Pal.
     const readUrl = ctx.activeTalents.has('read_url')
-      ? ' and read target pages with read_url'
+      ? ' then read the top result with read_url'
       : '';
     return (
-      `Today's date is ${today}. You can search the web with web_search${readUrl}. ` +
-      'Only search when live information, current news, dates, or prices are required. Do NOT search for code, website building, or standard knowledge. ' +
-      'When searching, inspect the single most relevant page first with read_url. Do not open multiple sites in parallel unless the first result is insufficient. ' +
-      `You have a budget of ${budget} tool calls. Answer using the facts in the results and cite source URLs.`
+      `Today is ${today}. ` +
+      `Use web_search ONLY for live/current data (today's news, live prices, real-time weather, recent events). ` +
+      `DO NOT search for: greetings, math, coding, website building, general knowledge, or anything from your training. ` +
+      `When you search${readUrl}, read 1 page at a time. Budget: ${budget} tool calls total.`
     );
   }
 
@@ -169,7 +168,7 @@ export class WebSearchEngine implements TalentEngine {
       function: {
         name: 'web_search',
         description:
-          'Search the web for current real-time information (e.g. today news, live currency rates, weather, current event dates). Write short keyword queries (2-5 words). Do NOT use web_search for coding tasks, generating websites/HTML, creative writing, or general knowledge.',
+          'Search the web for LIVE/CURRENT information only: today\'s breaking news, live currency/stock prices, real-time weather, or very recent events (last 1-7 days). DO NOT use for: greetings ("hello"), coding tasks, math, website building, general knowledge, history, or anything you can answer from training data. When in doubt, answer directly without searching.',
         parameters: {
           type: 'object',
           properties: {

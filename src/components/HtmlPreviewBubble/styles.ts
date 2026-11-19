@@ -55,8 +55,10 @@ export const createStyles = (colors: {
       paddingVertical: 2,
     },
     collapsedWebView: {
-      height: 250,
+      height: 260,
+      minHeight: 200,
       width: '100%',
+      flexShrink: 0,
       backgroundColor: colors.background,
     },
     codeSurface: {

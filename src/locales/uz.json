@@ -161,6 +161,14 @@
         "thinkText": "O'ylash",
         "cycleEffort": "Mulohaza darajasi: {{level}}. Darajani almashtirish uchun ikki marta bosing"
       }
+    },
+    "htmlPreview": {
+      "defaultTitle": "Ko'rib chiqish",
+      "showPreview": "Sahifani ko'rish",
+      "showCode": "HTML kodni ko'rish",
+      "copyHtml": "Kodni nusxalash",
+      "closePreview": "Yopish",
+      "openFullscreen": "To'liq ekranda ochish: {{title}}"
     }
   },
   "benchmark": {

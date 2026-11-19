@@ -639,6 +639,31 @@ export const ChatView = observer(
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [chatMessages]);
 
+    // Keep Android anchored to bottom during assistant streaming if user was at latest
+    const lastStreamScrollTime = React.useRef(0);
+    React.useEffect(() => {
+      if (Platform.OS === 'android' && isStreaming && atLatest.value) {
+        const now = Date.now();
+        if (now - lastStreamScrollTime.current > 120) {
+          lastStreamScrollTime.current = now;
+          list.current?.scrollToOffset({
+            animated: false,
+            offset: 0,
+          });
+        }
+      }
+    }, [isStreaming, chatMessages, atLatest]);
+
+    // When streaming completes or tool outcome lands, ensure bottom message stays visible
+    React.useEffect(() => {
+      if (!isStreaming && atLatest.value) {
+        list.current?.scrollToOffset({
+          animated: true,
+          offset: 0,
+        });
+      }
+    }, [isStreaming, atLatest]);
+
     // ============ PAGINATION HANDLER ============
     const handleEndReached = React.useCallback(
       // Ignoring because `scroll` event for some reason doesn't trigger even basic

@@ -134,6 +134,14 @@ export const HtmlPreviewBubble: React.FC<HtmlPreviewBubbleProps> = ({
 }) => {
   const theme = useTheme();
   const l10n = useContext(L10nContext);
+  const previewL10n = l10n?.htmlPreview ?? {
+    defaultTitle: 'Preview',
+    showPreview: 'Show rendered preview',
+    showCode: 'Show HTML code',
+    copyHtml: 'Copy HTML',
+    closePreview: 'Close preview',
+    openFullscreen: 'Open fullscreen: {{title}}',
+  };
   const isFocused = useIsFocused();
   const [fullscreen, setFullscreen] = useState(false);
   const [showCode, setShowCode] = useState(false);
@@ -161,7 +169,7 @@ export const HtmlPreviewBubble: React.FC<HtmlPreviewBubbleProps> = ({
 
   const wrappedHtml = useMemo(() => wrapDocument(html), [html]);
   const displayTitle =
-    title && title.length > 0 ? title : l10n.htmlPreview.defaultTitle;
+    title && title.length > 0 ? title : previewL10n.defaultTitle;
 
   const copyHtml = useCallback(() => {
     ReactNativeHapticFeedback.trigger('impactLight', hapticOptions);
@@ -180,8 +188,8 @@ export const HtmlPreviewBubble: React.FC<HtmlPreviewBubbleProps> = ({
             accessibilityRole="button"
             accessibilityLabel={
               showCode
-                ? l10n.htmlPreview.showPreview
-                : l10n.htmlPreview.showCode
+                ? previewL10n.showPreview
+                : previewL10n.showCode
             }
             testID="html-preview-toggle-code"
             hitSlop={8}
@@ -203,7 +211,7 @@ export const HtmlPreviewBubble: React.FC<HtmlPreviewBubbleProps> = ({
           <TouchableOpacity
             onPress={copyHtml}
             accessibilityRole="button"
-            accessibilityLabel={l10n.htmlPreview.copyHtml}
+            accessibilityLabel={previewL10n.copyHtml}
             testID="html-preview-copy"
             hitSlop={8}
             style={styles.headerButton}>
@@ -216,7 +224,7 @@ export const HtmlPreviewBubble: React.FC<HtmlPreviewBubbleProps> = ({
           <TouchableOpacity
             onPress={() => setFullscreen(true)}
             accessibilityRole="button"
-            accessibilityLabel={l10n.htmlPreview.openFullscreen.replace(
+            accessibilityLabel={(previewL10n.openFullscreen || 'Open fullscreen: {{title}}').replace(
               '{{title}}',
               displayTitle,
             )}
@@ -292,8 +300,8 @@ export const HtmlPreviewBubble: React.FC<HtmlPreviewBubbleProps> = ({
                 accessibilityRole="button"
                 accessibilityLabel={
                   showCode
-                    ? l10n.htmlPreview.showPreview
-                    : l10n.htmlPreview.showCode
+                    ? previewL10n.showPreview
+                    : previewL10n.showCode
                 }
                 testID="html-preview-modal-toggle-code"
                 hitSlop={8}
@@ -315,7 +323,7 @@ export const HtmlPreviewBubble: React.FC<HtmlPreviewBubbleProps> = ({
               <TouchableOpacity
                 onPress={copyHtml}
                 accessibilityRole="button"
-                accessibilityLabel={l10n.htmlPreview.copyHtml}
+                accessibilityLabel={previewL10n.copyHtml}
                 testID="html-preview-modal-copy"
                 hitSlop={8}
                 style={styles.modalHeaderButton}>
@@ -328,7 +336,7 @@ export const HtmlPreviewBubble: React.FC<HtmlPreviewBubbleProps> = ({
               <TouchableOpacity
                 onPress={() => setFullscreen(false)}
                 accessibilityRole="button"
-                accessibilityLabel={l10n.htmlPreview.closePreview}
+                accessibilityLabel={previewL10n.closePreview}
                 testID="html-preview-modal-close"
                 hitSlop={8}
                 style={styles.modalHeaderButton}>

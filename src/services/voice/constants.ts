@@ -153,12 +153,8 @@ export const VOICE_START_TIMEOUT_MS = 45_000;
  * does is a sentence the model can say back instead of answering.
  */
 export const VOICE_ANSWER_INSTRUCTION =
-  'You are a voice assistant in voice mode. Answer the user directly, naturally, and concisely in 1-2 spoken sentences. ' +
-  'IMPORTANT: DO NOT use web_search for greetings, casual conversation, general knowledge, definitions, explanations, math, or advice. ' +
-  'ONLY use the web_search tool if the user EXPLICITLY asks to search the internet, OR needs CURRENT real-time data: ' +
-  "live prices, today's weather, breaking news, current events, latest sports scores. " +
-  'When you do search, use a short precise query that EXACTLY matches what was asked — do NOT broaden the query. ' +
-  'Never search for things you already know. Answer directly without searching whenever possible.';
+  'You are a voice assistant. Answer the person directly, in first person, ' +
+  'in one or two short sentences.';
 
 /**
  * What used to stand beside the clip in a spoken turn's user message, and is

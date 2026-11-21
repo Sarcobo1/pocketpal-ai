@@ -151,14 +151,19 @@ export class WebSearchEngine implements TalentEngine {
   systemPromptFragment(ctx: SystemPromptContext): string {
     const today = ctx.now.toISOString().slice(0, 10);
     const budget = ctx.maxToolTurns - 1;
-    const readUrl = ctx.activeTalents.has('read_url')
-      ? ' then read the top result with read_url'
+    const hasReadUrl = ctx.activeTalents.has('read_url');
+    const readUrl = hasReadUrl
+      ? ' and read target pages with read_url'
+      : '';
+    const readUrlInstruction = hasReadUrl
+      ? ' When searching, inspect the single most relevant page first with read_url.'
       : '';
     return (
-      `Today is ${today}. ` +
-      `Use web_search ONLY for live/current data (today's news, live prices, real-time weather, recent events). ` +
-      `DO NOT search for: greetings, math, coding, website building, general knowledge, or anything from your training. ` +
-      `When you search${readUrl}, read 1 page at a time. Budget: ${budget} tool calls total.`
+      `Today's date is ${today}. You can search the web with web_search${readUrl}. ` +
+      'Use web_search ONLY for live/current data (today\'s news, live prices, real-time weather, recent events). ' +
+      'DO NOT search for: greetings ("hello"), casual chat, math, coding, website building, general knowledge, or anything from your training.' +
+      readUrlInstruction +
+      ` You have a budget of ${budget} tool calls. Answer directly without searching whenever possible, or using facts in the results and cite source URLs.`
     );
   }
 

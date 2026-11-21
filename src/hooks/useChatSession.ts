@@ -135,6 +135,12 @@ const prepareCompletion = async ({
     await chatSessionStore.getCurrentCompletionSettings();
   const stopWords = toJS(modelStore.activeModel?.stopWords);
 
+  if (!spoken) {
+    ttsStore.setVoiceOutputActive(false);
+    ttsStore.setModelVoice(null);
+    ttsStore.stop('text_send').catch(() => {});
+  }
+
   // A model that carries a speech decoder answers an audio turn *in speech*
   // unless something says otherwise: LFM3-Omni picks its output modality to
   // match its input, and inside a plain text completion there is no audio
@@ -1235,6 +1241,11 @@ export const useChatSession = (
       return;
     }
     leaseRef.current = lease;
+    if (!opts.spoken) {
+      ttsStore.setVoiceOutputActive(false);
+      ttsStore.setModelVoice(null);
+      ttsStore.stop('text_send').catch(() => {});
+    }
     const stopsWhileWaiting = stopsBeforeLease.current - stopsAtSend;
     vtrace('lease.grant', {spoken: !!opts.spoken, stopsWhileWaiting});
     if (stopsWhileWaiting !== 0) {
@@ -1421,9 +1432,11 @@ export const useChatSession = (
     ) {
       builtinTools.push(renderHtmlDef);
     }
-    const tools = [...existingTools, ...builtinTools];
+    const tools = opts.spoken ? [] : [...existingTools, ...builtinTools];
     if (tools.length > 0) {
       cleanCompletionParams.tools = tools;
+    } else {
+      delete cleanCompletionParams.tools;
     }
     const toolNames = tools
       .map((t: any) => t.function?.name ?? t.name)

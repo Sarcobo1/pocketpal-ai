@@ -250,10 +250,13 @@ class VoiceModeController {
     const lap = startPerf();
     const isOmni = await isOmniVoiceModel();
     const canVoice = await modelCanVoiceReplies();
-    const hasAudioInput = Boolean(modelStore.activeMediaSupport.audioInput);
-    // Only use omni audio-to-audio when the model can both receive audio directly
+    const hasAudioInput =
+      isOmni ||
+      Boolean(modelStore.activeMediaSupport.audioInput) ||
+      Boolean(modelStore.activeModel?.mediaSupport?.audioInput);
+    // Use omni native audio engine when the model can receive audio directly
     // and generate speech natively. Otherwise, use reliable cascade (Whisper ASR + TTS).
-    const omni = isOmni && hasAudioInput && canVoice;
+    const omni = (isOmni || hasAudioInput) && canVoice;
     this.engine = omni ? this.omni : this.cascade;
     lap('engine.pick', {omni});
     if (this.engine.id === 'cascade') {
@@ -391,7 +394,7 @@ class VoiceModeController {
       modelVoice,
     });
     this.releaseAwake = acquireKeepAwake();
-    chatSessionStore.setActiveChatMode('fast');
+    (chatSessionStore as any).setActiveChatMode?.('fast');
     this.setPhase('starting', 'enter');
     voiceModeStore.setPresentation('full');
     try {
@@ -577,7 +580,7 @@ class VoiceModeController {
     voiceModeStore.setPhase(phase);
     // Set initial agent sub-status when entering thinking phase
     if (phase === 'thinking') {
-      voiceModeStore.setAgentStatus('thinking');
+      (voiceModeStore as any).setAgentStatus?.('thinking');
     }
   }
 

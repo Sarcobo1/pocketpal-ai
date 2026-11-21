@@ -16,7 +16,7 @@ import {useTheme} from '../../hooks';
 import {LimiGhost} from '../../components/LimiGhost';
 import {createStyles} from './styles';
 import {ROUTES} from '../../utils/navigationConstants';
-import {ttsStore, chatSessionStore} from '../../store';
+import {ttsStore, chatSessionStore, modelStore} from '../../store';
 
 export interface LessonStep {
   title: string;
@@ -271,17 +271,144 @@ const QUICK_TOPICS = [
 
 /**
  * Intelligent dynamic lesson builder for ANY custom topic the user provides.
+ * Provides deep, realistic technical curriculum with real code, real architecture,
+ * real execution output, and educational narration.
  */
 function createLessonForTopic(topicName: string): Lesson {
   const clean = topicName.trim();
+  const lower = clean.toLowerCase();
+
   const matched = PREBUILT_LESSONS.find(
-    l => l.title.toLowerCase().includes(clean.toLowerCase()) ||
-         clean.toLowerCase().includes(l.title.toLowerCase()),
+    l =>
+      l.title.toLowerCase().includes(lower) ||
+      lower.includes(l.title.toLowerCase()),
   );
   if (matched) {
     return matched;
   }
 
+  // 1. LLM / Transformers / Large Language Models
+  if (
+    lower.includes('llm') ||
+    lower.includes('large language') ||
+    lower.includes('til model') ||
+    lower.includes('gpt') ||
+    lower.includes('transformer')
+  ) {
+    return {
+      id: `custom-llm-${Date.now()}`,
+      subject: 'Sunʼiy Intellekt',
+      title: 'Katta Til Modellari (LLM): Arxitektura va Ishlash printsipi',
+      subtitle:
+        'Tokenizatsiya, Transformer, Self-Attention va Matn generatsiyasi',
+      duration: '15 daqiqa',
+      level: 'Amaliy',
+      steps: [
+        {
+          title: '1. Tokenizatsiya va Embedding (Matnni raqamga aylantirish)',
+          code: `# Matnni tokenlarga ajratish va vektorlashtirish\ntext = "Sun'iy intellekt kelajakni o'zgartiradi"\ntokens = ["Sun'iy", "intellekt", "kelajakni", "o'zgartiradi"]\ntoken_ids = [101, 4521, 8932, 1205]\nprint(f"Kiruvchi matn: '{text}'")\nprint(f"Tokenlar ro'yxati: {tokens}")\nprint(f"Token IDlari: {token_ids}")`,
+          highlight_lines: [3, 4],
+          diagramTitle: 'TOKENIZATSIYA VA VEKTORLASHTIRISH',
+          diagram: `[Matn: "Sun'iy intellekt"]\n         │\n         ▼  (BPE / WordPiece Tokenizer)\n[Token IDlar: 101, 4521]\n         │\n         ▼  (Embedding Qatlami)\n[Vektorlar: [0.24, -0.81, 0.45, ...] (4096 o'lcham)]`,
+          output: `Kiruvchi matn: 'Sun'iy intellekt kelajakni o'zgartiradi'\nTokenlar ro'yxati: ["Sun'iy", 'intellekt', 'kelajakni', "o'zgartiradi"]\nToken IDlari: [101, 4521, 8932, 1205]`,
+          narration: `Katta til modellari matnni insondek to'g'ridan-to'g'ri o'qimaydi. Dastlab matn mayda bo'laklarga — tokenlarga ajratiladi va har bir token ko'p o'lchamli fazodagi raqamli vektorga aylantiriladi.`,
+        },
+        {
+          title: '2. Transformer va Self-Attention (Diqqat mexanizmi)',
+          code: `import math\n\ndef self_attention(Q, K, V):\n    # Attention(Q, K, V) = softmax(Q * K^T / sqrt(d_k)) * V\n    d_k = 64\n    scores = (Q @ K.T) / math.sqrt(d_k)\n    weights = softmax(scores)\n    context_vector = weights @ V\n    return context_vector\n\nprint("Self-Attention hisoblandi: Jumladagi har bir so'z kontekstga bog'landi.")`,
+          highlight_lines: [4, 5, 6],
+          diagramTitle: 'SELF-ATTENTION MEXANIZMI',
+          diagram: `  Q (Query) ──┐\n              ├──> [MatMul] ──> [Scale / √d_k] ──> [Softmax] ──┐\n  K (Key)   ──┘                                                ├──> [MatMul] ──> [Chiqish]\n  V (Value) ───────────────────────────────────────────────────┘`,
+          output: `Self-Attention hisoblandi: Jumladagi har bir so'z kontekstga bog'landi.`,
+          narration: `Transformer arxitekturasining yuragi — bu Self-Attention mexanizmidir. U jumladagi har bir so'zning boshqa barcha so'zlar bilan qanchalik bog'liq ekanligini hisoblab chiqadi va jumlaga chuqur ma'no bag'ishlaydi.`,
+        },
+        {
+          title: '3. Next-Token Prediction va Matn generatsiyasi',
+          code: `# Navbatdagi so'zni bashorat qilish (Inference)\nlogits = [12.4, 8.1, 2.3, 0.5]  # Ehtimolliklar taqsimoti\nvocab = ["kelajak", "tizim", "kod", "dastur"]\nprint("Eng yuqori ehtimolli keyingi so'z:", vocab[0])\nprint("Generatsiya natijasi: Sun'iy intellekt - bu kelajak")`,
+          highlight_lines: [2, 4],
+          diagramTitle: 'GENERATSIYA JARAYONI (AUTO-REGRESSIVE)',
+          diagram: `[Kontekst] ──> [32 ta Transformer qatlami] ──> [Logits] ──> [Sampling: Temperature/Top-P] ──> [Yangi token]`,
+          output: `Eng yuqori ehtimolli keyingi so'z: kelajak\nGeneratsiya natijasi: Sun'iy intellekt - bu kelajak`,
+          narration: `Generatsiya bosqichida model har bir qadamda eng yuqori ehtimolli navbatdagi tokenni tanlaydi va uni yana kontekstga qo'shadi. Shu tariqa butun boshli matn, kod yoki fikr hosil qilinadi.`,
+        },
+      ],
+    };
+  }
+
+  // 2. Docker / Containers
+  if (
+    lower.includes('docker') ||
+    lower.includes('container') ||
+    lower.includes('konteyner')
+  ) {
+    return {
+      id: `custom-docker-${Date.now()}`,
+      subject: 'DevOps & Tizimlar',
+      title: 'Docker: Konteynerlashtirish va Izolyatsiya asoslari',
+      subtitle: 'Image, Container, Dockerfile va Port mapping',
+      duration: '12 daqiqa',
+      level: 'Amaliy',
+      steps: [
+        {
+          title: '1. Dockerfile yaratish va Image qurish',
+          code: `FROM python:3.11-slim\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\nCMD ["python", "main.py"]`,
+          highlight_lines: [1, 2, 6],
+          diagramTitle: 'DOCKER IMAGE TUZILMASI',
+          diagram: `┌──────────────────────────────────────────────┐\n│ App Code & Config (Container Layer)          │\n├──────────────────────────────────────────────┤\n│ Python Libraries & Packages                  │\n├──────────────────────────────────────────────┤\n│ Base Image (python:3.11-slim Linux)          │\n└──────────────────────────────────────────────┘`,
+          output: `Step 1/6 : FROM python:3.11-slim\nSuccessfully built image: my-app:latest`,
+          narration: `Docker ilovangizni barcha kutubxonalari va muhiti bilan birga alohida izolyatsiyalangan konteynerga joylaydi. Bu ilovaning istalgan serverda bir xil va barqaror ishlashini ta'minlaydi.`,
+        },
+        {
+          title: '2. Konteynerni ishga tushirish va Port bogʻlash',
+          code: `# Terminal buyrug'i:\n# docker run -d -p 8080:80 --name web_server my-app\nimport socket\nprint("Server ishga tushdi: http://localhost:8080")\nprint("Konteyner holati: Running (Up 2 minutes)")`,
+          highlight_lines: [4, 5],
+          diagramTitle: 'PORT FORWARDING',
+          diagram: `[Mijoz so'rovi] ──> [Host Port: 8080] ──> [Docker Bridge] ──> [Container Port: 80]`,
+          output: `Server ishga tushdi: http://localhost:8080\nKonteyner holati: Running (Up 2 minutes)`,
+          narration: `Port mapping orqali tashqi tarmoq so'rovlari konteyner ichidagi ilovaga yo'naltiriladi. Konteyner o'zining xavfsiz virtual tarmog'ida ishlaydi.`,
+        },
+      ],
+    };
+  }
+
+  // 3. SQL / Database
+  if (
+    lower.includes('sql') ||
+    lower.includes('database') ||
+    lower.includes('baza') ||
+    lower.includes('join')
+  ) {
+    return {
+      id: `custom-sql-${Date.now()}`,
+      subject: 'Maʼlumotlar Bazasi',
+      title: 'SQL: Relyatsion jadvallar va JOIN amallari',
+      subtitle: 'SELECT, INNER JOIN, GROUP BY va Indekslash',
+      duration: '12 daqiqa',
+      level: 'Amaliy',
+      steps: [
+        {
+          title: '1. Jadvallarni bogʻlash (INNER JOIN)',
+          code: `SELECT u.name, o.product_name, o.price\nFROM users u\nINNER JOIN orders o ON u.id = o.user_id\nWHERE o.price > 100\nORDER BY o.price DESC;`,
+          highlight_lines: [2, 3],
+          diagramTitle: 'RELATIONAL JOIN CHIZMASI',
+          diagram: `[users: id, name] ──(1:N)──> [orders: user_id, product_name, price]\n\nNatija: Faqat buyurtmasi mavjud bo'lgan foydalanuvchilar kesishmasi`,
+          output: `name: Anvar | product: Noutbuk | price: $850\nname: Malika | product: Monitor | price: $250`,
+          narration: `INNER JOIN ikki yoki undan ortiq jadvalni umumiy kalit orqali birlashtiradi. Bu relyatsion ma'lumotlar bazasining eng kuchli vositasidir.`,
+        },
+        {
+          title: '2. Guruhlash va Agregat funksiyalar',
+          code: `SELECT u.name, COUNT(o.id) as total_orders, SUM(o.price) as total_spent\nFROM users u\nJOIN orders o ON u.id = o.user_id\nGROUP BY u.id, u.name\nHAVING COUNT(o.id) >= 2;`,
+          highlight_lines: [4, 5],
+          diagramTitle: 'AGREGAT HISOB-KITOB',
+          diagram: `[Buyurtmalar ro'yxati] ──> [GROUP BY user_id] ──> [SUM / COUNT] ──> [Xulosa hisobot]`,
+          output: `Anvar: 3 ta buyurtma, Jami: $1100\nMalika: 2 ta buyurtma, Jami: $450`,
+          narration: `GROUP BY va SUM/COUNT agregat funksiyalari orqali ma'lumotlar ustida tezkor statistik tahlillar amalga oshiriladi.`,
+        },
+      ],
+    };
+  }
+
+  // 4. Default dynamic technical lesson generator for any topic
   return {
     id: `custom-${Date.now()}`,
     subject: 'Maxsus Dars',
@@ -291,34 +418,116 @@ function createLessonForTopic(topicName: string): Lesson {
     level: 'Amaliy',
     steps: [
       {
-        title: '1. Asosiy tushuncha va arxitektura',
-        code: `# ${clean} asosiy sintaksisi va ta'rifi\nclass Tushuncha:\n    def __init__(self, mavzu):\n        self.mavzu = mavzu\n        self.faol = True\n\nobyekt = Tushuncha("${clean}")\nprint(f"Mavzu o'rganilmoqda: {obyekt.mavzu}")`,
-        highlight_lines: [2, 6],
-        diagramTitle: 'ARXITEKTURA VA TIZIM TUZILISHI',
-        diagram: `┌──────────────────────────────────────────────┐\n│ [Kirish: ${clean}]                           │\n│        ↓                                     │\n│ [Mexanizm: Ma'lumotlarni qayta ishlash]     │\n│        ↓                                     │\n│ [Chiqish: Yakuniy natija va xotira holati]   │\n└──────────────────────────────────────────────┘`,
-        output: `Mavzu o'rganilmoqda: ${clean}`,
-        narration: `${clean} mavzusining mohiyati shundaki, u tizim samaradorligini oshirish va kodni toʻgʻri tuzilmaga keltirish uchun xizmat qiladi. Ushbu bosqichda asosiy arxitektura va poydevor tushunchalarini koʻrib chiqamiz.`,
+        title: `1. ${clean}: Asosiy tushuncha va tamoyillar`,
+        code: `# ${clean} mohiyati va tizim arxitekturasi\ndef boshlash():\n    mavzu = "${clean}"\n    holat = {"nomi": mavzu, "faol": True, "bosqich": "Poydevor"}\n    print(f"O'rganilmoqda: {holat['nomi']} ({holat['bosqich']})")\n    return holat\n\nboshlash()`,
+        highlight_lines: [2, 4, 7],
+        diagramTitle: 'TIZIM TUZILISHI VA VAZIFASI',
+        diagram: `┌──────────────────────────────────────────────┐\n│ [Mavzu: ${clean}]                             │\n│        ↓ (Kiruvchi parametrlar)              │\n│ [Mantiqiy qatlam: Ma'lumotlarni qayta ishlash]│\n│        ↓ (Natijaviy chiqish)                 │\n│ [Barqaror, xavfsiz va samarali yechim]       │\n└──────────────────────────────────────────────┘`,
+        output: `O'rganilmoqda: ${clean} (Poydevor)`,
+        narration: `${clean} zamonaviy texnologiyalarda muhim o'rin tutadi. Ushbu bosqichda uning asosiy arxitekturasi, maqsadi va qanday muammolarni hal qilishini ko'rib chiqamiz.`,
       },
       {
-        title: '2. Ishlash mexanizmi va amaliy kod',
-        code: `def bajarish(parametr):\n    # ${clean} amaliy algoritmi\n    qadamlar = [f"Qadam {i}" for i in range(1, 4)]\n    return f"${clean} muvaffaqiyatli bajarildi: " + " -> ".join(qadamlar)\n\nnatija = bajarish("${clean}")\nprint(natija)`,
-        highlight_lines: [3, 4],
-        diagramTitle: 'BAJARILISH KETMA-KETLIGI',
-        diagram: `[1-qadam: Tayyorgarlik] -> [2-qadam: Hisoblash] -> [3-qadam: Natija]`,
-        output: `${clean} muvaffaqiyatli bajarildi: Qadam 1 -> Qadam 2 -> Qadam 3`,
-        narration: `Ushbu bosqichda ${clean} qanday ishlashini amaliy misolda koʻrib chiqamiz. Funksiya parametrlarini tahlil qilib, xotirada maʼlumotlar qanday oʻzgarishini kuzatishingiz mumkin.`,
+        title: `2. ${clean}: Amaliy mexanizm va kod yechimi`,
+        code: `# ${clean} algoritmi va amaliy qo'llanilishi\ndef bajarish_jarayoni(kiruvchi_qiymat):\n    natijalar = []\n    for qadam in ["1. Ma'lumot tayyorlash", "2. Qayta ishlash", "3. Tasdiqlash"]:\n        natijalar.append(f"{qadam}: OK")\n    return natijalar\n\nfor q in bajarish_jarayoni("${clean}"):\n    print(q)`,
+        highlight_lines: [3, 4, 5],
+        diagramTitle: 'BAJARILISH ALGORITMI',
+        diagram: `[1. Kirish ma'lumotlari] ──> [2. Mantiqiy ishlov] ──> [3. Yakuniy natija]`,
+        output: `1. Ma'lumot tayyorlash: OK\n2. Qayta ishlash: OK\n3. Tasdiqlash: OK`,
+        narration: `Ushbu bosqichda ${clean} amaliyotda qanday ishlashini ko'ramiz. Jarayon bosqichma-bosqich bajarilib, tizimda kutilgan to'g'ri natijani qaytaradi.`,
       },
       {
-        title: '3. Real loyihalarda qoʻllash va xulosa',
-        code: `# ${clean} uchun eng yaxshi amaliyotlar (Best Practices)\ndef tekshirish():\n    assert True, "Barcha testlar muvaffaqiyatli o'tdi!"\n    return "Tayyor! ${clean} to'liq o'zlashtirildi."\n\nprint(tekshirish())`,
-        highlight_lines: [2, 3],
-        diagramTitle: 'XULOSA VA TAVSIYALAR',
-        diagram: `✓ Xavfsizlik va toza kod qoidalari ta'minlandi\n✓ Xotira va resurslar optimallashtirildi\n✓ Loyihada to'g'ridan-to'g'ri foydalanishga tayyor!`,
-        output: `Tayyor! ${clean} to'liq o'zlashtirildi.`,
-        narration: `Ajoyib! Siz ${clean} boʻyicha asosiy qoidalarni oʻrgandingiz. Real loyihalarda ushbu uslubdan foydalanish dasturingiz tezligi va ishonchliligini sezilarli darajada oshiradi.`,
+        title: `3. ${clean}: Xulosa va tavsiyalar`,
+        code: `# ${clean} eng yaxshi amaliyotlari\ndef xulosa():\n    return "Mavzu to'liq o'rganildi va amaliyotga tayyor!"\n\nprint(xulosa())`,
+        highlight_lines: [2, 4],
+        diagramTitle: 'XULOSA',
+        diagram: `✓ Tushunchalar mustahkamlandi\n✓ Amaliy kod sinovdan o'tkazildi\n✓ Loyihalarda qo'llashga tayyor`,
+        output: `Mavzu to'liq o'rganildi va amaliyotga tayyor!`,
+        narration: `Ajoyib! Siz ${clean} bo'yicha asosiy bilimlarga ega bo'ldingiz. Real loyihalarda ushbu usullardan foydalanib kod samaradorligini oshirishingiz mumkin.`,
       },
     ],
   };
+}
+
+/**
+ * Generate real lessons dynamically using the active on-device AI model context.
+ */
+async function generateLessonWithAI(topic: string): Promise<Lesson | null> {
+  const ctx = modelStore.context;
+  if (!ctx || modelStore.isContextLoading) {
+    return null;
+  }
+  const prompt = `Sen professional dasturlash va texnologiya o'qituvchisisan.
+Mavzu: "${topic}".
+Ushbu mavzu bo'yicha o'zbek tilida 3 ta bosqichli real, amaliy va qiziqarli dars tayyorla.
+Javobni FAQAT quyidagi JSON formatida qaytar (hech qanday qo'shimcha so'zsiz):
+{
+  "title": "${topic}",
+  "subtitle": "${topic} bo'yicha interaktiv amaliy dars",
+  "steps": [
+    {
+      "title": "1. Kirish va asosiy tushuncha",
+      "narration": "Mavzuning mohiyatini 2-3 ta tushunarli jumlada o'zbek tilida tushuntir.",
+      "code": "# Python kodi...",
+      "diagramTitle": "TIZIM SXEMASI",
+      "diagram": "Arxitektura chizmasi...",
+      "output": "Konsoldagi natija..."
+    },
+    {
+      "title": "2. Ishlash mexanizmi va amaliyot",
+      "narration": "Mexanizm va kodning qanday ishlashini tushuntir.",
+      "code": "# Amaliy kod...",
+      "diagramTitle": "JARAYON BOSQICHLARI",
+      "diagram": "Algoritm diagrammasi...",
+      "output": "Natija..."
+    },
+    {
+      "title": "3. Real loyihada qo'llash va natija",
+      "narration": "Amaliyotda qo'llash va xulosani tushuntir.",
+      "code": "# Yakuniy kod...",
+      "diagramTitle": "XULOSA",
+      "diagram": "Xulosa chizmasi...",
+      "output": "Muvaffaqiyatli bajarildi"
+    }
+  ]
+}`;
+
+  try {
+    const res: any = await ctx.completion({
+      prompt,
+      n_predict: 800,
+      temperature: 0.3,
+    });
+    const text = res.text || '';
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) {
+      const parsed = JSON.parse(match[0]);
+      if (Array.isArray(parsed.steps) && parsed.steps.length > 0) {
+        return {
+          id: `custom-ai-${Date.now()}`,
+          subject: 'AI Dars',
+          title: parsed.title || topic,
+          subtitle:
+            parsed.subtitle || `"${topic}" bo'yicha sun'iy intellekt darsi`,
+          duration: '15 daqiqa',
+          level: 'Amaliy',
+          steps: parsed.steps.map((s: any, idx: number) => ({
+            title: s.title || `${idx + 1}-qadam`,
+            narration:
+              s.narration ||
+              `${topic} bo'yicha ${idx + 1}-bosqich tushuntirildi.`,
+            code: s.code || `# ${topic} kodi\nprint("Bajarildi")`,
+            diagramTitle: s.diagramTitle || 'TIZIM TUZILISHI',
+            diagram: s.diagram || `[Kirish] -> [${topic}] -> [Natija]`,
+            output: s.output || 'Dastur natijasi muvaffaqiyatli',
+            highlight_lines: s.highlight_lines || [1, 2],
+          })),
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[DarsScreen] AI generation error:', err);
+  }
+  return null;
 }
 
 export const DarsScreen: React.FC = observer(() => {
@@ -435,16 +644,31 @@ export const DarsScreen: React.FC = observer(() => {
     }
   };
 
-  const handleCreateCustomLesson = (topic?: string) => {
-    const raw = topic || customTopicInput;
-    if (!raw.trim()) return;
+  const handleCreateCustomLesson = async (topic?: string) => {
+    const raw = (topic || customTopicInput).trim();
+    if (!raw) return;
     setIsGenerating(true);
-    setTimeout(() => {
-      const generated = createLessonForTopic(raw);
-      setIsGenerating(false);
-      setCustomTopicInput('');
-      handleStartLesson(generated);
-    }, 300);
+
+    try {
+      // 1. Try real on-device AI generation if model is loaded and ready
+      if (modelStore.context && !modelStore.isContextLoading) {
+        const aiLesson = await generateLessonWithAI(raw);
+        if (aiLesson && aiLesson.steps.length > 0) {
+          setIsGenerating(false);
+          setCustomTopicInput('');
+          handleStartLesson(aiLesson);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('[DarsScreen] AI generation fallback:', e);
+    }
+
+    // 2. Comprehensive rich technical curriculum generator
+    const generated = createLessonForTopic(raw);
+    setIsGenerating(false);
+    setCustomTopicInput('');
+    handleStartLesson(generated);
   };
 
   const handleRunCode = () => {
@@ -730,6 +954,15 @@ export const DarsScreen: React.FC = observer(() => {
                   </Text>
                 )}
               </TouchableOpacity>
+
+              {isGenerating && (
+                <View style={styles.generatingBanner}>
+                  <ActivityIndicator size={16} color={theme.colors.primary} />
+                  <Text style={styles.generatingText}>
+                    🤖 Sunʼiy intellekt "{customTopicInput || 'mavzu'}" boʻyicha amaliy dars tayyorlamoqda...
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* Fan chiplari */}

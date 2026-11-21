@@ -381,4 +381,21 @@ export const createStyles = (theme: Theme) =>
       fontSize: 11,
       color: theme.colors.primary,
     },
+    generatingBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(52, 211, 153, 0.12)',
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.colors.primary,
+      padding: theme.spacing.sm,
+      marginTop: theme.spacing.sm,
+      gap: theme.spacing.sm,
+    },
+    generatingText: {
+      flex: 1,
+      fontFamily: 'Geist-Medium',
+      fontSize: 13,
+      color: theme.colors.primary,
+    },
   });

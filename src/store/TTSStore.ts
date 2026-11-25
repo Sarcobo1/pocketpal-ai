@@ -1769,6 +1769,24 @@ export class TTSStore {
   async deletePhonon(): Promise<void> {
     return this.deleteNeuralEngine('phonon');
   }
+
+  /**
+   * Select the first available voice for the given neural engine and make it
+   * `currentVoice`. Call this before `play()` when you want to preview a
+   * specific installed engine (e.g. from the Voice Studio preview button),
+   * rather than relying on whatever voice was last active.
+   */
+  async selectEngineVoice(id: NeuralEngineId): Promise<void> {
+    const engine = getNeuralEngine(id);
+    try {
+      const voices = await engine.getVoices();
+      if (voices.length > 0) {
+        this.setCurrentVoice(voices[0]!);
+      }
+    } catch (err) {
+      console.warn(`[TTSStore] selectEngineVoice(${id}) failed:`, err);
+    }
+  }
 }
 
 export const ttsStore = new TTSStore();

@@ -195,6 +195,25 @@ export const VoiceStudioScreen: React.FC = observer(() => {
         );
         return;
       }
+      // If the current voice is null or system but a neural engine is
+      // installed, switch to the best available neural engine automatically.
+      if (
+        ttsStore.currentVoice == null ||
+        ttsStore.currentVoice.engine === 'system'
+      ) {
+        const neuralPriority: NeuralEngineId[] = ['kokoro', 'supertonic', 'kitten', 'phonon'];
+        for (const engineId of neuralPriority) {
+          let dlState = '';
+          if (engineId === 'kokoro') dlState = ttsStore.kokoroDownloadState;
+          else if (engineId === 'supertonic') dlState = ttsStore.supertonicDownloadState;
+          else if (engineId === 'kitten') dlState = ttsStore.kittenDownloadState;
+          else if (engineId === 'phonon') dlState = ttsStore.phononDownloadState;
+          if (dlState === 'ready') {
+            await ttsStore.selectEngineVoice(engineId);
+            break;
+          }
+        }
+      }
       setIsPlaying(true);
       const msgId = `voice-studio-${Date.now()}`;
       try {
@@ -390,19 +409,6 @@ export const VoiceStudioScreen: React.FC = observer(() => {
               </Text>
             </View>
 
-            {/* Omni spotlight banner */}
-            <View style={styles.omniSpotlightBanner}>
-              <Text style={styles.omniSpotlightTitle}>⚡ Omni Ovozli Model (To'g'ridan-to'g'ri nutq)</Text>
-              <Text style={styles.omniSpotlightSub}>
-                Alohida STT va TTS yuklamasdan, to'g'ridan-to'g'ri bitta Omni model (masalan, LFM3-Omni) orqali gaplashmoqchimisiz?
-              </Text>
-              <TouchableOpacity
-                style={styles.omniSpotlightBtn}
-                onPress={() => navigation.navigate(ROUTES.MODELS, {initialCategory: 'omni'})}>
-                <Text style={styles.omniSpotlightBtnText}>Omni modellarni ko'rish →</Text>
-              </TouchableOpacity>
-            </View>
-
             {/* Recommended STT models fitting the device */}
             <View style={styles.recommendedSection}>
               <Text style={styles.recommendedTitle}>📱 Qurilmangizga mos STT modellari (Whisper)</Text>
@@ -579,19 +585,6 @@ export const VoiceStudioScreen: React.FC = observer(() => {
               </Text>
             </View>
 
-            {/* Omni spotlight banner */}
-            <View style={styles.omniSpotlightBanner}>
-              <Text style={styles.omniSpotlightTitle}>⚡ Omni Ovozli Model (To'g'ridan-to'g'ri nutq)</Text>
-              <Text style={styles.omniSpotlightSub}>
-                Alohida TTS yuklamasdan to'g'ridan-to'g'ri Omni model ovozidan foydalanmoqchimisiz?
-              </Text>
-              <TouchableOpacity
-                style={styles.omniSpotlightBtn}
-                onPress={() => navigation.navigate(ROUTES.MODELS, {initialCategory: 'omni'})}>
-                <Text style={styles.omniSpotlightBtnText}>Omni modellarni ko'rish →</Text>
-              </TouchableOpacity>
-            </View>
-
             {/* Recommended TTS voices fitting the device */}
             <View style={styles.recommendedSection}>
               <Text style={styles.recommendedTitle}>🔊 Qurilmangizga mos TTS ovozlari</Text>
@@ -649,8 +642,14 @@ export const VoiceStudioScreen: React.FC = observer(() => {
                       {isReady ? (
                         <TouchableOpacity
                           style={styles.modelItemBtn}
-                          onPress={() => {
+                          onPress={async () => {
                             ttsStore.setUserTTSOverride(true);
+                            // Switch to this engine's voice before preview so
+                            // the installed neural engine is used, not the
+                            // system/platform TTS fallback.
+                            if (!isSystem) {
+                              await ttsStore.selectEngineVoice(item.id as NeuralEngineId);
+                            }
                             ttsStore.play(`test-preview-${item.id}`, 'Salom! Men sizning PocketPal ovozli yordamchingizman.');
                           }}>
                           <Text style={styles.modelItemBtnText}>▶ Ovozni sinash</Text>

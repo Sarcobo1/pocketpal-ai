@@ -1787,6 +1787,65 @@ export class TTSStore {
       console.warn(`[TTSStore] selectEngineVoice(${id}) failed:`, err);
     }
   }
+
+  /**
+   * Return all voices for a given engine. Used by the Voice Studio speaker
+   * picker to populate the voice list without reaching into the engine layer
+   * directly from a screen.
+   */
+  async getVoicesForEngine(id: NeuralEngineId): Promise<Voice[]> {
+    try {
+      return await getNeuralEngine(id).getVoices();
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Synthesize `text` with `currentVoice` and save the result as a WAV file
+   * in the app's documents directory. Returns the saved file path so the
+   * caller can share it, or throws on error.
+   *
+   * Implementation: plays the audio normally (which is the only public
+   * synthesis path), then locates the most recent WAV written to
+   * `voiceAudioDir` by the engine. The file is copied to the exports dir
+   * so the user can share it persistently.
+   */
+  async renderToWavFile(text: string): Promise<string> {
+    if (!this.isTTSAvailable || !this.currentVoice) {
+      throw new Error('TTS mavjud emas yoki ovoz tanlanmagan');
+    }
+    const RNFS: typeof import('@dr.pogodin/react-native-fs') = require('@dr.pogodin/react-native-fs');
+    const exportDir = `${RNFS.DocumentDirectoryPath}/voice-exports`;
+    await RNFS.mkdir(exportDir);
+    const msgId = `export-${Date.now()}`;
+
+    // Record the files already in voiceAudioDir before synthesis
+    const audioDir = `${(RNFS as any).ExternalDirectoryPath || RNFS.CachesDirectoryPath}/voice-audio`;
+    const before: string[] = await RNFS.exists(audioDir)
+      ? (await RNFS.readDir(audioDir))
+          .filter((f: any) => f.name.endsWith('.wav'))
+          .map((f: any) => f.path)
+      : [];
+
+    await this.play(msgId, text);
+
+    // Find newly created WAV (not in `before` set)
+    const beforeSet = new Set(before);
+    const after = await RNFS.exists(audioDir)
+      ? (await RNFS.readDir(audioDir))
+          .filter((f: any) => f.name.endsWith('.wav') && !beforeSet.has(f.path))
+          .sort((a: any, b: any) => Number(b.mtime) - Number(a.mtime))
+      : [];
+
+    if (!after.length) {
+      throw new Error('Audio fayli yaratilmadi');
+    }
+    const src = (after[0] as any).path as string;
+    const dest = `${exportDir}/pocketpal-tts-${Date.now()}.wav`;
+    await RNFS.copyFile(src, dest);
+    return dest;
+  }
 }
 
 export const ttsStore = new TTSStore();

@@ -6,12 +6,14 @@ import {
   ScrollView,
   TextInput,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation, DrawerActions} from '@react-navigation/native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {observer} from 'mobx-react';
+import Share from 'react-native-share';
 
 import {useTheme, useVoiceCapture} from '../../hooks';
 import {createStyles} from './styles';
@@ -28,6 +30,7 @@ import {ROUTES} from '../../utils/navigationConstants';
 import {chatSessionStore, ttsStore, asrStore} from '../../store';
 import type {AsrTier} from '../../services/asr';
 import type {NeuralEngineId} from '../../store/TtsStore';
+import type {Voice} from '../../services/tts/types';
 
 const hapticOptions = {
   enableVibrateFallback: true,
@@ -52,9 +55,11 @@ export const VoiceStudioScreen: React.FC = observer(() => {
   const [ttsText, setTtsText] = useState(
     'Salom. Men sizning offline yordamchingizman.',
   );
-  const [selectedVoice, setSelectedVoice] = useState<'voice1' | 'voice2' | 'cloned'>('voice1');
   const [speed, setSpeed] = useState(1.0);
   const [isPlaying, setIsPlaying] = useState(false);
+  // Speaker (voice) list for installed engine
+  const [engineVoices, setEngineVoices] = useState<Voice[]>([]);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Voice cloning state
   const [isCloneRecording, setIsCloneRecording] = useState(false);
@@ -232,6 +237,63 @@ export const VoiceStudioScreen: React.FC = observer(() => {
       setIsPlaying(false);
     }
   }, [ttsStore.playbackState.mode, isPlaying]);
+
+  // Load voices whenever the active neural engine changes
+  useEffect(() => {
+    const engine = ttsStore.currentVoice?.engine;
+    if (!engine || engine === 'system') {
+      // Try first installed neural engine
+      const neural: NeuralEngineId[] = ['kokoro', 'supertonic', 'kitten', 'phonon'];
+      const activeId = neural.find(id => {
+        if (id === 'kokoro') return ttsStore.kokoroDownloadState === 'ready';
+        if (id === 'supertonic') return ttsStore.supertonicDownloadState === 'ready';
+        if (id === 'kitten') return ttsStore.kittenDownloadState === 'ready';
+        if (id === 'phonon') return ttsStore.phononDownloadState === 'ready';
+        return false;
+      });
+      if (activeId) {
+        ttsStore.getVoicesForEngine(activeId).then(setEngineVoices).catch(() => {});
+      } else {
+        setEngineVoices([]);
+      }
+    } else {
+      ttsStore.getVoicesForEngine(engine as NeuralEngineId)
+        .then(setEngineVoices)
+        .catch(() => {});
+    }
+  }, [
+    ttsStore.currentVoice,
+    ttsStore.kokoroDownloadState,
+    ttsStore.supertonicDownloadState,
+    ttsStore.kittenDownloadState,
+    ttsStore.phononDownloadState,
+  ]);
+
+  // Export synthesized TTS audio as WAV and share
+  const handleExportAudio = async () => {
+    if (!ttsText.trim()) return;
+    if (!ttsStore.isTTSAvailable || !ttsStore.currentVoice) {
+      Alert.alert('TTS mavjud emas', 'Avval ovoz modelini yuklab oling va tanlang.');
+      return;
+    }
+    ReactNativeHapticFeedback.trigger('impactMedium', hapticOptions);
+    setIsExporting(true);
+    try {
+      const path = await ttsStore.renderToWavFile(ttsText);
+      await Share.open({
+        url: `file://${path}`,
+        type: 'audio/wav',
+        filename: `pocketpal-tts-${Date.now()}.wav`,
+        title: 'TTS audio faylini saqlash',
+      });
+    } catch (e: any) {
+      if (e?.message !== 'User did not share') {
+        Alert.alert('Xatolik', e?.message ?? 'Audio yaratib bo\'lmadi.');
+      }
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const handleCloneToggle = () => {
     ReactNativeHapticFeedback.trigger('impactMedium', hapticOptions);
@@ -676,28 +738,28 @@ export const VoiceStudioScreen: React.FC = observer(() => {
               })}
             </View>
 
-            {/* Voice selector chips */}
-            <View style={styles.voiceChipsRow}>
-              {(['voice1', 'voice2', 'cloned'] as const).map(v => (
-                <TouchableOpacity
-                  key={v}
-                  style={[
-                    styles.voiceChip,
-                    selectedVoice === v && styles.voiceChipActive,
-                    v === 'cloned' && !hasClonedVoice && styles.voiceChipDisabled,
-                  ]}
-                  disabled={v === 'cloned' && !hasClonedVoice}
-                  onPress={() => setSelectedVoice(v)}>
-                  <Text
-                    style={[
-                      styles.voiceChipText,
-                      selectedVoice === v && styles.voiceChipTextActive,
-                    ]}>
-                    {v === 'voice1' ? 'Ovoz 1' : v === 'voice2' ? 'Ovoz 2' : 'Klonlangan'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            {/* Speaker / Voice selector */}
+            {engineVoices.length > 0 && (
+              <View style={styles.recommendedSection}>
+                <Text style={styles.recommendedTitle}>🎤 Diapazon (Speaker) tanlash</Text>
+                <View style={styles.voiceChipsRow}>
+                  {engineVoices.map(v => {
+                    const isActive = ttsStore.currentVoice?.id === v.id;
+                    return (
+                      <TouchableOpacity
+                        key={v.id}
+                        style={[styles.voiceChip, isActive && styles.voiceChipActive]}
+                        onPress={() => ttsStore.setCurrentVoice(v)}
+                        activeOpacity={0.75}>
+                        <Text style={[styles.voiceChipText, isActive && styles.voiceChipTextActive]}>
+                          {v.gender === 'f' ? '♀' : v.gender === 'm' ? '♂' : '◉'} {v.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
 
             {/* Text input */}
             <TextInput
@@ -741,6 +803,26 @@ export const VoiceStudioScreen: React.FC = observer(() => {
               )}
               <Text style={styles.playButtonText}>
                 {isPlaying ? 'To\'xtatish' : (isTTSReady ? '▷ Eshittirish' : 'TTS yuklanmagan')}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Export / Download audio button */}
+            <TouchableOpacity
+              style={[
+                styles.playButton,
+                {marginTop: 8, backgroundColor: isTTSReady && ttsText.trim() ? '#1E5A7A' : '#374151'},
+                (!isTTSReady || !ttsText.trim() || isExporting) && styles.playButtonDisabled,
+              ]}
+              onPress={handleExportAudio}
+              disabled={!isTTSReady || !ttsText.trim() || isExporting}
+              activeOpacity={0.8}>
+              {isExporting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <UploadIcon stroke="#fff" width={20} height={20} />
+              )}
+              <Text style={styles.playButtonText}>
+                {isExporting ? 'Sintez qilinmoqda...' : '⬇ Audio yuklab olish (WAV)'}
               </Text>
             </TouchableOpacity>
 
@@ -817,7 +899,6 @@ export const VoiceStudioScreen: React.FC = observer(() => {
                   <TouchableOpacity
                     onPress={() => {
                       setHasClonedVoice(false);
-                      setSelectedVoice('voice1');
                     }}>
                     <TrashIcon stroke="#EF4444" width={18} height={18} />
                   </TouchableOpacity>

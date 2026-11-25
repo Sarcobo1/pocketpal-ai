@@ -11,7 +11,7 @@ import {
   ScrollView,
 } from 'react-native';
 
-import {reaction, computed} from 'mobx';
+import {reaction, computed, runInAction} from 'mobx';
 import {v4 as uuidv4} from 'uuid';
 import 'react-native-get-random-values';
 import {observer} from 'mobx-react-lite';
@@ -35,13 +35,25 @@ import {
   ServerDetailsSheet,
 } from '../../components';
 
-import {uiStore, modelStore, hfStore, UIStore, serverStore} from '../../store';
+import {uiStore, modelStore, hfStore, UIStore, serverStore, asrStore, ttsStore} from '../../store';
 
-import {L10nContext, isProjectionModel} from '../../utils';
+import {L10nContext, isProjectionModel, formatBytes, hfAsModel} from '../../utils';
 import {Model, ModelOrigin, ModelType} from '../../utils/types';
 import {ErrorState} from '../../utils/errors';
+import type {AsrTier} from '../../services/asr';
+import type {NeuralEngineId} from '../../store/TtsStore';
 
-export const ModelsScreen: React.FC = observer(() => {
+export type ModelCategory = 'hammasi' | 'llm' | 'omni' | 'stt' | 'tts' | 'projector';
+
+interface ModelsScreenProps {
+  route?: {
+    params?: {
+      initialCategory?: ModelCategory;
+    };
+  };
+}
+
+export const ModelsScreen: React.FC<ModelsScreenProps> = observer(({route}) => {
   const l10n = useContext(L10nContext);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [hfSearchVisible, setHFSearchVisible] = useState(false);
@@ -50,7 +62,15 @@ export const ModelsScreen: React.FC = observer(() => {
   const [selectedModel, setSelectedModel] = useState<Model | undefined>();
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<'hammasi' | 'chat' | 'kod' | 'rasm'>('hammasi');
+  const [selectedCategory, setSelectedCategory] = useState<ModelCategory>(
+    (route?.params?.initialCategory as ModelCategory) || 'hammasi',
+  );
+
+  useEffect(() => {
+    if (route?.params?.initialCategory) {
+      setSelectedCategory(route?.params?.initialCategory);
+    }
+  }, [route?.params?.initialCategory]);
 
   // Centralized error state tracking - derive directly from MobX stores
   const [activeError, setActiveError] = useState<ErrorState | null>(null);
@@ -352,11 +372,99 @@ export const ModelsScreen: React.FC = observer(() => {
   const activeModelId = modelStore.activeModel?.id;
   const models = modelStore.displayModels;
 
-  // useMemo uses shallow comaprison for dependencies,
+  const isOmniModel = (name: string, filename?: string) =>
+    /omni/i.test(name) ||
+    /lfm3/i.test(name) ||
+    (filename ? /omni/i.test(filename) || /lfm3/i.test(filename) : false);
+
+  const KNOWN_PROJECTORS = [
+    {
+      id: 'LiquidAI/LFM3-Omni-2B-GGUF/mmproj-LFM3-Omni-2B-BF16.gguf',
+      repo: 'LiquidAI/LFM3-Omni-2B-GGUF',
+      filename: 'mmproj-LFM3-Omni-2B-BF16.gguf',
+      name: 'LFM3-Omni Proyektori (BF16)',
+      size: 853_000_000,
+      description: 'LFM3-Omni audio va ko\'rish proyektori (Ovozli suhbat uchun talab qilinadi)',
+      pairsWith: 'LFM3-Omni-2B',
+    },
+    {
+      id: 'LiquidAI/LFM3-Omni-2B-GGUF/mmproj-LFM3-Omni-2B-Q8_0.gguf',
+      repo: 'LiquidAI/LFM3-Omni-2B-GGUF',
+      filename: 'mmproj-LFM3-Omni-2B-Q8_0.gguf',
+      name: 'LFM3-Omni Proyektori (Q8_0)',
+      size: 564_000_000,
+      description: 'LFM3-Omni uchun siqilgan yuqori tezlikdagi audio proyektori',
+      pairsWith: 'LFM3-Omni-2B',
+    },
+    {
+      id: 'LiquidAI/LFM2-VL-1.6B-GGUF/mmproj-LFM2-VL-1.6B-Q8_0.gguf',
+      repo: 'LiquidAI/LFM2-VL-1.6B-GGUF',
+      filename: 'mmproj-LFM2-VL-1.6B-Q8_0.gguf',
+      name: 'LFM2-VL Proyektori (Q8_0)',
+      size: 564_115_648,
+      description: 'LFM2-VL modeli uchun rasmlarni tahlil qilish proyektori',
+      pairsWith: 'LFM2-VL-1.6B',
+    },
+    {
+      id: 'unsloth/gemma-4-E2B-it-GGUF/mmproj-F16.gguf',
+      repo: 'unsloth/gemma-4-E2B-it-GGUF',
+      filename: 'mmproj-F16.gguf',
+      name: 'Gemma Multimodal Proyektor (F16)',
+      size: 985_654_080,
+      description: 'Gemma modeli uchun multimodal ko\'rish proyektori',
+      pairsWith: 'Gemma Multimodal',
+    },
+  ];
+
+  const ensureProjectorModel = (proj: (typeof KNOWN_PROJECTORS)[0]): Model => {
+    let existing = modelStore.models.find(
+      m => m.id === proj.id || m.filename === proj.filename,
+    );
+    if (existing) {
+      return existing;
+    }
+    const hfModel = {
+      id: proj.repo,
+      author: proj.repo.split('/')[0],
+      url: `https://huggingface.co/${proj.repo}`,
+    } as any;
+    const modelFile = {
+      rfilename: proj.filename,
+      url: `https://huggingface.co/${proj.repo}/resolve/main/${proj.filename}`,
+      size: proj.size,
+    };
+    const created: Model = {
+      ...hfAsModel(hfModel, modelFile),
+      modelType: ModelType.PROJECTION,
+      name: proj.name,
+    };
+    runInAction(() => {
+      modelStore.models.push(created);
+    });
+    return created;
+  };
+
+  // useMemo uses shallow comparison for dependencies,
   // so we use computed instead for deep comparison
   // (model state changes not-downloaded -> downloaded)
   const filteredAndSortedModels = computed(() => {
     let result = models;
+    if (selectedCategory === 'llm') {
+      result = result.filter(m => !isOmniModel(m.name, m.filename));
+    } else if (selectedCategory === 'omni') {
+      result = result.filter(
+        m => isOmniModel(m.name, m.filename) || m.supportsMultimodal,
+      );
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        m =>
+          m.name.toLowerCase().includes(q) ||
+          (m.filename && m.filename.toLowerCase().includes(q)) ||
+          (m.author && m.author.toLowerCase().includes(q)),
+      );
+    }
     if (filters.includes('downloaded')) {
       result = result.filter(model => model.isDownloaded);
     }
@@ -458,6 +566,494 @@ export const ModelsScreen: React.FC = observer(() => {
     );
   };
 
+  const renderSTTSection = () => {
+    const tiers: {tier: AsrTier; name: string; size: string; badge: string; desc: string}[] = [
+      {
+        tier: 'base',
+        name: 'Whisper Base',
+        size: '~82 MB',
+        badge: '⚡ Tavsiya etiladi (4GB+ RAM)',
+        desc: 'Barcha telefonlarga mos, juda tez va aniq oflayn transkripsiya.',
+      },
+      {
+        tier: 'small',
+        name: 'Whisper Small',
+        size: '~265 MB',
+        badge: '🎯 Yuqori aniqlik (6GB+ RAM)',
+        desc: 'Shovqinli muhitda ham so\'zlarni va atamalarni yuqori aniqlikda taniydi.',
+      },
+      {
+        tier: 'large-turbo',
+        name: 'Whisper Large Turbo',
+        size: '~574 MB',
+        badge: '🚀 Maksimal sifat (8GB+ RAM)',
+        desc: 'Flagman qurilmalar uchun eng sifatli universal nutq modeli.',
+      },
+    ];
+
+    const filteredTiers = tiers.filter(t =>
+      searchQuery ? t.name.toLowerCase().includes(searchQuery.toLowerCase()) : true,
+    );
+
+    return (
+      <View style={{paddingBottom: 24}}>
+        <Text style={styles.sectionTitle}>STT (Whisper) Modellar</Text>
+        <Text style={styles.sectionSub}>Ovozni matnga aylantirish uchun oflayn modellar</Text>
+        {filteredTiers.map(item => {
+          const state = asrStore.downloadStates[item.tier];
+          const progress = asrStore.downloadProgress[item.tier];
+          const isSelected = item.tier === asrStore.selectedTier;
+          const isReady = state === 'ready';
+          const isDownloading = state === 'downloading';
+
+          return (
+            <View key={item.tier} style={styles.categoryCard}>
+              <View style={styles.categoryCardHeader}>
+                <View style={styles.categoryCardTitleRow}>
+                  <Text style={styles.categoryCardTitle}>{item.name}</Text>
+                  <Text style={styles.categoryCardSub}>{item.desc}</Text>
+                </View>
+                <View style={[styles.categoryCardBadge, isReady && styles.categoryCardBadgeActive]}>
+                  <Text style={[styles.categoryCardBadgeText, isReady && styles.categoryCardBadgeTextActive]}>
+                    {isReady ? (isSelected ? '✓ Faol' : 'O\'rnatilgan') : isDownloading ? 'Yuklanmoqda' : item.size}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.categoryCardMeta}>
+                <Text style={styles.categoryCardMetaText}>{item.badge}</Text>
+                <Text style={styles.categoryCardMetaText}>Hajmi: {item.size}</Text>
+              </View>
+
+              {isDownloading && (
+                <View style={styles.categoryCardProgressContainer}>
+                  <View style={styles.categoryCardProgressBar}>
+                    <View style={[styles.categoryCardProgressFill, {width: `${Math.round(progress * 100)}%`}]} />
+                  </View>
+                  <Text style={styles.categoryCardProgressText}>{Math.round(progress * 100)}%</Text>
+                </View>
+              )}
+
+              <View style={styles.categoryCardActions}>
+                {isReady ? (
+                  <>
+                    <TouchableOpacity
+                      style={[styles.categoryCardBtn, isSelected ? styles.categoryCardBtnOutline : styles.categoryCardBtnPrimary]}
+                      onPress={() => asrStore.selectTier(item.tier)}>
+                      <Text style={[styles.categoryCardBtnText, !isSelected && styles.categoryCardBtnTextPrimary]}>
+                        {isSelected ? '✓ Tanlangan (Faol)' : 'Faol qilish'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.categoryCardBtn, styles.categoryCardBtnDanger, {flex: 0.35}]}
+                      onPress={() => asrStore.deleteModel(item.tier)}>
+                      <Text style={[styles.categoryCardBtnText, styles.categoryCardBtnTextDanger]}>O'chirish</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : isDownloading ? (
+                  <View style={[styles.categoryCardBtn, styles.categoryCardBtnOutline]}>
+                    <Text style={styles.categoryCardBtnText}>Yuklanmoqda...</Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.categoryCardBtn, styles.categoryCardBtnPrimary]}
+                    onPress={async () => {
+                      asrStore.setUserASROverride(true);
+                      await asrStore.downloadModel(item.tier);
+                    }}>
+                    <Text style={[styles.categoryCardBtnText, styles.categoryCardBtnTextPrimary]}>
+                      📥 Yuklab olish ({item.size})
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
+
+  const renderTTSSection = () => {
+    const voices: {
+      id: NeuralEngineId | 'system';
+      name: string;
+      size: string;
+      badge: string;
+      desc: string;
+      onDownload?: () => Promise<void>;
+      onDelete?: () => Promise<void>;
+    }[] = [
+      {
+        id: 'kokoro',
+        name: 'Kokoro TTS',
+        size: '~85 MB',
+        badge: '⭐ Tavsiya etiladi',
+        desc: 'Eng tabiiy, ohangdor va yoqimli neyron ovoz modeli.',
+        onDownload: () => ttsStore.downloadKokoro(),
+        onDelete: () => ttsStore.deleteKokoro(),
+      },
+      {
+        id: 'supertonic',
+        name: 'Supertonic TTS',
+        size: '~65 MB',
+        badge: '⚡ Tezkor ovoz',
+        desc: 'Kam resurs talab qiluvchi, o\'ta tez ishlovchi ovoz modeli.',
+        onDownload: () => ttsStore.downloadSupertonic(),
+        onDelete: () => ttsStore.deleteSupertonic(),
+      },
+      {
+        id: 'kitten',
+        name: 'Kitten TTS',
+        size: '~55 MB',
+        badge: '🐱 Ixcham ovoz',
+        desc: 'Minimal hajmdagi yengil neyron nutq generatori.',
+        onDownload: () => ttsStore.downloadKitten(),
+        onDelete: () => ttsStore.deleteKitten(),
+      },
+      {
+        id: 'phonon',
+        name: 'Phonon TTS',
+        size: '~75 MB',
+        badge: '🌐 Ko\'p tilli ovoz',
+        desc: 'Turli tillarga moslashgan zamonaviy ovoz generatori.',
+        onDownload: () => ttsStore.downloadPhonon(),
+        onDelete: () => ttsStore.deletePhonon(),
+      },
+      {
+        id: 'system',
+        name: 'Tizim ovozi (Platform)',
+        size: 'O\'rnatilgan',
+        badge: '📱 Telefon ovozi',
+        desc: 'Telefoningiz operatsion tizimidagi o\'rnatilgan standart ovoz.',
+      },
+    ];
+
+    const filteredVoices = voices.filter(v =>
+      searchQuery ? v.name.toLowerCase().includes(searchQuery.toLowerCase()) : true,
+    );
+
+    return (
+      <View style={{paddingBottom: 24}}>
+        <Text style={styles.sectionTitle}>TTS (Ovozlar) Modellar</Text>
+        <Text style={styles.sectionSub}>Matnni tabiiy ovozda gapirish uchun modellar</Text>
+        {filteredVoices.map(item => {
+          const isSystem = item.id === 'system';
+          let state = 'not_installed';
+          let progress = 0;
+          if (isSystem) {
+            state = 'ready';
+            progress = 1;
+          } else if (item.id === 'kokoro') {
+            state = ttsStore.kokoroDownloadState;
+            progress = ttsStore.kokoroDownloadProgress;
+          } else if (item.id === 'supertonic') {
+            state = ttsStore.supertonicDownloadState;
+            progress = ttsStore.supertonicDownloadProgress;
+          } else if (item.id === 'kitten') {
+            state = ttsStore.kittenDownloadState;
+            progress = ttsStore.kittenDownloadProgress;
+          } else if (item.id === 'phonon') {
+            state = ttsStore.phononDownloadState;
+            progress = ttsStore.phononDownloadProgress;
+          }
+          const isReady = isSystem || state === 'ready';
+          const isDownloading = state === 'downloading';
+
+          return (
+            <View key={item.id} style={styles.categoryCard}>
+              <View style={styles.categoryCardHeader}>
+                <View style={styles.categoryCardTitleRow}>
+                  <Text style={styles.categoryCardTitle}>{item.name}</Text>
+                  <Text style={styles.categoryCardSub}>{item.desc}</Text>
+                </View>
+                <View style={[styles.categoryCardBadge, isReady && styles.categoryCardBadgeActive]}>
+                  <Text style={[styles.categoryCardBadgeText, isReady && styles.categoryCardBadgeTextActive]}>
+                    {isReady ? 'O\'rnatilgan' : isDownloading ? 'Yuklanmoqda' : item.size}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.categoryCardMeta}>
+                <Text style={styles.categoryCardMetaText}>{item.badge}</Text>
+                <Text style={styles.categoryCardMetaText}>Hajmi: {item.size}</Text>
+              </View>
+
+              {isDownloading && (
+                <View style={styles.categoryCardProgressContainer}>
+                  <View style={styles.categoryCardProgressBar}>
+                    <View style={[styles.categoryCardProgressFill, {width: `${Math.round(progress * 100)}%`}]} />
+                  </View>
+                  <Text style={styles.categoryCardProgressText}>{Math.round(progress * 100)}%</Text>
+                </View>
+              )}
+
+              <View style={styles.categoryCardActions}>
+                {isReady ? (
+                  <>
+                    <TouchableOpacity
+                      style={[styles.categoryCardBtn, styles.categoryCardBtnPrimary]}
+                      onPress={() => {
+                        ttsStore.setUserTTSOverride(true);
+                        ttsStore.play(`test-preview-${item.id}`, 'Salom! Men sizning PocketPal ovozli yordamchingizman.');
+                      }}>
+                      <Text style={[styles.categoryCardBtnText, styles.categoryCardBtnTextPrimary]}>
+                        ▶ Ovozni eshitish
+                      </Text>
+                    </TouchableOpacity>
+                    {!isSystem && item.onDelete && (
+                      <TouchableOpacity
+                        style={[styles.categoryCardBtn, styles.categoryCardBtnDanger, {flex: 0.35}]}
+                        onPress={item.onDelete}>
+                        <Text style={[styles.categoryCardBtnText, styles.categoryCardBtnTextDanger]}>O'chirish</Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
+                ) : isDownloading ? (
+                  <View style={[styles.categoryCardBtn, styles.categoryCardBtnOutline]}>
+                    <Text style={styles.categoryCardBtnText}>Yuklanmoqda...</Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.categoryCardBtn, styles.categoryCardBtnPrimary]}
+                    onPress={async () => {
+                      ttsStore.setUserTTSOverride(true);
+                      if (item.onDownload) {
+                        await item.onDownload();
+                      }
+                    }}>
+                    <Text style={[styles.categoryCardBtnText, styles.categoryCardBtnTextPrimary]}>
+                      📥 Yuklab olish ({item.size})
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
+
+  const renderProjectorSection = () => {
+    const knownFilenames = new Set(KNOWN_PROJECTORS.map(p => p.filename));
+    const storeProjectors = modelStore.models.filter(
+      m =>
+        (m.modelType === ModelType.PROJECTION ||
+          isProjectionModel(m.filename || '') ||
+          m.filename?.startsWith('mmproj-')) &&
+        !knownFilenames.has(m.filename),
+    );
+
+    const allProjectors = [
+      ...KNOWN_PROJECTORS.map(p => {
+        const model = ensureProjectorModel(p);
+        return {
+          id: model.id,
+          name: p.name,
+          filename: p.filename,
+          size: formatBytes(p.size),
+          desc: p.description,
+          pairsWith: p.pairsWith,
+          model,
+        };
+      }),
+      ...storeProjectors.map(m => ({
+        id: m.id,
+        name: m.name || m.filename,
+        filename: m.filename,
+        size: formatBytes(m.size || 0),
+        desc: 'Multimodal ko\'rish va audio proyektori',
+        pairsWith: 'Multimodal model',
+        model: m,
+      })),
+    ];
+
+    const filteredProjectors = allProjectors.filter(p =>
+      searchQuery
+        ? p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.pairsWith.toLowerCase().includes(searchQuery.toLowerCase())
+        : true,
+    );
+
+    return (
+      <View style={{paddingBottom: 24}}>
+        <Text style={styles.sectionTitle}>Proyektorlar (mmproj)</Text>
+        <Text style={styles.sectionSub}>Omni va ko'rish modellari uchun zarur proyektor fayllari</Text>
+        {filteredProjectors.map(item => {
+          const isDownloaded = item.model.isDownloaded;
+          const isDownloading = modelStore.isDownloading(item.model.id);
+          const progress = item.model.progress || 0;
+
+          return (
+            <View key={item.id} style={styles.categoryCard}>
+              <View style={styles.categoryCardHeader}>
+                <View style={styles.categoryCardTitleRow}>
+                  <Text style={styles.categoryCardTitle}>{item.name}</Text>
+                  <Text style={styles.categoryCardSub}>{item.desc}</Text>
+                </View>
+                <View style={[styles.categoryCardBadge, isDownloaded && styles.categoryCardBadgeActive]}>
+                  <Text style={[styles.categoryCardBadgeText, isDownloaded && styles.categoryCardBadgeTextActive]}>
+                    {isDownloaded ? 'Yuklab olingan' : isDownloading ? 'Yuklanmoqda' : item.size}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.categoryCardMeta}>
+                <Text style={styles.categoryCardMetaText}>Fayl: {item.filename}</Text>
+                <Text style={styles.categoryCardMetaText}>Mos: {item.pairsWith}</Text>
+              </View>
+
+              {isDownloading && (
+                <View style={styles.categoryCardProgressContainer}>
+                  <View style={styles.categoryCardProgressBar}>
+                    <View style={[styles.categoryCardProgressFill, {width: `${progress}%`}]} />
+                  </View>
+                  <Text style={styles.categoryCardProgressText}>{Math.round(progress)}%</Text>
+                </View>
+              )}
+
+              <View style={styles.categoryCardActions}>
+                {isDownloaded ? (
+                  <>
+                    <View style={[styles.categoryCardBtn, styles.categoryCardBtnOutline]}>
+                      <Text style={styles.categoryCardBtnText}>✓ Foydalanishga tayyor</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.categoryCardBtn, styles.categoryCardBtnDanger, {flex: 0.35}]}
+                      onPress={() => modelStore.deleteModel(item.model)}>
+                      <Text style={[styles.categoryCardBtnText, styles.categoryCardBtnTextDanger]}>O'chirish</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : isDownloading ? (
+                  <View style={[styles.categoryCardBtn, styles.categoryCardBtnOutline]}>
+                    <Text style={styles.categoryCardBtnText}>Yuklanmoqda ({Math.round(progress)}%)...</Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.categoryCardBtn, styles.categoryCardBtnPrimary]}
+                    onPress={() => modelStore.checkSpaceAndDownload(item.model.id)}>
+                    <Text style={[styles.categoryCardBtnText, styles.categoryCardBtnTextPrimary]}>
+                      📥 Yuklab olish ({item.size})
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
+
+  const renderOmniSection = () => {
+    const lfm3Proj = KNOWN_PROJECTORS[0];
+    const projModel = ensureProjectorModel(lfm3Proj);
+
+    const omniModels = modelStore.models.filter(
+      m =>
+        m.modelType !== ModelType.PROJECTION &&
+        (m.name?.toLowerCase().includes('omni') ||
+          m.filename?.toLowerCase().includes('omni') ||
+          m.name?.toLowerCase().includes('lfm3')),
+    );
+
+    return (
+      <View style={{paddingBottom: 24}}>
+        <View style={styles.omniBanner}>
+          <Text style={styles.omniBannerTitle}>⚡ Omni (To'g'ridan-to'g'ri nutq) Modellar</Text>
+          <Text style={styles.omniBannerText}>
+            Omni modellar matn generatorlaridan farqli ravishda, ovozli xabarlarni to'g'ridan-to'g'ri tushunadi va alohida STT/TTS siz ovozda javob qaytaradi.{'\n\n'}
+            Muhim: Model ovozda to'g'ri ishlashi uchun uning proyektor fayli (mmproj-LFM3-Omni-2B-BF16.gguf) ham yuklangan bo'lishi SHART.
+          </Text>
+        </View>
+
+        <Text style={styles.sectionTitle}>1. Kerakli Proyektor (mmproj)</Text>
+        <Text style={styles.sectionSub}>Ovozli suhbat va eshitish uchun talab etiladi</Text>
+
+        <View style={styles.categoryCard}>
+          <View style={styles.categoryCardHeader}>
+            <View style={styles.categoryCardTitleRow}>
+              <Text style={styles.categoryCardTitle}>{lfm3Proj.name}</Text>
+              <Text style={styles.categoryCardSub}>{lfm3Proj.description}</Text>
+            </View>
+            <View style={[styles.categoryCardBadge, projModel.isDownloaded && styles.categoryCardBadgeActive]}>
+              <Text style={[styles.categoryCardBadgeText, projModel.isDownloaded && styles.categoryCardBadgeTextActive]}>
+                {projModel.isDownloaded ? 'O\'rnatilgan' : formatBytes(lfm3Proj.size)}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.categoryCardMeta}>
+            <Text style={styles.categoryCardMetaText}>Fayl: {lfm3Proj.filename}</Text>
+            <Text style={styles.categoryCardMetaText}>Hajmi: {formatBytes(lfm3Proj.size)}</Text>
+          </View>
+
+          {modelStore.isDownloading(projModel.id) && (
+            <View style={styles.categoryCardProgressContainer}>
+              <View style={styles.categoryCardProgressBar}>
+                <View style={[styles.categoryCardProgressFill, {width: `${projModel.progress || 0}%`}]} />
+              </View>
+              <Text style={styles.categoryCardProgressText}>{Math.round(projModel.progress || 0)}%</Text>
+            </View>
+          )}
+
+          <View style={styles.categoryCardActions}>
+            {projModel.isDownloaded ? (
+              <View style={[styles.categoryCardBtn, styles.categoryCardBtnOutline]}>
+                <Text style={styles.categoryCardBtnText}>✓ Proyektor tayyor</Text>
+              </View>
+            ) : modelStore.isDownloading(projModel.id) ? (
+              <View style={[styles.categoryCardBtn, styles.categoryCardBtnOutline]}>
+                <Text style={styles.categoryCardBtnText}>Yuklanmoqda ({Math.round(projModel.progress || 0)}%)...</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[styles.categoryCardBtn, styles.categoryCardBtnPrimary]}
+                onPress={() => modelStore.checkSpaceAndDownload(projModel.id)}>
+                <Text style={[styles.categoryCardBtnText, styles.categoryCardBtnTextPrimary]}>
+                  📥 Proyektorni yuklab olish ({formatBytes(lfm3Proj.size)})
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        <Text style={styles.sectionTitle}>2. Omni Asosiy Modellar</Text>
+        <Text style={styles.sectionSub}>GGUF modelini yuklab oling yoki mahalliy faylni tanlang</Text>
+
+        {omniModels.length === 0 ? (
+          <View style={styles.categoryCard}>
+            <Text style={styles.categoryCardTitle}>LFM3-Omni-2B Modeli</Text>
+            <Text style={styles.categoryCardSub}>
+              Hugging Face qidiruvidan "LiquidAI/LFM3-Omni-2B-GGUF" deb qidirib modelni qo'shishingiz yoki pastdagi ".gguf fayl tanlash" tugmasi orqali telefoningizdagi faylni yuklashingiz mumkin.
+            </Text>
+            <View style={[styles.categoryCardActions, {marginTop: 12}]}>
+              <TouchableOpacity
+                style={[styles.categoryCardBtn, styles.categoryCardBtnPrimary]}
+                onPress={() => setHFSearchVisible(true)}>
+                <Text style={[styles.categoryCardBtnText, styles.categoryCardBtnTextPrimary]}>
+                  🔍 Hugging Face dan qidirish
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          omniModels.map(m => (
+            <ModelCard
+              key={m.id}
+              model={m}
+              activeModelId={activeModelId}
+              onOpenSettings={() => handleOpenSettings(m)}
+              onOpenServerDetails={handleOpenServerDetails}
+            />
+          ))
+        )}
+      </View>
+    );
+  };
+
   const flatListModels = Object.keys(groupedModels)
     .map(type => ({
       type,
@@ -465,11 +1061,13 @@ export const ModelsScreen: React.FC = observer(() => {
     }))
     .filter(group => group.items.length > 0);
 
-  const CATEGORIES: {id: 'hammasi' | 'chat' | 'kod' | 'rasm'; label: string}[] = [
-    {id: 'hammasi', label: 'Hammasi'},
-    {id: 'chat', label: 'Chat'},
-    {id: 'kod', label: 'Kod'},
-    {id: 'rasm', label: 'Rasm'},
+  const CATEGORIES: {id: ModelCategory; label: string}[] = [
+    {id: 'hammasi', label: 'Barchasi'},
+    {id: 'llm', label: 'LLM (Matn)'},
+    {id: 'omni', label: 'Omni (Ovozli)'},
+    {id: 'stt', label: 'STT (Whisper)'},
+    {id: 'tts', label: 'TTS (Ovozlar)'},
+    {id: 'projector', label: 'Proyektorlar (mmproj)'},
   ];
 
   const ListHeader = () => (
@@ -500,6 +1098,36 @@ export const ModelsScreen: React.FC = observer(() => {
           );
         })}
       </ScrollView>
+
+      {/* Quick shortcuts on Barchasi */}
+      {selectedCategory === 'hammasi' && !searchQuery && (
+        <View style={styles.quickCategoryGrid}>
+          <TouchableOpacity
+            style={styles.quickCategoryItem}
+            onPress={() => setSelectedCategory('omni')}>
+            <Text style={styles.quickCategoryItemTitle}>⚡ Omni</Text>
+            <Text style={styles.quickCategoryItemSub}>To'g'ridan ovoz</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.quickCategoryItem}
+            onPress={() => setSelectedCategory('stt')}>
+            <Text style={styles.quickCategoryItemTitle}>🎙️ STT</Text>
+            <Text style={styles.quickCategoryItemSub}>Whisper</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.quickCategoryItem}
+            onPress={() => setSelectedCategory('tts')}>
+            <Text style={styles.quickCategoryItemTitle}>🔊 TTS</Text>
+            <Text style={styles.quickCategoryItemSub}>Ovozlar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.quickCategoryItem}
+            onPress={() => setSelectedCategory('projector')}>
+            <Text style={styles.quickCategoryItemTitle}>🧩 mmproj</Text>
+            <Text style={styles.quickCategoryItemSub}>Proyektorlar</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 
@@ -513,6 +1141,16 @@ export const ModelsScreen: React.FC = observer(() => {
       </TouchableOpacity>
     </View>
   );
+
+  const isCustomCategory =
+    selectedCategory === 'stt' ||
+    selectedCategory === 'tts' ||
+    selectedCategory === 'projector' ||
+    selectedCategory === 'omni';
+
+  const flatListData = isCustomCategory
+    ? [{type: selectedCategory, items: []}]
+    : flatListModels;
 
   return (
     <View style={styles.container} testID="models-screen">
@@ -531,10 +1169,24 @@ export const ModelsScreen: React.FC = observer(() => {
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.listContainer}
-        data={flatListModels}
+        data={flatListData}
         keyExtractor={item => item.type}
         extraData={activeModelId}
-        renderItem={renderGroupHeader}
+        renderItem={info => {
+          if (selectedCategory === 'stt') {
+            return renderSTTSection();
+          }
+          if (selectedCategory === 'tts') {
+            return renderTTSSection();
+          }
+          if (selectedCategory === 'projector') {
+            return renderProjectorSection();
+          }
+          if (selectedCategory === 'omni') {
+            return renderOmniSection();
+          }
+          return renderGroupHeader(info);
+        }}
         ListHeaderComponent={<ListHeader />}
         ListFooterComponent={<ListFooter />}
         refreshControl={

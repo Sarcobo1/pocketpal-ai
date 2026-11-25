@@ -26,6 +26,8 @@ import {
 } from '../../assets/icons';
 import {ROUTES} from '../../utils/navigationConstants';
 import {chatSessionStore, ttsStore, asrStore} from '../../store';
+import type {AsrTier} from '../../services/asr';
+import type {NeuralEngineId} from '../../store/TtsStore';
 
 const hapticOptions = {
   enableVibrateFallback: true,
@@ -233,6 +235,71 @@ export const VoiceStudioScreen: React.FC = observer(() => {
   const isTTSReady = ttsStore.isTTSAvailable;
   const isSTTReady = asrStore.asrAvailable && asrStore.isSelectedTierReady;
 
+  const WHISPER_TIERS: {tier: AsrTier; name: string; size: string; badge: string; desc: string}[] = [
+    {
+      tier: 'base',
+      name: 'Whisper Base',
+      size: '~82 MB',
+      badge: '⚡ Tavsiya etiladi (4GB+ RAM)',
+      desc: 'Barcha telefonlarga mos, juda tez va aniq oflayn transkripsiya.',
+    },
+    {
+      tier: 'small',
+      name: 'Whisper Small',
+      size: '~265 MB',
+      badge: '🎯 Yuqori aniqlik (6GB+ RAM)',
+      desc: 'Shovqinli muhitda ham so\'zlarni va atamalarni yuqori aniqlikda taniydi.',
+    },
+    {
+      tier: 'large-turbo',
+      name: 'Whisper Large Turbo',
+      size: '~574 MB',
+      badge: '🚀 Maksimal sifat (8GB+ RAM)',
+      desc: 'Flagman qurilmalar uchun eng mukammal universal nutq modeli.',
+    },
+  ];
+
+  const TTS_ENGINES: {
+    id: NeuralEngineId | 'system';
+    name: string;
+    size: string;
+    badge: string;
+    desc: string;
+    onDownload?: () => Promise<void>;
+  }[] = [
+    {
+      id: 'kokoro',
+      name: 'Kokoro TTS',
+      size: '~85 MB',
+      badge: '⭐ Tavsiya etiladi',
+      desc: 'Eng tabiiy, ohangdor va yoqimli neyron ovoz modeli.',
+      onDownload: () => ttsStore.downloadKokoro(),
+    },
+    {
+      id: 'supertonic',
+      name: 'Supertonic TTS',
+      size: '~65 MB',
+      badge: '⚡ Tezkor ovoz',
+      desc: 'Kam resurs talab qiluvchi, o\'ta tezkor neyron ovoz generatori.',
+      onDownload: () => ttsStore.downloadSupertonic(),
+    },
+    {
+      id: 'kitten',
+      name: 'Kitten TTS',
+      size: '~55 MB',
+      badge: '🐱 Ixcham ovoz',
+      desc: 'Minimal hajmdagi yengil neyron nutq generatori.',
+      onDownload: () => ttsStore.downloadKitten(),
+    },
+    {
+      id: 'system',
+      name: 'Tizim ovozi (Platform)',
+      size: 'O\'rnatilgan',
+      badge: '📱 Telefon ovozi',
+      desc: 'Telefoningiz operatsion tizimidagi o\'rnatilgan standart ovoz.',
+    },
+  ];
+
   return (
     <View style={styles.root}>
       {/* Top Header */}
@@ -319,10 +386,87 @@ export const VoiceStudioScreen: React.FC = observer(() => {
               <Text style={styles.modelCardSub}>
                 {isSTTReady
                   ? 'Offline nutqni aniqlash modeli'
-                  : asrStore.asrAvailable
-                    ? 'Settings > Voice Input da yuklab oling'
-                    : 'Settings > Voice Input da yoqing'}
+                  : 'Quyidagi modellardan birini yuklab oling'}
               </Text>
+            </View>
+
+            {/* Omni spotlight banner */}
+            <View style={styles.omniSpotlightBanner}>
+              <Text style={styles.omniSpotlightTitle}>⚡ Omni Ovozli Model (To'g'ridan-to'g'ri nutq)</Text>
+              <Text style={styles.omniSpotlightSub}>
+                Alohida STT va TTS yuklamasdan, to'g'ridan-to'g'ri bitta Omni model (masalan, LFM3-Omni) orqali gaplashmoqchimisiz?
+              </Text>
+              <TouchableOpacity
+                style={styles.omniSpotlightBtn}
+                onPress={() => navigation.navigate(ROUTES.MODELS, {initialCategory: 'omni'})}>
+                <Text style={styles.omniSpotlightBtnText}>Omni modellarni ko'rish →</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Recommended STT models fitting the device */}
+            <View style={styles.recommendedSection}>
+              <Text style={styles.recommendedTitle}>📱 Qurilmangizga mos STT modellari (Whisper)</Text>
+              <Text style={styles.recommendedSub}>
+                {isSTTReady
+                  ? 'Boshqa Whisper o\'lchamini tanlashingiz yoki yuklab olishingiz mumkin:'
+                  : 'Ovozni matnga aylantirish uchun quyidagi mos modelni yuklab oling:'}
+              </Text>
+
+              {WHISPER_TIERS.map(item => {
+                const state = asrStore.downloadStates[item.tier];
+                const progress = asrStore.downloadProgress[item.tier];
+                const isSelected = item.tier === asrStore.selectedTier;
+                const isReady = state === 'ready';
+                const isDownloading = state === 'downloading';
+
+                return (
+                  <View key={item.tier} style={styles.modelItemCard}>
+                    <View style={styles.modelItemHeader}>
+                      <Text style={styles.modelItemTitle}>{item.name}</Text>
+                      <View style={[styles.modelItemBadge, isReady && styles.modelItemBadgeActive]}>
+                        <Text style={[styles.modelItemBadgeText, isReady && styles.modelItemBadgeTextActive]}>
+                          {isReady ? (isSelected ? '✓ Faol' : 'O\'rnatilgan') : isDownloading ? 'Yuklanmoqda' : item.size}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.modelItemDesc}>{item.desc}</Text>
+
+                    {isDownloading && (
+                      <View style={styles.modelItemProgressContainer}>
+                        <View style={styles.modelItemProgressBar}>
+                          <View style={[styles.modelItemProgressFill, {width: `${Math.round(progress * 100)}%`}]} />
+                        </View>
+                        <Text style={styles.modelItemProgressText}>{Math.round(progress * 100)}%</Text>
+                      </View>
+                    )}
+
+                    <View style={styles.modelItemActions}>
+                      {isReady ? (
+                        <TouchableOpacity
+                          style={[styles.modelItemBtn, isSelected ? styles.modelItemBtnOutline : null]}
+                          onPress={() => asrStore.selectTier(item.tier)}>
+                          <Text style={[styles.modelItemBtnText, isSelected ? styles.modelItemBtnTextOutline : null]}>
+                            {isSelected ? '✓ Tanlangan' : 'Faol qilish'}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : isDownloading ? (
+                        <View style={[styles.modelItemBtn, styles.modelItemBtnOutline]}>
+                          <Text style={styles.modelItemBtnTextOutline}>Yuklanmoqda...</Text>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          style={styles.modelItemBtn}
+                          onPress={async () => {
+                            asrStore.setUserASROverride(true);
+                            await asrStore.downloadModel(item.tier);
+                          }}>
+                          <Text style={styles.modelItemBtnText}>📥 Yuklab olish ({item.size})</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
             </View>
 
             {/* Mic button */}
@@ -425,14 +569,112 @@ export const VoiceStudioScreen: React.FC = observer(() => {
                   ]}
                 />
                 <Text style={styles.modelCardTitle}>
-                  {isTTSReady ? 'Piper TTS — Tayyor' : 'Piper TTS — yuklanmagan'}
+                  {isTTSReady ? 'TTS Ovoz — Tayyor' : 'TTS Ovoz — yuklanmagan'}
                 </Text>
               </View>
               <Text style={styles.modelCardSub}>
                 {isTTSReady
                   ? 'Offline matndan ovoz modeli'
-                  : 'Settings > Voice da yuklab oling'}
+                  : 'Quyidagi ovozlardan birini yuklab oling'}
               </Text>
+            </View>
+
+            {/* Omni spotlight banner */}
+            <View style={styles.omniSpotlightBanner}>
+              <Text style={styles.omniSpotlightTitle}>⚡ Omni Ovozli Model (To'g'ridan-to'g'ri nutq)</Text>
+              <Text style={styles.omniSpotlightSub}>
+                Alohida TTS yuklamasdan to'g'ridan-to'g'ri Omni model ovozidan foydalanmoqchimisiz?
+              </Text>
+              <TouchableOpacity
+                style={styles.omniSpotlightBtn}
+                onPress={() => navigation.navigate(ROUTES.MODELS, {initialCategory: 'omni'})}>
+                <Text style={styles.omniSpotlightBtnText}>Omni modellarni ko'rish →</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Recommended TTS voices fitting the device */}
+            <View style={styles.recommendedSection}>
+              <Text style={styles.recommendedTitle}>🔊 Qurilmangizga mos TTS ovozlari</Text>
+              <Text style={styles.recommendedSub}>
+                {isTTSReady
+                  ? 'Quyidagi ovozlardan birini sinab ko\'rishingiz yoki yangisini yuklab olishingiz mumkin:'
+                  : 'Matnni ovozda o\'qish uchun quyidagi ovoz modelini yuklab oling:'}
+              </Text>
+
+              {TTS_ENGINES.map(item => {
+                const isSystem = item.id === 'system';
+                let state = 'not_installed';
+                let progress = 0;
+                if (isSystem) {
+                  state = 'ready';
+                  progress = 1;
+                } else if (item.id === 'kokoro') {
+                  state = ttsStore.kokoroDownloadState;
+                  progress = ttsStore.kokoroDownloadProgress;
+                } else if (item.id === 'supertonic') {
+                  state = ttsStore.supertonicDownloadState;
+                  progress = ttsStore.supertonicDownloadProgress;
+                } else if (item.id === 'kitten') {
+                  state = ttsStore.kittenDownloadState;
+                  progress = ttsStore.kittenDownloadProgress;
+                } else if (item.id === 'phonon') {
+                  state = ttsStore.phononDownloadState;
+                  progress = ttsStore.phononDownloadProgress;
+                }
+                const isReady = isSystem || state === 'ready';
+                const isDownloading = state === 'downloading';
+
+                return (
+                  <View key={item.id} style={styles.modelItemCard}>
+                    <View style={styles.modelItemHeader}>
+                      <Text style={styles.modelItemTitle}>{item.name}</Text>
+                      <View style={[styles.modelItemBadge, isReady && styles.modelItemBadgeActive]}>
+                        <Text style={[styles.modelItemBadgeText, isReady && styles.modelItemBadgeTextActive]}>
+                          {isReady ? 'O\'rnatilgan' : isDownloading ? 'Yuklanmoqda' : item.size}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.modelItemDesc}>{item.desc}</Text>
+
+                    {isDownloading && (
+                      <View style={styles.modelItemProgressContainer}>
+                        <View style={styles.modelItemProgressBar}>
+                          <View style={[styles.modelItemProgressFill, {width: `${Math.round(progress * 100)}%`}]} />
+                        </View>
+                        <Text style={styles.modelItemProgressText}>{Math.round(progress * 100)}%</Text>
+                      </View>
+                    )}
+
+                    <View style={styles.modelItemActions}>
+                      {isReady ? (
+                        <TouchableOpacity
+                          style={styles.modelItemBtn}
+                          onPress={() => {
+                            ttsStore.setUserTTSOverride(true);
+                            ttsStore.play(`test-preview-${item.id}`, 'Salom! Men sizning PocketPal ovozli yordamchingizman.');
+                          }}>
+                          <Text style={styles.modelItemBtnText}>▶ Ovozni sinash</Text>
+                        </TouchableOpacity>
+                      ) : isDownloading ? (
+                        <View style={[styles.modelItemBtn, styles.modelItemBtnOutline]}>
+                          <Text style={styles.modelItemBtnTextOutline}>Yuklanmoqda...</Text>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          style={styles.modelItemBtn}
+                          onPress={async () => {
+                            ttsStore.setUserTTSOverride(true);
+                            if (item.onDownload) {
+                              await item.onDownload();
+                            }
+                          }}>
+                          <Text style={styles.modelItemBtnText}>📥 Yuklab olish ({item.size})</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
             </View>
 
             {/* Voice selector chips */}

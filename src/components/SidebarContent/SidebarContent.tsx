@@ -22,7 +22,6 @@ import {
   modelStore,
   SessionMetaData,
   uiStore,
-  voiceModeStore,
 } from '../../store';
 import {Menu, RenameModal, Checkbox} from '..';
 import {
@@ -36,7 +35,6 @@ import {
   TrashIcon,
   AppInfoIcon,
   MicrophoneIcon,
-  VoiceWaveformIcon,
   MoonIcon,
   SearchIcon,
   PlusIcon,
@@ -702,21 +700,17 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
               testID="drawer-item-voice-studio"
             />
             <Drawer.Item
-              label="Speak"
+              label="Model API (Server)"
               icon={() => (
-                <VoiceWaveformIcon
+                <ShareIcon
                   width={22}
                   height={22}
-                  color={theme.colors.primary}
+                  stroke={theme.colors.primary}
                 />
               )}
-              onPress={() => {
-                props.navigation.closeDrawer();
-                navigateTo(ROUTES.CHAT);
-                voiceModeStore.triggerVoiceLaunch();
-              }}
+              onPress={() => navigateTo(ROUTES.API_SERVER)}
               style={styles.menuDrawerItem}
-              testID="drawer-item-speak"
+              testID="drawer-item-api-server"
             />
             <Drawer.Item
               label="Dars"

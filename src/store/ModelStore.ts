@@ -1322,7 +1322,8 @@ class ModelStore {
       if (
         this.isAutoReleaseEnabled &&
         this.activeModelId &&
-        this.activeModel?.origin !== ModelOrigin.REMOTE
+        this.activeModel?.origin !== ModelOrigin.REMOTE &&
+        !require('./ApiServerStore').apiServerStore.isRunning
       ) {
         console.log('Inactive → Background: Auto-releasing context');
         this.markAutoReleased(this.activeModelId);
@@ -1334,7 +1335,8 @@ class ModelStore {
       if (
         this.isAutoReleaseEnabled &&
         this.activeModelId &&
-        this.activeModel?.origin !== ModelOrigin.REMOTE
+        this.activeModel?.origin !== ModelOrigin.REMOTE &&
+        !require('./ApiServerStore').apiServerStore.isRunning
       ) {
         console.log('Active → Background: Auto-releasing context');
         this.markAutoReleased(this.activeModelId);

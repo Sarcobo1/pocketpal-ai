@@ -16,6 +16,7 @@ import com.pocketpal.KeepAwakePackage
 import com.pocketpal.HardwareInfoPackage
 import com.pocketpal.NavigationBarPackage
 import com.pocketpal.SpeechStreamPackage
+import com.pocketpal.ApiServerPackage
 import com.pocketpal.download.DownloadPackage
 
 class MainApplication : Application(), ReactApplication {
@@ -31,6 +32,7 @@ class MainApplication : Application(), ReactApplication {
               add(DownloadPackage())
               add(NavigationBarPackage())
               add(SpeechStreamPackage())
+              add(ApiServerPackage())
             }
 
         override fun getJSMainModuleName(): String = "index"

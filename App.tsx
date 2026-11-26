@@ -58,6 +58,7 @@ import {
   AboutScreen,
   DarsScreen,
   VoiceStudioScreen,
+  ApiServerScreen,
 
   // Dev tools screen. Always in a debug build; in a release build after the
   // seven-tap unlock on the About screen.
@@ -226,6 +227,15 @@ const App = observer(() => {
                               options={{
                                 headerStyle: styles.headerWithoutDivider,
                                 title: 'Dars',
+                                headerShown: false,
+                              }}
+                            />
+                            <Drawer.Screen
+                              name={ROUTES.API_SERVER}
+                              component={gestureHandlerRootHOC(ApiServerScreen)}
+                              options={{
+                                headerStyle: styles.headerWithoutDivider,
+                                title: 'Model API',
                                 headerShown: false,
                               }}
                             />

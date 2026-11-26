@@ -7,6 +7,7 @@ export * from './PalsScreen';
 export * from './PlusScreen';
 export * from './SettingsScreen';
 export * from './VoiceStudioScreen';
+export * from './ApiServerScreen';
 
 // Dev tools screen. Only available in debug mode.
 export * from './DevToolsScreen';

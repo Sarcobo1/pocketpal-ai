@@ -8,6 +8,7 @@ export const ROUTES = {
   SETTINGS: 'Settings',
   APP_INFO: 'App Info',
   VOICE_STUDIO: 'VoiceStudio',
+  API_SERVER: 'ApiServer',
 
   // Dars (Lessons) route. Feature-flagged, only shown when FEATURE_DARS is enabled.
   DARS: 'Dars',

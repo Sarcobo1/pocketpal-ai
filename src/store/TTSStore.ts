@@ -1,4 +1,4 @@
-import {AppState, AppStateStatus} from 'react-native';
+import {AppState, AppStateStatus, NativeModules, Platform} from 'react-native';
 
 import {
   makeAutoObservable,
@@ -162,6 +162,13 @@ export class TTSStore {
 
   // Runtime playback state (discriminated union)
   playbackState: TTSPlaybackState = {mode: 'idle'};
+
+  /**
+   * Sub-phase of single-utterance playback (`play` / `preview`):
+   * `'preparing'` while the model/engine loads or synthesizes before the first
+   * audio sample reaches output, then `'speaking'` once audio actually plays.
+   */
+  playbackPhase: 'idle' | 'preparing' | 'speaking' = 'idle';
 
   /**
    * Utterances handed to a player that have not finished sounding.
@@ -826,7 +833,7 @@ export class TTSStore {
     }
   }
 
-  private getDownloadState(id: NeuralEngineId): NeuralDownloadState {
+  getDownloadState(id: NeuralEngineId): NeuralDownloadState {
     switch (id) {
       case 'supertonic':
         return this.supertonicDownloadState;
@@ -852,6 +859,7 @@ export class TTSStore {
     vtrace('tts.stop', {by, mode: state.mode});
     runInAction(() => {
       this.playbackState = {mode: 'idle'};
+      this.playbackPhase = 'idle';
     });
     this.streamStripper = null;
     this.streamPlaceholderEmitted = false;
@@ -986,6 +994,7 @@ export class TTSStore {
 
       const playing = runInAction(() => {
         this.playbackState = {mode: 'playing', messageId};
+        this.playbackPhase = 'preparing';
         return this.playbackState;
       });
 
@@ -994,7 +1003,9 @@ export class TTSStore {
         if (this.playbackState !== playing) {
           return;
         }
-        await this.engineUtterance(voice, spokenText);
+        await this.trackPlaybackPhase(voice, () =>
+          this.engineUtterance(voice, spokenText),
+        );
       } catch (err) {
         console.warn('[TTSStore] play failed:', err);
         if (voice.engine === 'phonon') {
@@ -1004,6 +1015,7 @@ export class TTSStore {
         runInAction(() => {
           if (this.playbackState === playing) {
             this.playbackState = {mode: 'idle'};
+            this.playbackPhase = 'idle';
           }
         });
       }
@@ -1026,6 +1038,67 @@ export class TTSStore {
     }
     await this.play(`notice-${Date.now()}`, text, {voiceOverride: voice});
     return true;
+  }
+
+  /**
+   * Run `utterance` while advancing `playbackPhase` from `'preparing'` to
+   * `'speaking'` only when audio output actually starts (first call to
+   * `neuralAudioPlayer.play`/`playNative`, or immediately before OS speech).
+   */
+  private async trackPlaybackPhase(
+    voice: Voice,
+    utterance: () => Promise<void>,
+  ): Promise<void> {
+    if (voice.engine === 'system') {
+      runInAction(() => {
+        if (this.playbackPhase === 'preparing') {
+          this.playbackPhase = 'speaking';
+        }
+      });
+      await utterance();
+      return;
+    }
+
+    const player = neuralAudioPlayer as
+      | (typeof neuralAudioPlayer & Record<string, any>)
+      | undefined;
+    const savedPlay = player?.play;
+    const savedPlayNative = player?.playNative;
+    const markSpeaking = () => {
+      runInAction(() => {
+        if (this.playbackPhase === 'preparing') {
+          this.playbackPhase = 'speaking';
+        }
+      });
+    };
+
+    if (player && typeof savedPlay === 'function') {
+      player.play = async (
+        ...args: Parameters<typeof neuralAudioPlayer.play>
+      ) => {
+        markSpeaking();
+        return savedPlay.apply(player, args);
+      };
+    }
+    if (player && typeof savedPlayNative === 'function') {
+      player.playNative = async (
+        ...args: Parameters<typeof neuralAudioPlayer.playNative>
+      ) => {
+        markSpeaking();
+        return savedPlayNative.apply(player, args);
+      };
+    }
+
+    try {
+      await utterance();
+    } finally {
+      if (player && savedPlay) {
+        player.play = savedPlay;
+      }
+      if (player && savedPlayNative) {
+        player.playNative = savedPlayNative;
+      }
+    }
   }
 
   /**
@@ -1068,6 +1141,7 @@ export class TTSStore {
       await this.stop();
       const playing = runInAction(() => {
         this.playbackState = {mode: 'playing', messageId};
+        this.playbackPhase = 'preparing';
         return this.playbackState;
       });
       try {
@@ -1075,15 +1149,9 @@ export class TTSStore {
         if (this.playbackState !== playing) {
           return;
         }
-        const engine = getEngine(voice.engine);
-        if (voice.engine === 'supertonic') {
-          await (engine as SupertonicEngine).play(TTS_PREVIEW_SAMPLE, voice, {
-            language: this.supertonicLanguage,
-            inferenceSteps: this.supertonicSteps,
-          });
-        } else {
-          await engine.play(TTS_PREVIEW_SAMPLE, voice);
-        }
+        await this.trackPlaybackPhase(voice, () =>
+          this.engineUtterance(voice, TTS_PREVIEW_SAMPLE),
+        );
       } catch (err) {
         console.warn('[TTSStore] preview failed:', err);
         if (voice.engine === 'phonon') {
@@ -1093,6 +1161,7 @@ export class TTSStore {
         runInAction(() => {
           if (this.playbackState === playing) {
             this.playbackState = {mode: 'idle'};
+            this.playbackPhase = 'idle';
           }
         });
       }
@@ -1805,11 +1874,14 @@ export class TTSStore {
   }
 
   /**
-   * Synthesize `text` with `currentVoice` and save the result as a WAV file
-   * in the app's documents directory (and Downloads on Android if accessible).
-   * Returns the saved file path so the caller can share it, or throws on error.
+   * Synthesize `text` with `currentVoice` and write a WAV file inside
+   * `CachesDirectoryPath/voice-exports` (covered by FileProvider for Android
+   * Share) and copy it into the public Downloads folder on Android via
+   * MediaStore. Returns paths for sharing and user confirmation.
    */
-  async renderToWavFile(text: string): Promise<string> {
+  async renderToWavFile(
+    text: string,
+  ): Promise<{cachePath: string; fileName: string; downloadsPath: string | null}> {
     if (!this.isTTSAvailable || !this.currentVoice) {
       throw new Error('TTS mavjud emas yoki ovoz tanlanmagan');
     }
@@ -1820,7 +1892,8 @@ export class TTSStore {
     }
 
     const RNFS: typeof import('@dr.pogodin/react-native-fs') = require('@dr.pogodin/react-native-fs');
-    const exportDir = `${RNFS.DocumentDirectoryPath}/voice-exports`;
+    const baseDir = RNFS.CachesDirectoryPath || RNFS.DocumentDirectoryPath;
+    const exportDir = `${baseDir}/voice-exports`;
     await RNFS.mkdir(exportDir);
 
     const chunks: Float32Array[] = [];
@@ -1856,18 +1929,26 @@ export class TTSStore {
 
     const wavBytes = float32PcmToWav(merged, sampleRate);
     const fileName = `pocketpal-tts-${Date.now()}.wav`;
-    const dest = `${exportDir}/${fileName}`;
-    await RNFS.writeFile(dest, fromByteArray(wavBytes), 'base64');
+    const cachePath = `${exportDir}/${fileName}`;
+    await RNFS.writeFile(cachePath, fromByteArray(wavBytes), 'base64');
 
-    if (RNFS.DownloadDirectoryPath) {
-      RNFS.writeFile(
-        `${RNFS.DownloadDirectoryPath}/${fileName}`,
-        fromByteArray(wavBytes),
-        'base64',
-      ).catch(() => {});
+    let downloadsPath: string | null = null;
+    if (Platform.OS === 'android') {
+      try {
+        const apiServer = NativeModules.ApiServerModule;
+        if (apiServer?.saveFileToDownloads) {
+          downloadsPath = await apiServer.saveFileToDownloads(
+            cachePath,
+            fileName,
+            'audio/wav',
+          );
+        }
+      } catch (err) {
+        console.warn('[TTSStore] saveFileToDownloads failed:', err);
+      }
     }
 
-    return dest;
+    return {cachePath, fileName, downloadsPath};
   }
 }
 

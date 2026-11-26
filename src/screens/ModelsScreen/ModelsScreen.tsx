@@ -41,7 +41,7 @@ import {L10nContext, isProjectionModel, formatBytes, hfAsModel} from '../../util
 import {Model, ModelOrigin, ModelType} from '../../utils/types';
 import {ErrorState} from '../../utils/errors';
 import type {AsrTier} from '../../services/asr';
-import type {NeuralEngineId} from '../../store/TtsStore';
+import type {NeuralEngineId} from '../../store/TTSStore';
 
 export type ModelCategory = 'hammasi' | 'llm' | 'omni' | 'stt' | 'tts' | 'projector';
 

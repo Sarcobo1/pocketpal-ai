@@ -291,30 +291,30 @@ export const createStyles = (theme: Theme, insetsTop: number, insetsBottom: numb
       fontWeight: '600' as const,
       color: theme.colors.onPrimary,
     },
-    // ---- New TTS action buttons (Eshittirish & Yuklab olish) ----
+    // ---- Clean TTS action buttons (Eshittirish & Yuklab olish) ----
     ttsActionBtn: {
       flexDirection: 'row' as const,
       alignItems: 'center' as const,
       justifyContent: 'center' as const,
       width: '100%',
-      height: 52,
-      borderRadius: 14,
+      height: 50,
+      borderRadius: 12,
       marginBottom: 10,
       gap: 10,
-      shadowColor: '#000',
-      shadowOffset: {width: 0, height: 2},
-      shadowOpacity: 0.18,
-      shadowRadius: 4,
-      elevation: 3,
     },
     ttsActionBtnPlay: {
       backgroundColor: '#059669',
+    },
+    ttsActionBtnPreparing: {
+      backgroundColor: '#0D9488',
     },
     ttsActionBtnStop: {
       backgroundColor: '#DC2626',
     },
     ttsActionBtnDownload: {
-      backgroundColor: '#1D4ED8',
+      backgroundColor: '#1E3A5F',
+      borderWidth: 1,
+      borderColor: '#2B527F',
     },
     ttsActionBtnDisabled: {
       opacity: 0.42,
@@ -324,7 +324,6 @@ export const createStyles = (theme: Theme, insetsTop: number, insetsBottom: numb
       fontFamily: 'Geist-Medium',
       fontWeight: '600' as const,
       color: '#FFFFFF',
-      letterSpacing: 0.2,
     },
     cloneCardHeaderRow: {
       flexDirection: 'row',

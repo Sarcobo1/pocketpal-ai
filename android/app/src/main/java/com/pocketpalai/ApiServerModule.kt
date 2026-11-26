@@ -1,9 +1,14 @@
 package com.pocketpal
 
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.media.MediaScannerConnection
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.provider.Settings
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
@@ -13,6 +18,9 @@ import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import org.json.JSONObject
 import java.io.BufferedInputStream
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.OutputStream
 import java.net.Inet4Address
 import java.net.NetworkInterface
@@ -456,6 +464,73 @@ class ApiServerModule(private val reactContext: ReactApplicationContext) :
       return fallbackIp ?: "127.0.0.1"
     } catch (_: Exception) {
       return "127.0.0.1"
+    }
+  }
+
+  @ReactMethod
+  fun saveFileToDownloads(
+    sourcePath: String,
+    fileName: String,
+    mimeType: String,
+    promise: Promise
+  ) {
+    try {
+      val cleanPath = sourcePath.removePrefix("file://")
+      val srcFile = File(cleanPath)
+      if (!srcFile.exists()) {
+        promise.reject("FILE_NOT_FOUND", "Source file does not exist: $cleanPath")
+        return
+      }
+
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        val resolver = reactContext.contentResolver
+        val values = ContentValues().apply {
+          put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+          put(MediaStore.Downloads.MIME_TYPE, mimeType)
+          put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+          put(MediaStore.Downloads.IS_PENDING, 1)
+        }
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+          ?: throw IllegalStateException("MediaStore insert returned null")
+
+        try {
+          resolver.openOutputStream(uri)?.use { out ->
+            FileInputStream(srcFile).use { input ->
+              input.copyTo(out)
+            }
+          } ?: throw IllegalStateException("Unable to open MediaStore output stream")
+
+          values.clear()
+          values.put(MediaStore.Downloads.IS_PENDING, 0)
+          resolver.update(uri, values, null, null)
+          promise.resolve("Download/$fileName")
+        } catch (e: Exception) {
+          resolver.delete(uri, null, null)
+          throw e
+        }
+      } else {
+        @Suppress("DEPRECATION")
+        val downloadsDir =
+          Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        if (!downloadsDir.exists()) {
+          downloadsDir.mkdirs()
+        }
+        val destFile = File(downloadsDir, fileName)
+        FileInputStream(srcFile).use { input ->
+          FileOutputStream(destFile).use { out ->
+            input.copyTo(out)
+          }
+        }
+        MediaScannerConnection.scanFile(
+          reactContext,
+          arrayOf(destFile.absolutePath),
+          arrayOf(mimeType),
+          null
+        )
+        promise.resolve(destFile.absolutePath)
+      }
+    } catch (e: Exception) {
+      promise.reject("DOWNLOAD_SAVE_ERROR", e.message, e)
     }
   }
 }

@@ -53,6 +53,9 @@ import {firstSpokenSentence} from '../services/voice/speechStream';
 import {speechReasonOf} from '../services/voice/types';
 import type {ModelVoiceSink} from '../services/voice/types';
 import {logPerf, markTurn} from '../utils/mediaPerf';
+import {fromByteArray} from 'base64-js';
+import {neuralAudioPlayer} from '@pocketpalai/react-native-speech/engine-sdk';
+import {float32PcmToWav} from '../services/voice/wav';
 import {vtrace} from '../utils/voiceTrace';
 import {chatSessionStore} from './ChatSessionStore';
 
@@ -1803,47 +1806,67 @@ export class TTSStore {
 
   /**
    * Synthesize `text` with `currentVoice` and save the result as a WAV file
-   * in the app's documents directory. Returns the saved file path so the
-   * caller can share it, or throws on error.
-   *
-   * Implementation: plays the audio normally (which is the only public
-   * synthesis path), then locates the most recent WAV written to
-   * `voiceAudioDir` by the engine. The file is copied to the exports dir
-   * so the user can share it persistently.
+   * in the app's documents directory (and Downloads on Android if accessible).
+   * Returns the saved file path so the caller can share it, or throws on error.
    */
   async renderToWavFile(text: string): Promise<string> {
     if (!this.isTTSAvailable || !this.currentVoice) {
       throw new Error('TTS mavjud emas yoki ovoz tanlanmagan');
     }
+    if (this.currentVoice.engine === 'system') {
+      throw new Error(
+        'Tizim ovozini WAV faylga saqlab bo\'lmaydi. Kokoro, Supertonic yoki Kitten modelini tanlang.',
+      );
+    }
+
     const RNFS: typeof import('@dr.pogodin/react-native-fs') = require('@dr.pogodin/react-native-fs');
     const exportDir = `${RNFS.DocumentDirectoryPath}/voice-exports`;
     await RNFS.mkdir(exportDir);
-    const msgId = `export-${Date.now()}`;
 
-    // Record the files already in voiceAudioDir before synthesis
-    const audioDir = `${(RNFS as any).ExternalDirectoryPath || RNFS.CachesDirectoryPath}/voice-audio`;
-    const before: string[] = await RNFS.exists(audioDir)
-      ? (await RNFS.readDir(audioDir))
-          .filter((f: any) => f.name.endsWith('.wav'))
-          .map((f: any) => f.path)
-      : [];
+    const chunks: Float32Array[] = [];
+    let sampleRate = 24000;
+    const origPlay = neuralAudioPlayer.play.bind(neuralAudioPlayer);
+    neuralAudioPlayer.play = async (audioBuffer: {
+      samples: Float32Array;
+      sampleRate: number;
+    }) => {
+      if (audioBuffer?.samples?.length) {
+        chunks.push(new Float32Array(audioBuffer.samples));
+        sampleRate = audioBuffer.sampleRate || sampleRate;
+      }
+    };
 
-    await this.play(msgId, text);
-
-    // Find newly created WAV (not in `before` set)
-    const beforeSet = new Set(before);
-    const after = await RNFS.exists(audioDir)
-      ? (await RNFS.readDir(audioDir))
-          .filter((f: any) => f.name.endsWith('.wav') && !beforeSet.has(f.path))
-          .sort((a: any, b: any) => Number(b.mtime) - Number(a.mtime))
-      : [];
-
-    if (!after.length) {
-      throw new Error('Audio fayli yaratilmadi');
+    try {
+      await this.play(`export-${Date.now()}`, text);
+    } finally {
+      neuralAudioPlayer.play = origPlay;
     }
-    const src = (after[0] as any).path as string;
-    const dest = `${exportDir}/pocketpal-tts-${Date.now()}.wav`;
-    await RNFS.copyFile(src, dest);
+
+    const totalLen = chunks.reduce((sum, c) => sum + c.length, 0);
+    if (totalLen === 0) {
+      throw new Error('Audio sintez qilinmadi');
+    }
+
+    const merged = new Float32Array(totalLen);
+    let offset = 0;
+    for (const c of chunks) {
+      merged.set(c, offset);
+      offset += c.length;
+    }
+
+    const wavBytes = float32PcmToWav(merged, sampleRate);
+    const fileName = `pocketpal-tts-${Date.now()}.wav`;
+    const dest = `${exportDir}/${fileName}`;
+    await RNFS.writeFile(dest, fromByteArray(wavBytes), 'base64');
+
+    if (RNFS.DownloadDirectoryPath) {
+      RNFS.writeFile(
+        `${RNFS.DownloadDirectoryPath}/${fileName}`,
+        fromByteArray(wavBytes),
+        'base64',
+      ).catch(() => {});
+    }
+
     return dest;
   }
 }

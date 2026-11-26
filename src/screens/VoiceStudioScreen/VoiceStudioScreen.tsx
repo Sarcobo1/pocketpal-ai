@@ -272,8 +272,32 @@ export const VoiceStudioScreen: React.FC = observer(() => {
   // Export synthesized TTS audio as WAV and share
   const handleExportAudio = async () => {
     if (!ttsText.trim()) return;
-    if (!ttsStore.isTTSAvailable || !ttsStore.currentVoice) {
+    if (!ttsStore.isTTSAvailable) {
       Alert.alert('TTS mavjud emas', 'Avval ovoz modelini yuklab oling va tanlang.');
+      return;
+    }
+    if (
+      ttsStore.currentVoice == null ||
+      ttsStore.currentVoice.engine === 'system'
+    ) {
+      const neuralPriority: NeuralEngineId[] = ['kokoro', 'supertonic', 'kitten', 'phonon'];
+      for (const engineId of neuralPriority) {
+        let dlState = '';
+        if (engineId === 'kokoro') dlState = ttsStore.kokoroDownloadState;
+        else if (engineId === 'supertonic') dlState = ttsStore.supertonicDownloadState;
+        else if (engineId === 'kitten') dlState = ttsStore.kittenDownloadState;
+        else if (engineId === 'phonon') dlState = ttsStore.phononDownloadState;
+        if (dlState === 'ready') {
+          await ttsStore.selectEngineVoice(engineId);
+          break;
+        }
+      }
+    }
+    if (!ttsStore.currentVoice || ttsStore.currentVoice.engine === 'system') {
+      Alert.alert(
+        'Neyron TTS modeli kerak',
+        'Audio faylni yuklab olish uchun avval Kokoro, Supertonic yoki Kitten modelini yuklab oling.',
+      );
       return;
     }
     ReactNativeHapticFeedback.trigger('impactMedium', hapticOptions);
@@ -742,7 +766,11 @@ export const VoiceStudioScreen: React.FC = observer(() => {
             {engineVoices.length > 0 && (
               <View style={styles.recommendedSection}>
                 <Text style={styles.recommendedTitle}>🎤 Diapazon (Speaker) tanlash</Text>
-                <View style={styles.voiceChipsRow}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  nestedScrollEnabled
+                  contentContainerStyle={styles.voiceChipsRow}>
                   {engineVoices.map(v => {
                     const isActive = ttsStore.currentVoice?.id === v.id;
                     return (
@@ -757,7 +785,7 @@ export const VoiceStudioScreen: React.FC = observer(() => {
                       </TouchableOpacity>
                     );
                   })}
-                </View>
+                </ScrollView>
               </View>
             )}
 

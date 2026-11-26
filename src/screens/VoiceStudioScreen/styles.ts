@@ -288,8 +288,43 @@ export const createStyles = (theme: Theme, insetsTop: number, insetsBottom: numb
     playButtonText: {
       fontSize: 16,
       fontFamily: 'Geist-Medium',
-      fontWeight: '600',
+      fontWeight: '600' as const,
       color: theme.colors.onPrimary,
+    },
+    // ---- New TTS action buttons (Eshittirish & Yuklab olish) ----
+    ttsActionBtn: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      width: '100%',
+      height: 52,
+      borderRadius: 14,
+      marginBottom: 10,
+      gap: 10,
+      shadowColor: '#000',
+      shadowOffset: {width: 0, height: 2},
+      shadowOpacity: 0.18,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    ttsActionBtnPlay: {
+      backgroundColor: '#059669',
+    },
+    ttsActionBtnStop: {
+      backgroundColor: '#DC2626',
+    },
+    ttsActionBtnDownload: {
+      backgroundColor: '#1D4ED8',
+    },
+    ttsActionBtnDisabled: {
+      opacity: 0.42,
+    },
+    ttsActionBtnText: {
+      fontSize: 15,
+      fontFamily: 'Geist-Medium',
+      fontWeight: '600' as const,
+      color: '#FFFFFF',
+      letterSpacing: 0.2,
     },
     cloneCardHeaderRow: {
       flexDirection: 'row',

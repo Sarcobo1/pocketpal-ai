@@ -7,6 +7,7 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation, DrawerActions} from '@react-navigation/native';
@@ -57,6 +58,8 @@ export const VoiceStudioScreen: React.FC = observer(() => {
   );
   const [speed, setSpeed] = useState(1.0);
   const [isPlaying, setIsPlaying] = useState(false);
+  // isBuffering = TTS is loading/preparing audio (before first sound plays)
+  const [isBuffering, setIsBuffering] = useState(false);
   // Speaker (voice) list for installed engine
   const [engineVoices, setEngineVoices] = useState<Voice[]>([]);
   const [isExporting, setIsExporting] = useState(false);
@@ -191,52 +194,63 @@ export const VoiceStudioScreen: React.FC = observer(() => {
     if (isPlaying) {
       setIsPlaying(false);
       await ttsStore.stop('voice-studio-user');
-    } else {
-      if (!ttsStore.isTTSAvailable) {
-        Alert.alert(
-          'TTS mavjud emas',
-          'Matndan ovozga o\'chirish uchun avval Settings > Voice > TTS modelini yuklab oling.',
-          [{text: 'OK'}],
-        );
-        return;
-      }
-      // If the current voice is null or system but a neural engine is
-      // installed, switch to the best available neural engine automatically.
-      if (
-        ttsStore.currentVoice == null ||
-        ttsStore.currentVoice.engine === 'system'
-      ) {
-        const neuralPriority: NeuralEngineId[] = ['kokoro', 'supertonic', 'kitten', 'phonon'];
-        for (const engineId of neuralPriority) {
-          let dlState = '';
-          if (engineId === 'kokoro') dlState = ttsStore.kokoroDownloadState;
-          else if (engineId === 'supertonic') dlState = ttsStore.supertonicDownloadState;
-          else if (engineId === 'kitten') dlState = ttsStore.kittenDownloadState;
-          else if (engineId === 'phonon') dlState = ttsStore.phononDownloadState;
-          if (dlState === 'ready') {
-            await ttsStore.selectEngineVoice(engineId);
-            break;
-          }
+      return;
+    }
+    if (!ttsStore.isTTSAvailable) {
+      Alert.alert(
+        'TTS mavjud emas',
+        'Matndan ovozga o\'chirish uchun avval Settings > Voice > TTS modelini yuklab oling.',
+        [{text: 'OK'}],
+      );
+      return;
+    }
+    // If the current voice is null or system but a neural engine is
+    // installed, switch to the best available neural engine automatically.
+    if (
+      ttsStore.currentVoice == null ||
+      ttsStore.currentVoice.engine === 'system'
+    ) {
+      const neuralPriority: NeuralEngineId[] = ['kokoro', 'supertonic', 'kitten', 'phonon'];
+      for (const engineId of neuralPriority) {
+        let dlState = '';
+        if (engineId === 'kokoro') dlState = ttsStore.kokoroDownloadState;
+        else if (engineId === 'supertonic') dlState = ttsStore.supertonicDownloadState;
+        else if (engineId === 'kitten') dlState = ttsStore.kittenDownloadState;
+        else if (engineId === 'phonon') dlState = ttsStore.phononDownloadState;
+        if (dlState === 'ready') {
+          await ttsStore.selectEngineVoice(engineId);
+          break;
         }
       }
-      setIsPlaying(true);
-      const msgId = `voice-studio-${Date.now()}`;
-      try {
-        await ttsStore.play(msgId, ttsText);
-      } catch (e) {
-        console.warn('[VoiceStudio] TTS play error:', e);
-      } finally {
-        setIsPlaying(false);
-      }
+    }
+    // Show buffering spinner while audio is being prepared
+    setIsBuffering(true);
+    const msgId = `voice-studio-${Date.now()}`;
+    try {
+      // Start play — this resolves once audio actually begins playing
+      const playPromise = ttsStore.play(msgId, ttsText);
+      // Once the first chunk is queued (a brief moment), flip to "playing"
+      // We use a small timeout to let the native queue register
+      setTimeout(() => {
+        setIsBuffering(false);
+        setIsPlaying(true);
+      }, 300);
+      await playPromise;
+    } catch (e) {
+      console.warn('[VoiceStudio] TTS play error:', e);
+    } finally {
+      setIsBuffering(false);
+      setIsPlaying(false);
     }
   };
 
   // Sync isPlaying with store
   useEffect(() => {
-    if (ttsStore.playbackState.mode === 'idle' && isPlaying) {
+    if (ttsStore.playbackState.mode === 'idle' && (isPlaying || isBuffering)) {
       setIsPlaying(false);
+      setIsBuffering(false);
     }
-  }, [ttsStore.playbackState.mode, isPlaying]);
+  }, [ttsStore.playbackState.mode, isPlaying, isBuffering]);
 
   // Load voices whenever the active neural engine changes
   useEffect(() => {
@@ -304,12 +318,34 @@ export const VoiceStudioScreen: React.FC = observer(() => {
     setIsExporting(true);
     try {
       const path = await ttsStore.renderToWavFile(ttsText);
-      await Share.open({
-        url: `file://${path}`,
-        type: 'audio/wav',
-        filename: `pocketpal-tts-${Date.now()}.wav`,
-        title: 'TTS audio faylini saqlash',
-      });
+      // On Android, Share.open with a file:// path that isn't media-scanned
+      // can crash with a null URI. Use react-native-share with the absolute path:
+      try {
+        await Share.open({
+          url: `file://${path}`,
+          type: 'audio/wav',
+          filename: `pocketpal-tts-${Date.now()}.wav`,
+          title: "Audio faylini saqlash yoki ulashish",
+          failOnCancel: false,
+        });
+      } catch (shareErr: any) {
+        // If Share fails (e.g. null URI crash on some Android versions),
+        // fall back to opening the Downloads folder so user can find the file
+        const RNFS: typeof import('@dr.pogodin/react-native-fs') = require('@dr.pogodin/react-native-fs');
+        if (RNFS.DownloadDirectoryPath) {
+          Alert.alert(
+            'Fayl saqlandi',
+            `Audio fayl yuklab olindi:\nDownloads/pocketpal-tts-*.wav`,
+            [{text: 'OK'}],
+          );
+        } else {
+          Alert.alert(
+            'Fayl tayyor',
+            `Ovoz fayli saqlandi:\n${path}`,
+            [{text: 'OK'}],
+          );
+        }
+      }
     } catch (e: any) {
       if (e?.message !== 'User did not share') {
         Alert.alert('Xatolik', e?.message ?? 'Audio yaratib bo\'lmadi.');
@@ -818,39 +854,51 @@ export const VoiceStudioScreen: React.FC = observer(() => {
               </View>
             </View>
 
-            {/* Play button */}
+            {/* Play / Stop / Buffering button */}
             <TouchableOpacity
-              style={[styles.playButton, (!isTTSReady || !ttsText.trim()) && styles.playButtonDisabled]}
+              style={[
+                styles.ttsActionBtn,
+                isPlaying ? styles.ttsActionBtnStop : styles.ttsActionBtnPlay,
+                (!isTTSReady || !ttsText.trim() || isBuffering) && styles.ttsActionBtnDisabled,
+              ]}
               onPress={handlePlayTts}
-              disabled={!ttsText.trim()}
-              activeOpacity={0.8}>
-              {isPlaying ? (
-                <StopIcon stroke="#fff" width={22} height={22} />
+              disabled={!ttsText.trim() || isBuffering}
+              activeOpacity={0.85}>
+              {isBuffering ? (
+                <ActivityIndicator size="small" color="#fff" style={{marginRight: 8}} />
+              ) : isPlaying ? (
+                <StopIcon stroke="#fff" width={20} height={20} />
               ) : (
-                <PlayIcon stroke="#fff" width={22} height={22} />
+                <PlayIcon stroke="#fff" width={20} height={20} />
               )}
-              <Text style={styles.playButtonText}>
-                {isPlaying ? 'To\'xtatish' : (isTTSReady ? '▷ Eshittirish' : 'TTS yuklanmagan')}
+              <Text style={styles.ttsActionBtnText}>
+                {isBuffering
+                  ? 'Tayyorlanmoqda...'
+                  : isPlaying
+                  ? '⏹  To\'xtatish'
+                  : isTTSReady
+                  ? '▶  Eshittirish'
+                  : 'TTS yuklanmagan'}
               </Text>
             </TouchableOpacity>
 
             {/* Export / Download audio button */}
             <TouchableOpacity
               style={[
-                styles.playButton,
-                {marginTop: 8, backgroundColor: isTTSReady && ttsText.trim() ? '#1E5A7A' : '#374151'},
-                (!isTTSReady || !ttsText.trim() || isExporting) && styles.playButtonDisabled,
+                styles.ttsActionBtn,
+                styles.ttsActionBtnDownload,
+                (!isTTSReady || !ttsText.trim() || isExporting) && styles.ttsActionBtnDisabled,
               ]}
               onPress={handleExportAudio}
               disabled={!isTTSReady || !ttsText.trim() || isExporting}
-              activeOpacity={0.8}>
+              activeOpacity={0.85}>
               {isExporting ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color="#fff" style={{marginRight: 8}} />
               ) : (
-                <UploadIcon stroke="#fff" width={20} height={20} />
+                <UploadIcon stroke="#fff" width={19} height={19} />
               )}
-              <Text style={styles.playButtonText}>
-                {isExporting ? 'Sintez qilinmoqda...' : '⬇ Audio yuklab olish (WAV)'}
+              <Text style={styles.ttsActionBtnText}>
+                {isExporting ? 'Sintez qilinmoqda...' : '⬇  Audio yuklab olish (WAV)'}
               </Text>
             </TouchableOpacity>
 
